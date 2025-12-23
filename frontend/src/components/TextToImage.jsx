@@ -10,6 +10,7 @@ import { Switch } from "./ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { useToast } from "../hooks/useToast";
+import { ModelSelector } from "./ModelSelector";
 
 const SIZES = [
   { value: "256x256", label: "256 x 256" },
@@ -36,7 +37,7 @@ const STYLE_OPTIONS = [
   { value: "natural", label: "Natural" },
 ];
 
-export function TextToImage({ onGenerated, settings, selectedModel }) {
+export function TextToImage({ onGenerated, settings, selectedModel, onModelChange }) {
   const { addToast } = useToast();
   const { generateQueued, isLoading, result } = useImageGeneration();
 
@@ -105,6 +106,15 @@ export function TextToImage({ onGenerated, settings, selectedModel }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Model Selector */}
+        <div className="space-y-2">
+          <ModelSelector
+            currentModel={selectedModel}
+            onModelChange={onModelChange}
+            className="w-full"
+          />
+        </div>
+
         {/* Prompt */}
         <div className="space-y-2">
           <Label htmlFor="prompt">Prompt *</Label>

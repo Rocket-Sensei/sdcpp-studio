@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { useToast } from "../hooks/useToast";
+import { ModelSelector } from "./ModelSelector";
 
 const SIZES = [
   { value: "256x256", label: "256 x 256" },
@@ -21,7 +22,7 @@ const MODE_OPTIONS = [
   { value: "variation", label: "Variation" },
 ];
 
-export function ImageToImage({ onGenerated, selectedModel }) {
+export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
   const { addToast } = useToast();
   const { generate, isLoading, result } = useImageGeneration();
 
@@ -106,6 +107,15 @@ export function ImageToImage({ onGenerated, selectedModel }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Model Selector */}
+        <div className="space-y-2">
+          <ModelSelector
+            currentModel={selectedModel}
+            onModelChange={onModelChange}
+            className="w-full"
+          />
+        </div>
+
         {/* Source Image Upload */}
         <div className="space-y-2">
           <Label>Source Image *</Label>

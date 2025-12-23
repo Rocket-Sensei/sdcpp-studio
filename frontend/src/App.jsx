@@ -7,7 +7,6 @@ import { ImageToImage } from "./components/ImageToImage";
 import { History } from "./components/History";
 import { Queue } from "./components/Queue";
 import { ModelManager } from "./components/ModelManager";
-import { ModelSelector } from "./components/ModelSelector";
 import { Button } from "./components/ui/button";
 import { useGenerations } from "./hooks/useImageGeneration";
 
@@ -64,13 +63,6 @@ function App() {
                   ))}
                 </TabsList>
               </Tabs>
-
-              {/* Model Selector */}
-              <ModelSelector
-                currentModel={currentModel}
-                onModelChange={setCurrentModel}
-                className="flex-shrink-0"
-              />
             </div>
           </div>
         </header>
@@ -83,6 +75,7 @@ function App() {
                 onGenerated={handleGenerated}
                 settings={createMoreSettings}
                 selectedModel={currentModel}
+                onModelChange={setCurrentModel}
               />
             </TabsContent>
 
@@ -90,6 +83,7 @@ function App() {
               <ImageToImage
                 onGenerated={handleGenerated}
                 selectedModel={currentModel}
+                onModelChange={setCurrentModel}
               />
             </TabsContent>
 
