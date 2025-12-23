@@ -1,4 +1,3 @@
-import FormData from 'form-data';
 import { randomUUID } from 'crypto';
 import { createGeneration, createGeneratedImage } from '../db/queries.js';
 import { getModelManager } from './modelManager.js';
@@ -47,10 +46,9 @@ export async function generateImageDirect(params, mode = 'generate') {
   const finalPrompt = `${processedPrompt}<sd_cpp_extra_args>${JSON.stringify(extraArgs)}</sd_cpp_extra_args>`;
 
   let requestBody;
-  let headers = {};
 
   if (isFormData && params.image) {
-    // For edit/variation with image upload
+    // For edit/variation with image upload - use native FormData
     const formData = new FormData();
 
     // Build prompt string with negative prompt if present
@@ -61,23 +59,22 @@ export async function generateImageDirect(params, mode = 'generate') {
 
     formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
     formData.append('prompt', promptString);
-    formData.append('image', params.image.buffer, {
-      filename: 'image.png',
-      contentType: params.image.mimetype
-    });
+
+    // Convert buffer to Blob for FormData
+    const imageBlob = new Blob([params.image.buffer], { type: params.image.mimetype || 'image/png' });
+    formData.append('image', imageBlob, 'image.png');
+
     formData.append('n', params.n || 1);
     formData.append('size', params.size || '512x512');
     formData.append('response_format', 'b64_json');
 
     if (params.mask) {
-      formData.append('mask', params.mask.buffer, {
-        filename: 'mask.png',
-        contentType: params.mask.mimetype
-      });
+      const maskBlob = new Blob([params.mask.buffer], { type: params.mask.mimetype || 'image/png' });
+      formData.append('mask', maskBlob, 'mask.png');
     }
 
     requestBody = formData;
-    headers = formData.getHeaders();
+    // Don't set Content-Type header - let fetch set it with boundary
   } else {
     // For text-to-image
     // Build prompt string with negative prompt if present
@@ -124,12 +121,8 @@ export async function generateImageDirect(params, mode = 'generate') {
   // Make API request
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': isFormData ? undefined : 'application/json',
-      ...headers
-    },
-    body: isFormData ? requestBody.getBuffer() : JSON.stringify(requestBody),
-    duplex: isFormData ? 'half' : undefined
+    headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
+    body: isFormData ? requestBody : JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
@@ -175,10 +168,9 @@ export async function generateImage(params, mode = 'generate') {
   const finalPrompt = `${processedPrompt}<sd_cpp_extra_args>${JSON.stringify(extraArgs)}</sd_cpp_extra_args>`;
 
   let requestBody;
-  let headers = {};
 
   if (isFormData && params.image) {
-    // For edit/variation with image upload
+    // For edit/variation with image upload - use native FormData
     const formData = new FormData();
 
     // Build prompt string with negative prompt if present
@@ -189,23 +181,22 @@ export async function generateImage(params, mode = 'generate') {
 
     formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
     formData.append('prompt', promptString);
-    formData.append('image', params.image.buffer, {
-      filename: 'image.png',
-      contentType: params.image.mimetype
-    });
+
+    // Convert buffer to Blob for FormData
+    const imageBlob = new Blob([params.image.buffer], { type: params.image.mimetype || 'image/png' });
+    formData.append('image', imageBlob, 'image.png');
+
     formData.append('n', params.n || 1);
     formData.append('size', params.size || '512x512');
     formData.append('response_format', 'b64_json');
 
     if (params.mask) {
-      formData.append('mask', params.mask.buffer, {
-        filename: 'mask.png',
-        contentType: params.mask.mimetype
-      });
+      const maskBlob = new Blob([params.mask.buffer], { type: params.mask.mimetype || 'image/png' });
+      formData.append('mask', maskBlob, 'mask.png');
     }
 
     requestBody = formData;
-    headers = formData.getHeaders();
+    // Don't set Content-Type header - let fetch set it with boundary
   } else {
     // For text-to-image
     // Build prompt string with negative prompt if present
@@ -252,12 +243,8 @@ export async function generateImage(params, mode = 'generate') {
   // Make API request
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': isFormData ? undefined : 'application/json',
-      ...headers
-    },
-    body: isFormData ? requestBody.getBuffer() : JSON.stringify(requestBody),
-    duplex: isFormData ? 'half' : undefined
+    headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
+    body: isFormData ? requestBody : JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
