@@ -1,20 +1,147 @@
 # Default model (used when no specific model requested)
-default: fluxed-up-flux
+default: qwen-image
 
 # Models configuration
 models:
+  # ==================== Qwen Image Models (Server Mode) ====================
+  qwen-image:
+    name: "Qwen Image"
+    description: "Qwen Image - advanced text-to-image model with complex text rendering and precise image editing capabilities"
+    # Server mode command
+    command: "./bin/sd-server"
+    args:
+      - "-l"
+      - "0.0.0.0"
+      - "--listen-port"
+      - "1236"
+      - "--diffusion-model"
+      - "./models/Qwen_Image-Q4_K_M.gguf"
+      - "--vae"
+      - "./models/qwen_image_vae.safetensors"
+      - "--qwen2vl"
+      - "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+      - "--cfg-scale"
+      - "2.5"
+      - "--sampling-method"
+      - "euler"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--diffusion-fa"
+      - "--flow-shift"
+      - "3"
+    api: "http://localhost:1236/v1"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1236
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    huggingface:
+      repo: "QuantStack/Qwen-Image-GGUF"
+      files:
+        - path: "Qwen_Image-Q4_K_M.gguf"
+          dest: "./models/"
+        - path: "qwen_image_vae.safetensors"
+          dest: "./models/"
+          repo: "Comfy-Org/Qwen-Image_ComfyUI"
+          subpath: "split_files/vae"
+        - path: "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+          dest: "./models/"
+          repo: "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF"
+
+  qwen-image-edit:
+    name: "Qwen Image Edit"
+    description: "Qwen Image Edit - image-to-image editing model with object manipulation and style transformation"
+    command: "./bin/sd-server"
+    args:
+      - "-l"
+      - "0.0.0.0"
+      - "--listen-port"
+      - "1237"
+      - "--diffusion-model"
+      - "./models/Qwen-Image-Edit-2509-Q4_K_M.gguf"
+      - "--vae"
+      - "./models/qwen_image_vae.safetensors"
+      - "--qwen2vl"
+      - "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+      - "--cfg-scale"
+      - "2.5"
+      - "--sampling-method"
+      - "euler"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--diffusion-fa"
+      - "--flow-shift"
+      - "3"
+    api: "http://localhost:1237/v1"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1237
+    model_type: "image-to-image"
+    default_size: "1024x1024"
+    huggingface:
+      repo: "QuantStack/Qwen-Image-GGUF"
+      files:
+        - path: "Qwen-Image-Edit-2509-Q4_K_M.gguf"
+          dest: "./models/"
+        - path: "qwen_image_vae.safetensors"
+          dest: "./models/"
+          repo: "Comfy-Org/Qwen-Image_ComfyUI"
+          subpath: "split_files/vae"
+        - path: "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+          dest: "./models/"
+          repo: "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF"
+
+  # ==================== Z-Image Turbo (CLI Mode) ====================
+  z-image-turbo:
+    name: "Z-Image Turbo"
+    description: "Z-Image Turbo - fast text-to-image model with 4GB VRAM support"
+    # CLI mode command (one-shot generation)
+    command: "./bin/sd-cli"
+    args:
+      - "--diffusion-model"
+      - "./models/z_image_turbo-Q8_0.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--llm"
+      - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-p"
+      - "A cinematic photograph"
+      - "--cfg-scale"
+      - "1.0"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--diffusion-fa"
+      - "-H"
+      - "1024"
+      - "-W"
+      - "1024"
+    api: null  # CLI mode
+    mode: "on_demand"
+    exec_mode: "cli"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    huggingface:
+      repo: "leejet/Z-Image-Turbo-GGUF"
+      files:
+        - path: "z_image_turbo-Q8_0.gguf"
+          dest: "./models/"
+        - path: "ae.safetensors"
+          dest: "./models/"
+          repo: "black-forest-labs/FLUX.1-schnell"
+        - path: "Qwen3-4B-Instruct-2507-Q8_0.gguf"
+          dest: "./models/"
+          repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF"
+
+  # ==================== Flux Models ====================
   fluxed-up-flux:
-    # Display name
     name: "FluxedUp Flux NSFW"
-    # Description
     description: "High quality flux model with NSFW support"
-    # Command template to start SD-CPP in server mode
-    command: "./build/bin/sd-server"
+    command: "./bin/sd-server"
     args:
       - "-l"
       - "0.0.0.0"
       - "--diffusion-model"
-      - "/media/nvme/sdnext/models/UNET/fluxedUpFluxNSFW_v51Q4KSV2.gguf"
+      - "./models/fluxedUpFluxNSFW_v51Q4KSV2.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--clip_l"
@@ -29,25 +156,23 @@ models:
       - "euler"
       - "-v"
       - "--clip-on-cpu"
-    # API endpoint when server is running
     api: "http://localhost:1234/v1"
-    # Mode: on_demand (start/stop per request) or preload (keep running)
     mode: "on_demand"
-    # Execution mode: server (long-running) or cli (one-shot per image)
     exec_mode: "server"
-    # Port to use (auto-assigned if not specified)
     port: 1234
-    # HuggingFace model info for downloads
+    model_type: "text-to-image"
+    default_size: "1024x1024"
     huggingface:
       repo: "gel基础/fluxedUpFluxNSFW_v51Q4KSV2"
       files:
         - path: "fluxedUpFluxNSFW_v51Q4KSV2.gguf"
-          dest: "/media/nvme/sdnext/models/UNET/"
+          dest: "./models/"
 
+  # ==================== Stable Diffusion Models ====================
   sd15-base:
     name: "SD 1.5 Base"
     description: "Stable Diffusion 1.5 base model"
-    command: "./build/bin/sd-server"
+    command: "./bin/sd-server"
     args:
       - "-l"
       - "0.0.0.0"
@@ -59,6 +184,8 @@ models:
     mode: "preload"
     exec_mode: "server"
     port: 1235
+    model_type: "text-to-image"
+    default_size: "512x512"
     huggingface:
       repo: "runwayml/stable-diffusion-v1-5"
       files:
@@ -68,13 +195,15 @@ models:
   sdxl-turbo:
     name: "SDXL Turbo"
     description: "Fast SDXL Turbo for quick generations"
-    command: "./build/bin/sd"
+    command: "./bin/sd-cli"
     args:
       - "-m"
       - "./models/sd_xl_turbo_1.0_fp16.safetensors"
-    api: null  # CLI mode doesn't have an API
+    api: null
     mode: "on_demand"
     exec_mode: "cli"
+    model_type: "text-to-image"
+    default_size: "512x512"
     huggingface:
       repo: "stabilityai/sdxl-turbo"
       files:

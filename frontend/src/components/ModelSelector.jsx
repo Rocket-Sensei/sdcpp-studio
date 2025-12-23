@@ -51,7 +51,9 @@ export function ModelSelector({ currentModel, onModelChange, className = "" }) {
 
       // Set default model if none selected
       if (!currentModel && data.default) {
-        onModelChange?.(data.default);
+        // data.default might be an object (with id property) or a string
+        const defaultModelId = typeof data.default === 'object' ? data.default.id : data.default;
+        onModelChange?.(defaultModelId);
       }
       setError(null);
     } catch (err) {

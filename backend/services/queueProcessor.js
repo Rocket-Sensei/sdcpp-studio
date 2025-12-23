@@ -265,6 +265,9 @@ async function processGenerateJob(job, modelConfig) {
     n: job.n,
     quality: job.quality,
     style: job.style,
+    response_format: 'b64_json',
+    user_id: job.user_id || null,
+    source_image_id: job.source_image_id || null,
   });
 
   updateJobProgress(job.id, 0.85, 'Saving images...');
@@ -300,7 +303,8 @@ async function processGenerateJob(job, modelConfig) {
  */
 async function processHTTPGeneration(job, modelConfig, params) {
   // Build the request with model-specific API endpoint
-  const apiUrl = modelConfig.api;
+  // Replace localhost with 127.0.0.1 to avoid IPv6 issues with Node.js fetch
+  const apiUrl = modelConfig.api.replace('localhost', '127.0.0.1');
 
   // Parse SD-specific extra args from prompt
   let processedPrompt = params.prompt || '';
@@ -448,7 +452,11 @@ async function processEditJob(job, modelConfig) {
     size: job.size,
     seed: job.seed,
     n: params.n,
-    source_image_id: job.source_image_id,
+    quality: job.quality,
+    style: job.style,
+    response_format: 'b64_json',
+    user_id: job.user_id || null,
+    source_image_id: job.source_image_id || null,
   });
 
   updateJobProgress(job.id, 0.85, 'Saving images...');
@@ -523,7 +531,11 @@ async function processVariationJob(job, modelConfig) {
     size: job.size,
     seed: job.seed,
     n: params.n,
-    source_image_id: job.source_image_id,
+    quality: job.quality,
+    style: job.style,
+    response_format: 'b64_json',
+    user_id: job.user_id || null,
+    source_image_id: job.source_image_id || null,
   });
 
   updateJobProgress(job.id, 0.85, 'Saving images...');

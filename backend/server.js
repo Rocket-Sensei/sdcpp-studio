@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { config } from 'dotenv';
 import { initializeDatabase, getImagesDir } from './db/database.js';
 import { generateImage } from './services/imageService.js';
 import { getAllGenerations, getGenerationById, getImageById, getImagesByGenerationId } from './db/queries.js';
@@ -13,13 +14,31 @@ import { startQueueProcessor } from './services/queueProcessor.js';
 // Model management services
 import { modelManager } from './services/modelManager.js';
 import { processTracker } from './services/processTracker.js';
-import { modelDownloader } from './services/modelDownloader.js';
+import { modelDownloader, getDownloadMethod } from './services/modelDownloader.js';
+
+// Load environment variables from .env file
+const envResult = config({
+  path: path.join(dirname(fileURLToPath(import.meta.url)), '.env')
+});
+
+if (envResult.error) {
+  // .env file is optional, log but don't fail
+  console.log('Note: .env file not found, using environment variables');
+}
+
+// Log HuggingFace token status
+if (process.env.HF_TOKEN) {
+  console.log('HuggingFace token configured for authenticated downloads');
+} else {
+  console.log('No HuggingFace token found (HF_TOKEN not set)');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';  // Default to all interfaces
 
 // Middleware
 app.use(cors());
@@ -186,16 +205,20 @@ app.delete('/api/generations/:id', async (req, res) => {
 // Add job to queue (text-to-image)
 app.post('/api/queue/generate', async (req, res) => {
   try {
-    const job = addToQueue({
+    const params = {
       type: 'generate',
-      model: req.body.model || 'sd-cpp-local',
       prompt: req.body.prompt,
       negative_prompt: req.body.negative_prompt,
       size: req.body.size,
       n: req.body.n,
       quality: req.body.quality,
       style: req.body.style,
-    });
+    };
+    // Only include model if provided
+    if (req.body.model) {
+      params.model = req.body.model;
+    }
+    const job = addToQueue(params);
     res.json({ job_id: job.id, status: job.status });
   } catch (error) {
     console.error('Error adding to queue:', error);
@@ -206,15 +229,19 @@ app.post('/api/queue/generate', async (req, res) => {
 // Add job to queue (image-to-image edit)
 app.post('/api/queue/edit', upload.single('image'), async (req, res) => {
   try {
-    const job = addToQueue({
+    const params = {
       type: 'edit',
-      model: req.body.model || 'sd-cpp-local',
       prompt: req.body.prompt,
       negative_prompt: req.body.negative_prompt,
       size: req.body.size,
       n: req.body.n,
       source_image_id: req.body.source_image_id,
-    });
+    };
+    // Only include model if provided
+    if (req.body.model) {
+      params.model = req.body.model;
+    }
+    const job = addToQueue(params);
     res.json({ job_id: job.id, status: job.status });
   } catch (error) {
     console.error('Error adding to queue:', error);
@@ -225,15 +252,19 @@ app.post('/api/queue/edit', upload.single('image'), async (req, res) => {
 // Add job to queue (variation)
 app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
   try {
-    const job = addToQueue({
+    const params = {
       type: 'variation',
-      model: req.body.model || 'sd-cpp-local',
       prompt: req.body.prompt,
       negative_prompt: req.body.negative_prompt,
       size: req.body.size,
       n: req.body.n,
       source_image_id: req.body.source_image_id,
-    });
+    };
+    // Only include model if provided
+    if (req.body.model) {
+      params.model = req.body.model;
+    }
+    const job = addToQueue(params);
     res.json({ job_id: job.id, status: job.status });
   } catch (error) {
     console.error('Error adding to queue:', error);
@@ -302,16 +333,81 @@ app.get('/api/queue/stats', async (req, res) => {
 app.get('/api/models', async (req, res) => {
   try {
     const models = modelManager.getAllModels();
+    // getAllModels() returns an array, so we need to handle it properly
     res.json({
-      models: Object.entries(models).map(([id, config]) => ({
-        id,
-        ...config,
-        running: modelManager.isModelRunning(id)
-      })),
+      models: models,
       default: modelManager.getDefaultModel()
     });
   } catch (error) {
     console.error('Error fetching models:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/models/running
+ * Get list of currently running models
+ * NOTE: This route must be defined BEFORE /api/models/:id to avoid "running" being treated as a model ID
+ */
+app.get('/api/models/running', async (req, res) => {
+  try {
+    const runningModels = modelManager.getRunningModels();
+    const processes = processTracker.getAllProcesses();
+
+    const result = runningModels.map(modelId => {
+      const model = modelManager.getModel(modelId);
+      const processInfo = processes.find(p => p.modelId === modelId);
+
+      return {
+        id: modelId,
+        name: model?.name || modelId,
+        pid: processInfo?.pid,
+        port: processInfo?.port,
+        execMode: processInfo?.execMode,
+        startedAt: processInfo?.startedAt,
+        api: model?.api || null
+      };
+    });
+
+    res.json({
+      count: result.length,
+      models: result
+    });
+  } catch (error) {
+    console.error('Error fetching running models:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/models/downloaded
+ * Get list of downloaded models
+ * NOTE: This route must be defined BEFORE /api/models/:id to avoid "downloaded" being treated as a model ID
+ */
+app.get('/api/models/downloaded', async (req, res) => {
+  try {
+    const downloadedModels = modelDownloader.getDownloadedModels();
+    const allModels = modelManager.getAllModels();
+
+    // Enrich with model configuration details
+    const result = downloadedModels.map(dm => {
+      const modelConfig = allModels.find(m => m.id === dm.modelId);
+      return {
+        modelId: dm.modelId,
+        name: modelConfig?.name || dm.modelId,
+        files: dm.files,
+        downloadedAt: dm.downloadedAt,
+        totalSize: dm.totalSize,
+        huggingfaceRepo: modelConfig?.huggingface?.repo || null
+      };
+    });
+
+    res.json({
+      count: result.length,
+      models: result
+    });
+  } catch (error) {
+    console.error('Error fetching downloaded models:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -572,33 +668,104 @@ app.delete('/api/models/download/:id', async (req, res) => {
 });
 
 /**
- * GET /api/models/downloaded
- * Get list of downloaded models
+ * GET /api/models/:id/files/status
+ * Check if model files exist on disk
  */
-app.get('/api/models/downloaded', async (req, res) => {
+app.get('/api/models/:id/files/status', async (req, res) => {
   try {
-    const downloadedModels = modelDownloader.getDownloadedModels();
-    const allModels = modelManager.getAllModels();
+    const { existsSync } = await import('fs');
+    const { join, dirname, basename, resolve } = await import('path');
 
-    // Enrich with model configuration details
-    const result = downloadedModels.map(dm => {
-      const modelConfig = allModels[dm.modelId];
+    const modelId = req.params.id;
+    const model = modelManager.getModel(modelId);
+
+    if (!model) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+
+    if (!model.huggingface || !model.huggingface.files) {
+      return res.json({
+        modelId,
+        hasHuggingFace: false,
+        files: []
+      });
+    }
+
+    // Get project root path (backend/..)
+    const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+    // Check each file
+    const fileStatus = model.huggingface.files.map(file => {
+      // Use the dest from config, or fall back to MODELS_DIR env, or ./models
+      const destDir = file.dest || process.env.MODELS_DIR || './models';
+
+      // Resolve the path from the project root
+      // If destDir is relative (starts with . or not starting with /), resolve it from project root
+      const resolvedDestDir = resolve(projectRoot, destDir);
+      const fileName = basename(file.path);
+      const filePath = join(resolvedDestDir, fileName);
+      const exists = existsSync(filePath);
+
       return {
-        modelId: dm.modelId,
-        name: modelConfig?.name || dm.modelId,
-        files: dm.files,
-        downloadedAt: dm.downloadedAt,
-        totalSize: dm.totalSize,
-        huggingfaceRepo: modelConfig?.huggingface?.repo || null
+        path: file.path,
+        dest: file.dest,
+        filePath,
+        resolvedDestDir,
+        exists,
+        fileName
       };
     });
 
+    const allExist = fileStatus.every(f => f.exists);
+
     res.json({
-      count: result.length,
-      models: result
+      modelId,
+      hasHuggingFace: true,
+      allFilesExist: allExist,
+      files: fileStatus
     });
   } catch (error) {
-    console.error('Error fetching downloaded models:', error);
+    console.error('Error checking model files:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/models/:id/download
+ * Download model files from HuggingFace based on model config
+ */
+app.post('/api/models/:id/download', async (req, res) => {
+  try {
+    const modelId = req.params.id;
+    const model = modelManager.getModel(modelId);
+
+    if (!model) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+
+    if (!model.huggingface || !model.huggingface.files) {
+      return res.status(400).json({ error: 'Model has no HuggingFace configuration' });
+    }
+
+    // Start the download
+    const downloadId = await modelDownloader.downloadModel(
+      model.huggingface.repo,
+      model.huggingface.files,
+      (progress) => {
+        console.log(`Download ${modelId} progress:`, progress);
+      }
+    );
+
+    res.json({
+      success: true,
+      downloadId,
+      modelId,
+      repo: model.huggingface.repo,
+      status: 'downloading',
+      message: `Download started for ${model.name}`
+    });
+  } catch (error) {
+    console.error('Error starting download:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -608,11 +775,31 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`SD API endpoint: ${process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1234/v1'}`);
+app.listen(PORT, HOST, async () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
+  console.log(`SD API endpoint: ${process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1231/v1'}`);
+
+  // Initialize model manager
+  try {
+    modelManager.loadConfig();
+    const allModels = modelManager.getAllModels();
+    const defaultModel = modelManager.getDefaultModel();
+    console.log(`Model manager initialized: ${allModels.length} models loaded`);
+    console.log(`Default model: ${defaultModel?.id || defaultModel?.name || 'none'}`);
+  } catch (error) {
+    console.error(`Failed to load model configuration: ${error.message}`);
+  }
 
   // Start the queue processor
   startQueueProcessor(2000);
   console.log(`Queue processor started (polling every 2 seconds)`);
+
+  // Log download method info
+  const downloadMethod = await getDownloadMethod();
+  console.log(`Download method: ${downloadMethod}`);
+
+  // Log HuggingFace cache directories
+  console.log(`Python HF Hub cache: ${process.env.HF_HUB_CACHE || process.env.HUGGINGFACE_HUB_CACHE || './models/hf_cache/hub'}`);
+  console.log(`Node.js cache: ${process.env.NODE_HF_CACHE || './models/hf_cache/node'}`);
+  console.log(`Models directory: ${process.env.MODELS_DIR || './models'}`);
 });

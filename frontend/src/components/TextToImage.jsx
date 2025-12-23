@@ -36,7 +36,7 @@ const STYLE_OPTIONS = [
   { value: "natural", label: "Natural" },
 ];
 
-export function TextToImage({ onGenerated, settings }) {
+export function TextToImage({ onGenerated, settings, selectedModel }) {
   const { addToast } = useToast();
   const { generateQueued, isLoading, result } = useImageGeneration();
 
@@ -71,7 +71,7 @@ export function TextToImage({ onGenerated, settings }) {
     try {
       const params = {
         mode: 'generate',
-        model: 'sd-cpp-local',
+        model: selectedModel?.id || undefined, // Use selected model, undefined will use default
         prompt,
         negative_prompt: negativePrompt,
         size,

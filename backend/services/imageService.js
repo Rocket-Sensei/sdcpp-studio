@@ -57,7 +57,7 @@ export async function generateImageDirect(params, mode = 'generate') {
       promptString = `${finalPrompt}<negative_prompt>${negativePrompt}</negative_prompt>`;
     }
 
-    formData.append('model', params.model || 'sd-cpp-local');
+    formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
     formData.append('prompt', promptString);
     formData.append('image', params.image.buffer, {
       filename: 'image.png',
@@ -174,7 +174,7 @@ export async function generateImage(params, mode = 'generate') {
       promptString = `${finalPrompt}<negative_prompt>${negativePrompt}</negative_prompt>`;
     }
 
-    formData.append('model', params.model || 'sd-cpp-local');
+    formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
     formData.append('prompt', promptString);
     formData.append('image', params.image.buffer, {
       filename: 'image.png',
@@ -247,7 +247,7 @@ export async function generateImage(params, mode = 'generate') {
   await createGeneration({
     id: generationId,
     type: mode,
-    model: params.model || 'sd-cpp-local',
+    model: params.model || 'sd-cpp-local', // Note: legacy fallback, should use actual model ID
     prompt: processedPrompt,
     negative_prompt: negativePrompt,
     size: params.size || '512x512',

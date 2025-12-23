@@ -21,7 +21,7 @@ const MODE_OPTIONS = [
   { value: "variation", label: "Variation" },
 ];
 
-export function ImageToImage({ onGenerated }) {
+export function ImageToImage({ onGenerated, selectedModel }) {
   const { addToast } = useToast();
   const { generate, isLoading, result } = useImageGeneration();
 
@@ -80,7 +80,7 @@ export function ImageToImage({ onGenerated }) {
     try {
       await generate({
         mode,
-        model: 'sd-cpp-local',
+        model: selectedModel?.id || undefined, // Use selected model, undefined will use default
         prompt,
         negative_prompt: negativePrompt,
         size,

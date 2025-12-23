@@ -19,6 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Default paths
+const PROJECT_ROOT = path.join(__dirname, '../..');  // Project root (two levels up from backend/services/)
 const DEFAULT_CONFIG_PATH = path.join(__dirname, '../config/models.yml');
 
 // Model status constants
@@ -351,7 +352,7 @@ export class ModelManager {
 
       // Spawn process
       const processOptions = {
-        cwd: options.cwd || process.cwd(),
+        cwd: options.cwd || PROJECT_ROOT,  // Default to project root so paths resolve correctly
         env: { ...process.env, ...options.env },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false
@@ -814,3 +815,8 @@ export function getModelManager(options = {}) {
 export default function createModelManager(options = {}) {
   return new ModelManager(options);
 }
+
+/**
+ * Singleton instance - automatically initialized on import
+ */
+export const modelManager = getModelManager();

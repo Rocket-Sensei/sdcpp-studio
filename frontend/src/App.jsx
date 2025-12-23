@@ -79,11 +79,18 @@ function App() {
         <main className="container mx-auto px-4 py-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsContent value="text-to-image" className="max-w-2xl mx-auto mt-0">
-              <TextToImage onGenerated={handleGenerated} settings={createMoreSettings} />
+              <TextToImage
+                onGenerated={handleGenerated}
+                settings={createMoreSettings}
+                selectedModel={currentModel}
+              />
             </TabsContent>
 
             <TabsContent value="image-to-image" className="max-w-2xl mx-auto mt-0">
-              <ImageToImage onGenerated={handleGenerated} />
+              <ImageToImage
+                onGenerated={handleGenerated}
+                selectedModel={currentModel}
+              />
             </TabsContent>
 
             <TabsContent value="queue" className="max-w-4xl mx-auto mt-0">

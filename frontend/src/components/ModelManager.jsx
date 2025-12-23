@@ -94,6 +94,7 @@ export function ModelManager() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [modelFilesStatus, setModelFilesStatus] = useState({});
   const { addToast } = useToast();
 
   // Fetch all models
@@ -102,7 +103,15 @@ export function ModelManager() {
       const response = await fetch("/api/models");
       if (response.ok) {
         const data = await response.json();
-        setModels(data.models || []);
+        const modelsList = data.models || [];
+        setModels(modelsList);
+
+        // Fetch file status for each model with HuggingFace config
+        for (const model of modelsList) {
+          if (model.huggingface) {
+            fetchModelFilesStatus(model.id);
+          }
+        }
       } else {
         throw new Error("Failed to fetch models");
       }
@@ -114,6 +123,22 @@ export function ModelManager() {
       setIsRefreshing(false);
     }
   }, [addToast]);
+
+  // Fetch model files status
+  const fetchModelFilesStatus = useCallback(async (modelId) => {
+    try {
+      const response = await fetch(`/api/models/${modelId}/files/status`);
+      if (response.ok) {
+        const data = await response.json();
+        setModelFilesStatus(prev => ({
+          ...prev,
+          [modelId]: data
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching model files status:", error);
+    }
+  }, []);
 
   // Refresh model statuses
   const refreshModels = async () => {
@@ -167,27 +192,30 @@ export function ModelManager() {
 
   // Download a model
   const downloadModel = async (modelId) => {
-    setSelectedModel(models.find((m) => m.id === modelId));
+    const model = models.find((m) => m.id === modelId);
+    setSelectedModel(model);
     setShowDownloadDialog(true);
     setDownloadProgress({ status: DOWNLOAD_STATUS.PENDING, progress: 0 });
 
     try {
-      const response = await fetch("/api/models/download", {
+      // Use the new endpoint that uses model config
+      const response = await fetch(`/api/models/${modelId}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model_id: modelId }),
       });
 
       if (response.ok) {
         const data = await response.json();
         setDownloadProgress({
           status: DOWNLOAD_STATUS.DOWNLOADING,
-          jobId: data.job_id,
+          jobId: data.downloadId,
           progress: 0,
+          modelName: model.name,
+          repo: data.repo,
         });
 
         // Poll for download progress
-        pollDownloadProgress(data.job_id);
+        pollDownloadProgress(data.downloadId, modelId);
       } else {
         const error = await response.json();
         throw new Error(error.error || "Failed to start download");
@@ -200,7 +228,7 @@ export function ModelManager() {
   };
 
   // Poll download progress
-  const pollDownloadProgress = async (jobId) => {
+  const pollDownloadProgress = async (jobId, modelId) => {
     const interval = setInterval(async () => {
       try {
         const response = await fetch(`/api/models/download/${jobId}`);
@@ -214,6 +242,7 @@ export function ModelManager() {
             speed: data.speed,
             eta: data.eta,
             error: data.error,
+            files: data.files,
           });
 
           if (
@@ -224,6 +253,10 @@ export function ModelManager() {
             clearInterval(interval);
             if (data.status === DOWNLOAD_STATUS.COMPLETED) {
               addToast("Success", "Model downloaded successfully", "success");
+              // Refresh file status for this model
+              if (modelId) {
+                fetchModelFilesStatus(modelId);
+              }
               await fetchModels();
             }
           }
@@ -422,51 +455,54 @@ export function ModelManager() {
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center justify-end gap-2">
-                            {!model.downloaded ? (
+                            {model.huggingface && modelFilesStatus[model.id] && !modelFilesStatus[model.id].allFilesExist ? (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => downloadModel(model.id)}
                                 className="gap-1.5"
+                                title={`Missing files: ${modelFilesStatus[model.id].files.filter(f => !f.exists).map(f => f.fileName).join(", ")}`}
                               >
                                 <Download className="h-3.5 w-3.5" />
                                 Download
                               </Button>
+                            ) : model.exec_mode === "cli" ? (
+                              <Badge variant="secondary" className="gap-1.5">
+                                <Terminal className="h-3 w-3" />
+                                CLI Mode (on-demand)
+                              </Badge>
+                            ) : model.status === MODEL_STATUS.RUNNING ? (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => stopModel(model.id)}
+                                disabled={isLoadingAction}
+                                className="gap-1.5"
+                              >
+                                {isLoadingAction ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <StopCircle className="h-3.5 w-3.5" />
+                                )}
+                                Unload
+                              </Button>
                             ) : (
-                              <>
-                                {canStart && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => startModel(model.id)}
-                                    disabled={isLoadingAction}
-                                    className="gap-1.5"
-                                  >
-                                    {isLoadingAction ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Play className="h-3.5 w-3.5" />
-                                    )}
-                                    Start
-                                  </Button>
+                              <Button
+                                size="sm"
+                                variant={model.status === MODEL_STATUS.STARTING ? "secondary" : "default"}
+                                onClick={() => startModel(model.id)}
+                                disabled={isLoadingAction || model.status === MODEL_STATUS.STARTING || model.status === MODEL_STATUS.STOPPING}
+                                className="gap-1.5"
+                              >
+                                {isLoadingAction ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : model.status === MODEL_STATUS.STARTING ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Play className="h-3.5 w-3.5" />
                                 )}
-                                {canStop && (
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => stopModel(model.id)}
-                                    disabled={isLoadingAction}
-                                    className="gap-1.5"
-                                  >
-                                    {isLoadingAction ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <StopCircle className="h-3.5 w-3.5" />
-                                    )}
-                                    Stop
-                                  </Button>
-                                )}
-                              </>
+                                Load
+                              </Button>
                             )}
                             <Button
                               size="sm"

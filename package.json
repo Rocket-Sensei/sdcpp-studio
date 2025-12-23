@@ -10,7 +10,12 @@
     "dev:frontend": "cd frontend && vite",
     "build": "cd frontend && vite build",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "models": "node backend/scripts/models-cli.js",
+    "models:list": "node backend/scripts/models-cli.js list",
+    "models:info": "node backend/scripts/models-cli.js info",
+    "models:files": "node backend/scripts/models-cli.js files",
+    "models:running": "node backend/scripts/models-cli.js running"
   },
   "keywords": [
     "stable-diffusion",

@@ -12,32 +12,64 @@ export const QueueStatus = {
 
 /**
  * Add a job to the queue
+ * @param {Object} params - Job parameters
+ * @param {string} params.model - Model ID (uses DEFAULT from DB if not specified)
  */
 export function addToQueue(params) {
   const db = getDatabase();
   const id = params.id || randomUUID();
 
-  const stmt = db.prepare(`
-    INSERT INTO queue (
-      id, type, model, prompt, negative_prompt, size, seed, n,
-      quality, style, source_image_id, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  // Note: model is NOT NULL with DEFAULT 'sd-cpp-local' in the DB schema
+  // If params.model is provided and non-null, we need to include it
+  // If params.model is null/undefined, the DB will use the DEFAULT value
+  // So we need dynamic SQL building
 
-  stmt.run(
-    id,
-    params.type || 'generate',
-    params.model || 'sd-cpp-local',
-    params.prompt || null,
-    params.negative_prompt || null,
-    params.size || null,
-    params.seed || null,
-    params.n || 1,
-    params.quality || null,
-    params.style || null,
-    params.source_image_id || null,
-    QueueStatus.PENDING
-  );
+  let sql, queryParams;
+  if (params.model !== undefined && params.model !== null) {
+    sql = `
+      INSERT INTO queue (
+        id, type, model, prompt, negative_prompt, size, seed, n,
+        quality, style, source_image_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    queryParams = [
+      id,
+      params.type || 'generate',
+      params.model,
+      params.prompt || null,
+      params.negative_prompt || null,
+      params.size || null,
+      params.seed || null,
+      params.n || 1,
+      params.quality || null,
+      params.style || null,
+      params.source_image_id || null,
+      QueueStatus.PENDING
+    ];
+  } else {
+    sql = `
+      INSERT INTO queue (
+        id, type, prompt, negative_prompt, size, seed, n,
+        quality, style, source_image_id, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    queryParams = [
+      id,
+      params.type || 'generate',
+      params.prompt || null,
+      params.negative_prompt || null,
+      params.size || null,
+      params.seed || null,
+      params.n || 1,
+      params.quality || null,
+      params.style || null,
+      params.source_image_id || null,
+      QueueStatus.PENDING
+    ];
+  }
+
+  const dynamicStmt = db.prepare(sql);
+  dynamicStmt.run(...queryParams);
 
   return getJobById(id);
 }

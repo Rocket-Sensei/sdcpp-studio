@@ -618,6 +618,26 @@ export function getProcessByPort(port) {
 // Auto-initialize on module import
 initializeProcessTracker();
 
+// Export a processTracker object for convenience
+export const processTracker = {
+  registerProcess,
+  unregisterProcess,
+  getProcess,
+  getAllProcesses,
+  killProcess,
+  cleanupZombies,
+  isPortAvailable,
+  getAvailablePort,
+  sendHeartbeat,
+  updateProcessStatus,
+  getProcessStats,
+  isProcessRunning,
+  getProcessesByExecMode,
+  getProcessByPort,
+  initialize: initializeProcessTracker,
+  shutdown: shutdownProcessTracker
+};
+
 // Export for testing
 export {
   processes as _processes,
