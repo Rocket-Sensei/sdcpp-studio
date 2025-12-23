@@ -1,0 +1,17 @@
+{
+  "name": "sd-webui-tests",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "form-data": "^4.0.1"
+  },
+  "devDependencies": {
+    "@vitest/ui": "^2.1.8",
+    "vitest": "^2.1.8"
+  }
+}

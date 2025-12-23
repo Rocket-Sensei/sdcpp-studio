@@ -1,0 +1,26 @@
+{
+  "name": "sd-webui",
+  "version": "1.0.0",
+  "description": "Web interface for Stable Diffusion via OpenAI-compatible API",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && node --watch server.js",
+    "dev:frontend": "cd frontend && vite",
+    "build": "cd frontend && vite build",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "keywords": ["stable-diffusion", "openai", "image-generation"],
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "vitest": "^2.1.8"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}
