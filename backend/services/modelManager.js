@@ -276,11 +276,16 @@ export class ModelManager {
       this.loadConfig();
     }
 
-    return Array.from(this.models.values()).map(model => ({
-      ...model,
-      isRunning: this.isModelRunning(model.id),
-      status: this.getModelStatus(model.id)
-    }));
+    return Array.from(this.models.values()).map(model => {
+      const modelStatus = this.getModelStatus(model.id);
+      return {
+        ...model,
+        isRunning: this.isModelRunning(model.id),
+        status: modelStatus.status,
+        pid: modelStatus.pid || null,
+        port: modelStatus.port || null
+      };
+    });
   }
 
   /**
