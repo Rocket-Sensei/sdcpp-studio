@@ -4,6 +4,7 @@ import { createGeneration, createGeneratedImage } from '../db/queries.js';
 import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
 import { cliHandler } from './cliHandler.js';
+import { readFile } from 'fs/promises';
 
 let isProcessing = false;
 let currentJob = null;
@@ -473,16 +474,38 @@ async function processCLIGeneration(job, modelConfig, params) {
 async function processEditJob(job, modelConfig) {
   const modelId = modelConfig.id;
 
-  // Update progress
-  updateJobProgress(job.id, 0.15, 'Preparing edit parameters...');
+  // Check if input image path is provided
+  if (!job.input_image_path) {
+    throw new Error('Edit job requires input_image_path');
+  }
 
+  // Update progress
+  updateJobProgress(job.id, 0.15, 'Loading input image...');
+
+  // Load the input image from disk
+  const imageBuffer = await readFile(job.input_image_path);
+
+  // Prepare params for generateImageDirect
   const params = {
+    model: modelId,
     prompt: job.prompt,
     negative_prompt: job.negative_prompt,
     size: job.size,
     seed: job.seed ? parseInt(job.seed) : null,
     n: job.n || 1,
+    image: {
+      buffer: imageBuffer,
+      mimetype: job.input_image_mime_type || 'image/png'
+    }
   };
+
+  // Load mask if provided
+  if (job.mask_image_path) {
+    params.mask = {
+      buffer: await readFile(job.mask_image_path),
+      mimetype: job.mask_image_mime_type || 'image/png'
+    };
+  }
 
   updateJobProgress(job.id, 0.25, 'Generating edit...');
 
@@ -497,10 +520,10 @@ async function processEditJob(job, modelConfig) {
     console.warn(`[QueueProcessor] Edit mode with CLI not fully supported, using generate`);
     response = await processCLIGeneration(job, modelConfig, params);
   } else if (modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.API) {
-    // Use HTTP API for server mode (local) or API mode (external)
+    // Use generateImageDirect for edit mode with FormData
     const apiType = modelConfig.exec_mode === ExecMode.API ? 'external' : 'local';
     console.log(`[QueueProcessor] Using ${apiType} HTTP API for edit at ${modelConfig.api}`);
-    response = await processHTTPGeneration(job, modelConfig, params);
+    response = await generateImageDirect(params, 'edit');
   } else {
     throw new Error(`Unknown execution mode: ${modelConfig.exec_mode}`);
   }
@@ -555,15 +578,29 @@ async function processEditJob(job, modelConfig) {
 async function processVariationJob(job, modelConfig) {
   const modelId = modelConfig.id;
 
-  // Update progress
-  updateJobProgress(job.id, 0.15, 'Preparing variation parameters...');
+  // Check if input image path is provided
+  if (!job.input_image_path) {
+    throw new Error('Variation job requires input_image_path');
+  }
 
+  // Update progress
+  updateJobProgress(job.id, 0.15, 'Loading input image...');
+
+  // Load the input image from disk
+  const imageBuffer = await readFile(job.input_image_path);
+
+  // Prepare params for generateImageDirect
   const params = {
+    model: modelId,
     prompt: job.prompt,
     negative_prompt: job.negative_prompt,
     size: job.size,
     seed: job.seed ? parseInt(job.seed) : null,
     n: job.n || 1,
+    image: {
+      buffer: imageBuffer,
+      mimetype: job.input_image_mime_type || 'image/png'
+    }
   };
 
   updateJobProgress(job.id, 0.25, 'Generating variation...');
@@ -578,10 +615,13 @@ async function processVariationJob(job, modelConfig) {
     // Full implementation would need CLI-specific variation handling
     console.warn(`[QueueProcessor] Variation mode with CLI not fully supported, using generate`);
     response = await processCLIGeneration(job, modelConfig, params);
+  } else if (modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.API) {
+    // Use generateImageDirect for variation mode with FormData
+    const apiType = modelConfig.exec_mode === ExecMode.API ? 'external' : 'local';
+    console.log(`[QueueProcessor] Using ${apiType} HTTP API for variation at ${modelConfig.api}`);
+    response = await generateImageDirect(params, 'variation');
   } else {
-    // Use HTTP API for server mode models
-    console.log(`[QueueProcessor] Using HTTP API for variation at ${modelConfig.api}`);
-    response = await processHTTPGeneration(job, modelConfig, params);
+    throw new Error(`Unknown execution mode: ${modelConfig.exec_mode}`);
   }
 
   updateJobProgress(job.id, 0.7, 'Saving generation record...');

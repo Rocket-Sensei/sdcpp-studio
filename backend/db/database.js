@@ -62,6 +62,12 @@ export function initializeDatabase() {
     )
   `);
 
+  // Create input images directory for edit/variation uploads
+  const inputImagesDir = `${__dirname}/../data/input`;
+  if (!existsSync(inputImagesDir)) {
+    mkdirSync(inputImagesDir, { recursive: true });
+  }
+
   // Create queue table for async job processing
   db.exec(`
     CREATE TABLE IF NOT EXISTS queue (
@@ -76,6 +82,10 @@ export function initializeDatabase() {
       quality TEXT,
       style TEXT,
       source_image_id TEXT,
+      input_image_path TEXT,
+      input_image_mime_type TEXT,
+      mask_image_path TEXT,
+      mask_image_mime_type TEXT,
       status TEXT DEFAULT 'pending',
       progress REAL DEFAULT 0,
       error TEXT,
@@ -169,6 +179,7 @@ export function initializeDatabase() {
 
   console.log(`Database initialized at ${dbPath}`);
   console.log(`Images directory: ${imagesDir}`);
+  console.log(`Input images directory: ${inputImagesDir}`);
 }
 
 export function getDatabase() {
@@ -183,6 +194,14 @@ export function getImagesDir() {
     mkdirSync(imagesDir, { recursive: true });
   }
   return imagesDir;
+}
+
+export function getInputImagesDir() {
+  const inputDir = `${__dirname}/../data/input`;
+  if (!existsSync(inputDir)) {
+    mkdirSync(inputDir, { recursive: true });
+  }
+  return inputDir;
 }
 
 export function closeDatabase() {

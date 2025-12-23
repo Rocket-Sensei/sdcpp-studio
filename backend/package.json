@@ -4,11 +4,18 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "models": "node scripts/models-cli.js",
+    "models:list": "node scripts/models-cli.js list",
+    "models:info": "node scripts/models-cli.js info",
+    "models:files": "node scripts/models-cli.js files",
+    "models:running": "node scripts/models-cli.js running"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "easydl": "^1.2.0",
     "express": "^4.21.2",
     "form-data": "^4.0.1",
     "js-yaml": "^4.1.0",

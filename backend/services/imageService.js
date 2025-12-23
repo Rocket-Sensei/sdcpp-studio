@@ -62,7 +62,7 @@ export async function generateImageDirect(params, mode = 'generate') {
 
     // Convert buffer to Blob for FormData
     const imageBlob = new Blob([params.image.buffer], { type: params.image.mimetype || 'image/png' });
-    formData.append('image', imageBlob, 'image.png');
+    formData.append('image[]', imageBlob, 'image.png');
 
     formData.append('n', params.n || 1);
     formData.append('size', params.size || '512x512');
@@ -70,7 +70,7 @@ export async function generateImageDirect(params, mode = 'generate') {
 
     if (params.mask) {
       const maskBlob = new Blob([params.mask.buffer], { type: params.mask.mimetype || 'image/png' });
-      formData.append('mask', maskBlob, 'mask.png');
+      formData.append('mask[]', maskBlob, 'mask.png');
     }
 
     requestBody = formData;
@@ -210,7 +210,7 @@ export async function generateImage(params, mode = 'generate') {
 
     // Convert buffer to Blob for FormData
     const imageBlob = new Blob([params.image.buffer], { type: params.image.mimetype || 'image/png' });
-    formData.append('image', imageBlob, 'image.png');
+    formData.append('image[]', imageBlob, 'image.png');
 
     formData.append('n', params.n || 1);
     formData.append('size', params.size || '512x512');
@@ -218,7 +218,7 @@ export async function generateImage(params, mode = 'generate') {
 
     if (params.mask) {
       const maskBlob = new Blob([params.mask.buffer], { type: params.mask.mimetype || 'image/png' });
-      formData.append('mask', maskBlob, 'mask.png');
+      formData.append('mask[]', maskBlob, 'mask.png');
     }
 
     requestBody = formData;

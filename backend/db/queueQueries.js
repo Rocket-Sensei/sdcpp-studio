@@ -14,62 +14,94 @@ export const QueueStatus = {
  * Add a job to the queue
  * @param {Object} params - Job parameters
  * @param {string} params.model - Model ID (uses DEFAULT from DB if not specified)
+ * @param {string} params.input_image_path - Path to uploaded input image (for edit/variation)
+ * @param {string} params.input_image_mime_type - MIME type of input image
+ * @param {string} params.mask_image_path - Path to uploaded mask image (optional)
+ * @param {string} params.mask_image_mime_type - MIME type of mask image
  */
 export function addToQueue(params) {
   const db = getDatabase();
   const id = params.id || randomUUID();
 
-  // Note: model is NOT NULL with DEFAULT 'sd-cpp-local' in the DB schema
-  // If params.model is provided and non-null, we need to include it
-  // If params.model is null/undefined, the DB will use the DEFAULT value
-  // So we need dynamic SQL building
+  // Build the SQL dynamically based on which parameters are provided
+  const columns = ['id', 'type', 'status'];
+  const placeholders = ['?', '?', '?'];
+  const values = [id, params.type || 'generate', QueueStatus.PENDING];
 
-  let sql, queryParams;
+  // Add model if provided (otherwise uses DB default)
   if (params.model !== undefined && params.model !== null) {
-    sql = `
-      INSERT INTO queue (
-        id, type, model, prompt, negative_prompt, size, seed, n,
-        quality, style, source_image_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    queryParams = [
-      id,
-      params.type || 'generate',
-      params.model,
-      params.prompt || null,
-      params.negative_prompt || null,
-      params.size || null,
-      params.seed || null,
-      params.n || 1,
-      params.quality || null,
-      params.style || null,
-      params.source_image_id || null,
-      QueueStatus.PENDING
-    ];
-  } else {
-    sql = `
-      INSERT INTO queue (
-        id, type, prompt, negative_prompt, size, seed, n,
-        quality, style, source_image_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    queryParams = [
-      id,
-      params.type || 'generate',
-      params.prompt || null,
-      params.negative_prompt || null,
-      params.size || null,
-      params.seed || null,
-      params.n || 1,
-      params.quality || null,
-      params.style || null,
-      params.source_image_id || null,
-      QueueStatus.PENDING
-    ];
+    columns.push('model');
+    placeholders.push('?');
+    values.push(params.model);
   }
 
-  const dynamicStmt = db.prepare(sql);
-  dynamicStmt.run(...queryParams);
+  // Add standard params if provided
+  if (params.prompt !== undefined) {
+    columns.push('prompt');
+    placeholders.push('?');
+    values.push(params.prompt);
+  }
+  if (params.negative_prompt !== undefined) {
+    columns.push('negative_prompt');
+    placeholders.push('?');
+    values.push(params.negative_prompt);
+  }
+  if (params.size !== undefined) {
+    columns.push('size');
+    placeholders.push('?');
+    values.push(params.size);
+  }
+  if (params.seed !== undefined) {
+    columns.push('seed');
+    placeholders.push('?');
+    values.push(params.seed);
+  }
+  if (params.n !== undefined) {
+    columns.push('n');
+    placeholders.push('?');
+    values.push(params.n);
+  }
+  if (params.quality !== undefined) {
+    columns.push('quality');
+    placeholders.push('?');
+    values.push(params.quality);
+  }
+  if (params.style !== undefined) {
+    columns.push('style');
+    placeholders.push('?');
+    values.push(params.style);
+  }
+  if (params.source_image_id !== undefined) {
+    columns.push('source_image_id');
+    placeholders.push('?');
+    values.push(params.source_image_id);
+  }
+
+  // Add image paths for edit/variation
+  if (params.input_image_path) {
+    columns.push('input_image_path');
+    placeholders.push('?');
+    values.push(params.input_image_path);
+  }
+  if (params.input_image_mime_type) {
+    columns.push('input_image_mime_type');
+    placeholders.push('?');
+    values.push(params.input_image_mime_type);
+  }
+  if (params.mask_image_path) {
+    columns.push('mask_image_path');
+    placeholders.push('?');
+    values.push(params.mask_image_path);
+  }
+  if (params.mask_image_mime_type) {
+    columns.push('mask_image_mime_type');
+    placeholders.push('?');
+    values.push(params.mask_image_mime_type);
+  }
+
+  const sql = `INSERT INTO queue (${columns.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  const stmt = db.prepare(sql);
+  stmt.run(...values);
 
   return getJobById(id);
 }

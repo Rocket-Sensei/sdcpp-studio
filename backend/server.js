@@ -5,7 +5,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { config } from 'dotenv';
-import { initializeDatabase, getImagesDir } from './db/database.js';
+import { initializeDatabase, getImagesDir, getInputImagesDir } from './db/database.js';
+import { randomUUID } from 'crypto';
+import { writeFile } from 'fs/promises';
 import { generateImage } from './services/imageService.js';
 import { getAllGenerations, getGenerationById, getImageById, getImagesByGenerationId } from './db/queries.js';
 import { addToQueue, getJobs, getJobById, cancelJob, getQueueStats } from './db/queueQueries.js';
@@ -227,8 +229,19 @@ app.post('/api/queue/generate', async (req, res) => {
 });
 
 // Add job to queue (image-to-image edit)
-app.post('/api/queue/edit', upload.single('image'), async (req, res) => {
+app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'mask', maxCount: 1 }]), async (req, res) => {
   try {
+    const imageFile = req.files?.image?.[0];
+    if (!imageFile) {
+      return res.status(400).json({ error: 'Image file is required' });
+    }
+
+    // Save uploaded image to disk
+    const inputImagesDir = getInputImagesDir();
+    const imageFilename = `${randomUUID()}.png`;
+    const imagePath = path.join(inputImagesDir, imageFilename);
+    await writeFile(imagePath, imageFile.buffer);
+
     const params = {
       type: 'edit',
       prompt: req.body.prompt,
@@ -236,7 +249,20 @@ app.post('/api/queue/edit', upload.single('image'), async (req, res) => {
       size: req.body.size,
       n: req.body.n,
       source_image_id: req.body.source_image_id,
+      input_image_path: imagePath,
+      input_image_mime_type: imageFile.mimetype,
     };
+
+    // Handle optional mask upload
+    const maskFile = req.files?.mask?.[0];
+    if (maskFile) {
+      const maskFilename = `${randomUUID()}_mask.png`;
+      const maskPath = path.join(inputImagesDir, maskFilename);
+      await writeFile(maskPath, maskFile.buffer);
+      params.mask_image_path = maskPath;
+      params.mask_image_mime_type = maskFile.mimetype;
+    }
+
     // Only include model if provided
     if (req.body.model) {
       params.model = req.body.model;
@@ -252,6 +278,16 @@ app.post('/api/queue/edit', upload.single('image'), async (req, res) => {
 // Add job to queue (variation)
 app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file is required' });
+    }
+
+    // Save uploaded image to disk
+    const inputImagesDir = getInputImagesDir();
+    const imageFilename = `${randomUUID()}.png`;
+    const imagePath = path.join(inputImagesDir, imageFilename);
+    await writeFile(imagePath, req.file.buffer);
+
     const params = {
       type: 'variation',
       prompt: req.body.prompt,
@@ -259,7 +295,10 @@ app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
       size: req.body.size,
       n: req.body.n,
       source_image_id: req.body.source_image_id,
+      input_image_path: imagePath,
+      input_image_mime_type: req.file.mimetype,
     };
+
     // Only include model if provided
     if (req.body.model) {
       params.model = req.body.model;
