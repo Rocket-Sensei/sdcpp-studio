@@ -24,6 +24,11 @@ export async function createGeneration(data) {
     throw new Error('Model is required for generation. Please specify a model ID.');
   }
 
+  // Generate a random seed if not provided (ensures every generation has a seed)
+  const seed = data.seed !== undefined && data.seed !== null && data.seed !== ''
+    ? data.seed
+    : Math.floor(Math.random() * 4294967295);
+
   const stmt = db.prepare(`
     INSERT INTO generations (
       id, type, model, prompt, negative_prompt, size, seed, n,
@@ -40,7 +45,7 @@ export async function createGeneration(data) {
     data.prompt || null,
     data.negative_prompt || null,
     data.size || null,
-    data.seed || null,
+    seed,
     data.n || 1,
     data.quality || null,
     data.style || null,

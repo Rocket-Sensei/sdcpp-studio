@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Wand2, Upload, Image as ImageIcon, Sparkles, List,
   ChevronDown, ChevronUp, Download, Loader2
@@ -23,15 +23,16 @@ const MODES = [
   { value: "upscale", label: "Upscale", icon: ImageIcon, needsImage: true },
 ];
 
-const SIZES = [
-  { value: "256x256", label: "256 x 256" },
-  { value: "512x512", label: "512 x 512" },
-  { value: "768x768", label: "768 x 768" },
-  { value: "1024x1024", label: "1024 x 1024" },
-  { value: "1024x768", label: "1024 x 768 (Landscape)" },
-  { value: "768x1024", label: "768 x 1024 (Portrait)" },
-  { value: "1536x1024", label: "1536 x 1024 (Landscape)" },
-  { value: "1024x1536", label: "1024 x 1536 (Portrait)" },
+// Size presets for quick selection
+const SIZE_PRESETS = [
+  { width: 256, height: 256, label: "256" },
+  { width: 512, height: 512, label: "512" },
+  { width: 768, height: 768, label: "768" },
+  { width: 1024, height: 1024, label: "1024" },
+  { width: 1024, height: 768, label: "1024x768" },
+  { width: 768, height: 1024, label: "768x1024" },
+  { width: 1536, height: 1024, label: "1536x1024" },
+  { width: 1024, height: 1536, label: "1024x1536" },
 ];
 
 const UPSCALE_FACTORS = [2, 4, 8];
@@ -81,9 +82,18 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
   // Common settings
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [size, setSize] = useState("512x512");
+
+  // Size as separate width/height for sliders
+  const [width, setWidth] = useState(512);
+  const [height, setHeight] = useState(512);
+  const size = useMemo(() => `${width}x${height}`, [width, height]);
+
   const [seed, setSeed] = useState("");
   const [useQueue, setUseQueue] = useState(true);
+
+  // Store full models data for applying defaults
+  const [modelsData, setModelsData] = useState([]);
+  const [selectedModelData, setSelectedModelData] = useState(null);
 
   // Image-related settings (for img2img, imgedit, upscale)
   const [sourceImage, setSourceImage] = useState(null);
@@ -120,12 +130,58 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
       });
   }, []);
 
+  // Fetch models data to apply defaults
+  useEffect(() => {
+    fetch("/api/models")
+      .then((res) => res.json())
+      .then((data) => {
+        setModelsData(data.models || []);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch models:", err);
+      });
+  }, []);
+
+  // Apply model defaults when model changes
+  useEffect(() => {
+    if (!selectedModel || !modelsData.length) return;
+
+    const model = modelsData.find(m => m.id === selectedModel);
+    if (!model) return;
+
+    setSelectedModelData(model);
+
+    // Apply default_size from model config
+    if (model.default_size) {
+      const [w, h] = model.default_size.split('x').map(Number);
+      if (w && h) {
+        setWidth(w);
+        setHeight(h);
+      }
+    }
+
+    // Apply generation_params from model config
+    if (model.generation_params) {
+      const params = model.generation_params;
+      if (params.cfg_scale !== undefined) setCfgScale(params.cfg_scale);
+      if (params.sample_steps !== undefined) setSampleSteps(params.sample_steps);
+      if (params.sampling_method) setSamplingMethod(params.sampling_method);
+      if (params.clip_skip !== undefined) setClipSkip(params.clip_skip.toString());
+    }
+  }, [selectedModel, modelsData]);
+
   // Apply settings when provided (from "Create More" button)
   useEffect(() => {
     if (settings) {
       if (settings.prompt) setPrompt(settings.prompt);
       if (settings.negative_prompt !== undefined) setNegativePrompt(settings.negative_prompt);
-      if (settings.size) setSize(settings.size);
+      if (settings.size) {
+        const [w, h] = settings.size.split('x').map(Number);
+        if (w && h) {
+          setWidth(w);
+          setHeight(h);
+        }
+      }
       if (settings.seed) setSeed(settings.seed.toString());
       if (settings.type === 'edit' || settings.type === 'variation') {
         setMode(settings.type === 'edit' ? 'imgedit' : 'img2img');
@@ -207,17 +263,15 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
       if (useQueue) {
         await generateQueued(params);
         toast.success("Job added to queue! Check Gallery for progress.");
+        // Don't navigate when using queue - user may want to queue more images
+        return;
       } else {
         await generateQueued(params);
         toast.success("Image generated successfully!");
       }
 
-      // Handle post-generation upscaling
-      if (upscaleAfterGeneration && onGenerated) {
-        // Note: In a real implementation, you'd wait for the generation to complete
-        // and then upscale the result. For now, we'll navigate to gallery.
-        onGenerated();
-      } else if (onGenerated) {
+      // Only navigate to gallery when NOT using queue
+      if (onGenerated) {
         onGenerated();
       }
     } catch (err) {
@@ -426,20 +480,74 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
 
         {/* Size (not for upscale - it has its own size options) */}
         {mode !== "upscale" && (
-          <div className="space-y-2">
-            <Label htmlFor="size">Image Size</Label>
-            <Select value={size} onValueChange={setSize} disabled={isLoading || isUpscaling}>
-              <SelectTrigger id="size">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SIZES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Image Size</Label>
+              <span className="text-sm text-muted-foreground">{width} x {height}</span>
+            </div>
+
+            {/* Width Slider */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Width</span>
+                <span className="text-xs font-mono">{width}px</span>
+              </div>
+              <Slider
+                value={[width]}
+                onValueChange={(v) => setWidth(v[0])}
+                min={100}
+                max={2048}
+                step={8}
+                disabled={isLoading || isUpscaling}
+                className="w-full"
+              />
+            </div>
+
+            {/* Height Slider */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Height</span>
+                <span className="text-xs font-mono">{height}px</span>
+              </div>
+              <Slider
+                value={[height]}
+                onValueChange={(v) => setHeight(v[0])}
+                min={100}
+                max={2048}
+                step={8}
+                disabled={isLoading || isUpscaling}
+                className="w-full"
+              />
+            </div>
+
+            {/* Preset Buttons */}
+            <div className="flex flex-wrap gap-2">
+              {SIZE_PRESETS.map((preset) => (
+                <button
+                  key={`${preset.width}x${preset.height}`}
+                  onClick={() => {
+                    setWidth(preset.width);
+                    setHeight(preset.height);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded border transition-colors",
+                    width === preset.width && height === preset.height
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border hover:border-primary/50"
+                  )}
+                  disabled={isLoading || isUpscaling}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Model default indicator */}
+            {selectedModelData?.default_size && (
+              <div className="text-xs text-muted-foreground">
+                Model default: {selectedModelData.default_size}
+              </div>
+            )}
           </div>
         )}
 
