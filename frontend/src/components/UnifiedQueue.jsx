@@ -27,6 +27,7 @@ import { useGenerations } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
 import { formatDate } from "../lib/utils";
+import { authenticatedFetch } from "../utils/api";
 
 const GENERATION_STATUS = {
   PENDING: "pending",
@@ -86,13 +87,13 @@ const Thumbnail = memo(function Thumbnail({ generation }) {
   useEffect(() => {
     const loadImages = async () => {
       try {
-        const response = await fetch(`/api/generations/${generation.id}`);
+        const response = await authenticatedFetch(`/api/generations/${generation.id}`);
         if (!response.ok) return;
 
         const gen = await response.json();
         if (gen.images && gen.images.length > 0) {
           setImageCount(gen.images.length);
-          const imgResponse = await fetch(`/api/images/${gen.images[0].id}`);
+          const imgResponse = await authenticatedFetch(`/api/images/${gen.images[0].id}`);
           if (imgResponse.ok) {
             const blob = await imgResponse.blob();
             setSrc(URL.createObjectURL(blob));
@@ -161,7 +162,7 @@ export function UnifiedQueue({ onCreateMore }) {
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const response = await fetch('/api/models');
+        const response = await authenticatedFetch('/api/models');
         if (response.ok) {
           const data = await response.json();
           // Create a map of model ID to model name
@@ -221,7 +222,7 @@ export function UnifiedQueue({ onCreateMore }) {
 
   const handleCancel = async (id) => {
     try {
-      const response = await fetch(`/api/queue/${id}`, {
+      const response = await authenticatedFetch(`/api/queue/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -237,7 +238,7 @@ export function UnifiedQueue({ onCreateMore }) {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`/api/generations/${id}`, {
+      const response = await authenticatedFetch(`/api/generations/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -300,7 +301,7 @@ export function UnifiedQueue({ onCreateMore }) {
         });
       }
 
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method: 'POST',
         headers,
         body
@@ -319,7 +320,7 @@ export function UnifiedQueue({ onCreateMore }) {
 
   const handleViewImage = async (generation, imageIndex = 0) => {
     try {
-      const response = await fetch(`/api/generations/${generation.id}`);
+      const response = await authenticatedFetch(`/api/generations/${generation.id}`);
       if (!response.ok) throw new Error("Failed to fetch generation");
 
       const fullGeneration = await response.json();
@@ -347,7 +348,7 @@ export function UnifiedQueue({ onCreateMore }) {
 
   const handleDownload = async (generationId, imageIndex = 0) => {
     try {
-      const response = await fetch(`/api/generations/${generationId}`);
+      const response = await authenticatedFetch(`/api/generations/${generationId}`);
       if (!response.ok) throw new Error("Failed to fetch generation");
 
       const generation = await response.json();
@@ -358,7 +359,7 @@ export function UnifiedQueue({ onCreateMore }) {
       }
 
       const image = generation.images[imageIndex];
-      const imageResponse = await fetch(`/api/images/${image.id}`);
+      const imageResponse = await authenticatedFetch(`/api/images/${image.id}`);
       if (!imageResponse.ok) throw new Error("Failed to download image");
 
       const blob = await imageResponse.blob();

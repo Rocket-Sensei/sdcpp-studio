@@ -30,6 +30,7 @@ import {
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
+import { authenticatedFetch } from "../utils/api";
 
 // Model status constants
 const MODEL_STATUS = {
@@ -99,7 +100,7 @@ export function ModelManager() {
   // Fetch all models
   const fetchModels = useCallback(async () => {
     try {
-      const response = await fetch("/api/models");
+      const response = await authenticatedFetch("/api/models");
       if (response.ok) {
         const data = await response.json();
         const modelsList = data.models || [];
@@ -126,7 +127,7 @@ export function ModelManager() {
   // Fetch model files status
   const fetchModelFilesStatus = useCallback(async (modelId) => {
     try {
-      const response = await fetch(`/api/models/${modelId}/files/status`);
+      const response = await authenticatedFetch(`/api/models/${modelId}/files/status`);
       if (response.ok) {
         const data = await response.json();
         setModelFilesStatus(prev => ({
@@ -149,7 +150,7 @@ export function ModelManager() {
   const startModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "starting" }));
     try {
-      const response = await fetch(`/api/models/${modelId}/start`, {
+      const response = await authenticatedFetch(`/api/models/${modelId}/start`, {
         method: "POST",
       });
       if (response.ok) {
@@ -171,7 +172,7 @@ export function ModelManager() {
   const stopModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "stopping" }));
     try {
-      const response = await fetch(`/api/models/${modelId}/stop`, {
+      const response = await authenticatedFetch(`/api/models/${modelId}/stop`, {
         method: "POST",
       });
       if (response.ok) {
@@ -198,7 +199,7 @@ export function ModelManager() {
 
     try {
       // Use the new endpoint that uses model config
-      const response = await fetch(`/api/models/${modelId}/download`, {
+      const response = await authenticatedFetch(`/api/models/${modelId}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -230,7 +231,7 @@ export function ModelManager() {
   const pollDownloadProgress = async (jobId, modelId) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/models/download/${jobId}`);
+        const response = await authenticatedFetch(`/api/models/download/${jobId}`);
         if (response.ok) {
           const data = await response.json();
           setDownloadProgress({
@@ -271,7 +272,7 @@ export function ModelManager() {
   const cancelDownload = async () => {
     if (downloadProgress?.jobId) {
       try {
-        await fetch(`/api/models/download/${downloadProgress.jobId}`, {
+        await authenticatedFetch(`/api/models/download/${downloadProgress.jobId}`, {
           method: "DELETE",
         });
         setDownloadProgress({ status: DOWNLOAD_STATUS.CANCELLED });

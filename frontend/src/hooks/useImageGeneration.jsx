@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { authenticatedFetch } from "../utils/api";
 
 export function useImageGeneration() {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +42,7 @@ export function useImageGeneration() {
         body = JSON.stringify(params);
       }
 
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method: 'POST',
         headers,
         body
@@ -100,7 +101,7 @@ export function useImageGeneration() {
         body = JSON.stringify(params);
       }
 
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method: 'POST',
         headers,
         body
@@ -135,7 +136,7 @@ export function useGenerations() {
     setError(null);
 
     try {
-      const response = await fetch('/api/generations');
+      const response = await authenticatedFetch('/api/generations');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -152,7 +153,7 @@ export function useGenerations() {
 
   const deleteGeneration = useCallback(async (id) => {
     try {
-      const response = await fetch(`/api/generations/${id}`, {
+      const response = await authenticatedFetch(`/api/generations/${id}`, {
         method: 'DELETE'
       });
       if (!response.ok) {

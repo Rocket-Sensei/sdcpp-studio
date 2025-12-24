@@ -15,6 +15,7 @@ import { useImageGeneration } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { ModelSelector } from "./ModelSelector";
 import { cn } from "../lib/utils";
+import { authenticatedFetch } from "../utils/api";
 
 const MODES = [
   { value: "txt2img", label: "Text to Image", icon: Wand2, needsImage: false },
@@ -290,7 +291,7 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
     try {
       const base64Data = imageToUpscale.split("base64,")?.[1] || imageToUpscale;
 
-      const response = await fetch("/sdapi/v1/extra-single-image", {
+      const response = await authenticatedFetch("/sdapi/v1/extra-single-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

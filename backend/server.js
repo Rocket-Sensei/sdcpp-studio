@@ -11,6 +11,7 @@ import { runMigrations } from './db/migrations.js';
 import { randomUUID } from 'crypto';
 import { writeFile } from 'fs/promises';
 import { generateImage } from './services/imageService.js';
+import { authenticateRequest, isAuthEnabled } from './middleware/auth.js';
 import {
   getAllGenerations,
   getGenerationById,
@@ -124,12 +125,13 @@ app.get('/api/config', (req, res) => {
   const defaultModel = modelManager.getDefaultModel();
   res.json({
     sdApiEndpoint: process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1234/v1',
-    model: defaultModel?.id || 'qwen-image'
+    model: defaultModel?.id || 'qwen-image',
+    authRequired: isAuthEnabled()
   });
 });
 
 // Generate image (text-to-image)
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', authenticateRequest, async (req, res) => {
   try {
     const result = await generateImage(req.body);
     res.json(result);
@@ -140,7 +142,7 @@ app.post('/api/generate', async (req, res) => {
 });
 
 // Generate image edit (image-to-image)
-app.post('/api/edit', upload.single('image'), async (req, res) => {
+app.post('/api/edit', authenticateRequest, upload.single('image'), async (req, res) => {
   try {
     const result = await generateImage({
       ...req.body,
@@ -154,7 +156,7 @@ app.post('/api/edit', upload.single('image'), async (req, res) => {
 });
 
 // Generate image variation
-app.post('/api/variation', upload.single('image'), async (req, res) => {
+app.post('/api/variation', authenticateRequest, upload.single('image'), async (req, res) => {
   try {
     const result = await generateImage({
       ...req.body,
@@ -235,7 +237,7 @@ app.get('/api/generations/:id/images', async (req, res) => {
 });
 
 // Delete generation
-app.delete('/api/generations/:id', async (req, res) => {
+app.delete('/api/generations/:id', authenticateRequest, async (req, res) => {
   try {
     // Delete the generation (also deletes associated images via cascade)
     const result = deleteGeneration(req.params.id);
@@ -249,7 +251,7 @@ app.delete('/api/generations/:id', async (req, res) => {
 // ========== Queue API Endpoints ==========
 
 // Add job to queue (text-to-image)
-app.post('/api/queue/generate', async (req, res) => {
+app.post('/api/queue/generate', authenticateRequest, async (req, res) => {
   try {
     const id = randomUUID();
     const params = {
@@ -279,7 +281,7 @@ app.post('/api/queue/generate', async (req, res) => {
 });
 
 // Add job to queue (image-to-image edit)
-app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'mask', maxCount: 1 }]), async (req, res) => {
+app.post('/api/queue/edit', authenticateRequest, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'mask', maxCount: 1 }]), async (req, res) => {
   try {
     const imageFile = req.files?.image?.[0];
     if (!imageFile) {
@@ -335,7 +337,7 @@ app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { nam
 });
 
 // Add job to queue (variation)
-app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
+app.post('/api/queue/variation', authenticateRequest, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Image file is required' });
@@ -421,7 +423,7 @@ app.get('/api/queue/:id', async (req, res) => {
 });
 
 // Cancel job
-app.delete('/api/queue/:id', async (req, res) => {
+app.delete('/api/queue/:id', authenticateRequest, async (req, res) => {
   try {
     const job = cancelGeneration(req.params.id);
     if (!job) {
@@ -717,7 +719,7 @@ app.get('/api/models/:id/status', async (req, res) => {
  * POST /api/models/:id/start
  * Start a model process
  */
-app.post('/api/models/:id/start', async (req, res) => {
+app.post('/api/models/:id/start', authenticateRequest, async (req, res) => {
   try {
     const modelId = req.params.id;
     const model = modelManager.getModel(modelId);
@@ -754,7 +756,7 @@ app.post('/api/models/:id/start', async (req, res) => {
  * POST /api/models/:id/stop
  * Stop a running model process
  */
-app.post('/api/models/:id/stop', async (req, res) => {
+app.post('/api/models/:id/stop', authenticateRequest, async (req, res) => {
   try {
     const modelId = req.params.id;
     const model = modelManager.getModel(modelId);
@@ -827,7 +829,7 @@ app.get('/api/models/running', async (req, res) => {
  * Start a model download from HuggingFace
  * Body: { modelId, repo, files }
  */
-app.post('/api/models/download', async (req, res) => {
+app.post('/api/models/download', authenticateRequest, async (req, res) => {
   try {
     const { modelId, repo, files } = req.body;
 
@@ -885,7 +887,7 @@ app.get('/api/models/download/:id', async (req, res) => {
  * DELETE /api/models/download/:id
  * Cancel an active model download
  */
-app.delete('/api/models/download/:id', async (req, res) => {
+app.delete('/api/models/download/:id', authenticateRequest, async (req, res) => {
   try {
     const downloadId = req.params.id;
     const status = modelDownloader.getDownloadStatus(downloadId);
@@ -981,7 +983,7 @@ app.get('/api/models/:id/files/status', async (req, res) => {
  * POST /api/models/:id/download
  * Download model files from HuggingFace based on model config
  */
-app.post('/api/models/:id/download', async (req, res) => {
+app.post('/api/models/:id/download', authenticateRequest, async (req, res) => {
   try {
     const modelId = req.params.id;
     const model = modelManager.getModel(modelId);
@@ -1122,7 +1124,7 @@ app.get('/sdapi/v1/options', (req, res) => {
 });
 
 // POST /sdapi/v1/options - Set options (for set-model endpoint)
-app.post('/sdapi/v1/options', async (req, res) => {
+app.post('/sdapi/v1/options', authenticateRequest, async (req, res) => {
   try {
     const { sd_model_checkpoint } = req.body;
     if (sd_model_checkpoint) {
@@ -1222,7 +1224,7 @@ app.get('/sdapi/v1/progress', (req, res) => {
 });
 
 // POST /sdapi/v1/interrupt - Interrupt current generation
-app.post('/sdapi/v1/interrupt', (req, res) => {
+app.post('/sdapi/v1/interrupt', authenticateRequest, (req, res) => {
   try {
     const jobs = getAllGenerations();
     const processingJob = jobs.find(j => j.status === 'processing');
@@ -1237,7 +1239,7 @@ app.post('/sdapi/v1/interrupt', (req, res) => {
 });
 
 // POST /sdapi/v1/txt2img - Text to image generation
-app.post('/sdapi/v1/txt2img', async (req, res) => {
+app.post('/sdapi/v1/txt2img', authenticateRequest, async (req, res) => {
   try {
     const {
       prompt,
@@ -1417,7 +1419,7 @@ app.get('/sdapi/v1/upscalers', async (req, res) => {
  * Upscale a single image
  * Compatible with SD.next / Automatic1111 API
  */
-app.post('/sdapi/v1/extra-single-image', async (req, res) => {
+app.post('/sdapi/v1/extra-single-image', authenticateRequest, async (req, res) => {
   try {
     const { upscaleImage } = await import('./services/upscalerService.js');
 
@@ -1474,7 +1476,7 @@ app.post('/sdapi/v1/extra-single-image', async (req, res) => {
  * Upscale multiple images in batch
  * Compatible with SD.next / Automatic1111 API
  */
-app.post('/sdapi/v1/extra-batch-images', async (req, res) => {
+app.post('/sdapi/v1/extra-batch-images', authenticateRequest, async (req, res) => {
   try {
     const { upscaleImage } = await import('./services/upscalerService.js');
 
