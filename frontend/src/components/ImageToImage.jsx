@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Upload, Image as ImageIcon, Sparkles, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -34,6 +34,9 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
   const [mode, setMode] = useState("edit");
   const [sourceImage, setSourceImage] = useState(null);
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
+
+  // Memoize filterCapabilities to prevent unnecessary ModelSelector re-renders
+  const filterCapabilities = useMemo(() => ['image-to-image'], []);
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -113,7 +116,7 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
             currentModel={selectedModel}
             onModelChange={onModelChange}
             className="w-full"
-            filterCapabilities={['image-to-image']}
+            filterCapabilities={filterCapabilities}
           />
         </div>
 

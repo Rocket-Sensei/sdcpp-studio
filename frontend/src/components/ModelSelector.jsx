@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Circle, Play, Square, Loader2 } from "lucide-react";
 import {
   Select,
@@ -59,19 +59,40 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
       }
 
       setModels(filteredModels);
-
-      // Set default model if none selected
-      if (!currentModel && data.default) {
-        // data.default might be an object (with id property) or a string
-        const defaultModelId = typeof data.default === 'object' ? data.default.id : data.default;
-        onModelChange?.(defaultModelId);
-      }
-      setError(null);
+      return data; // Return data for default model handling
     } catch (err) {
       console.error("Error fetching models:", err);
       setError(err.message);
+      return null;
     }
-  }, [currentModel, onModelChange, filterCapabilities]);
+  }, [filterCapabilities]);
+
+  // Set default model if none selected
+  useEffect(() => {
+    const setDefaultModel = async () => {
+      if (!currentModel) {
+        try {
+          const response = await fetch(`${API_BASE}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.default) {
+              const defaultModelId = typeof data.default === 'object' ? data.default.id : data.default;
+              onModelChange?.(defaultModelId);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching default model:", err);
+        }
+      }
+    };
+    setDefaultModel();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep a ref to the latest fetchModels function for polling
+  const fetchModelsRef = useRef(fetchModels);
+  useEffect(() => {
+    fetchModelsRef.current = fetchModels;
+  }, [fetchModels]);
 
   // Initial data load
   useEffect(() => {
@@ -84,13 +105,14 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
   }, [fetchModels]);
 
   // Poll for status updates every 5 seconds
+  // Uses a ref to avoid resetting the interval when fetchModels changes
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchModels();
+      fetchModelsRef.current();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [fetchModels]);
+  }, []); // Empty deps - interval only created once on mount
 
   // Start a model
   const startModel = async (modelId) => {
@@ -152,15 +174,15 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
   // Get model running status
   const getModelStatus = (modelId) => {
     const model = models.find((m) => m.id === modelId);
-    // Use status from model object, fallback to stopped
-    return model?.status?.status || MODEL_STATUS.STOPPED;
+    // status is a string directly on the model object from the API
+    return model?.status || MODEL_STATUS.STOPPED;
   };
 
   // Get model port
   const getModelPort = (modelId) => {
     const model = models.find((m) => m.id === modelId);
-    // Use port from model status object
-    return model?.status?.port;
+    // port is a direct property on the model object from the API
+    return model?.port;
   };
 
   // Get model by ID

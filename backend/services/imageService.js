@@ -20,6 +20,12 @@ export async function generateImageDirect(params, mode = 'generate') {
   let processedPrompt = params.prompt || '';
   let extraArgs = {};
 
+  // DEBUG: Log image buffer info for FormData
+  if (isFormData && params.image) {
+    console.log(`[ImageService] Image buffer size: ${params.image.buffer.length}, mimetype: ${params.image.mimetype}`);
+    console.log(`[ImageService] Image buffer first 32 bytes (hex): ${params.image.buffer.slice(0, 32).toString('hex')}`);
+  }
+
   const extraArgsMatch = processedPrompt.match(/<sd_cpp_extra_args>(.*?)<\/sd_cpp_extra_args>/s);
   if (extraArgsMatch) {
     try {
@@ -61,7 +67,8 @@ export async function generateImageDirect(params, mode = 'generate') {
     formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
     formData.append('prompt', promptString);
 
-    // Convert buffer to Blob for FormData
+    // Add image - Node.js native FormData requires wrapping Buffer in Blob
+    // Blob constructor accepts an array of Buffers and optional type
     const imageBlob = new Blob([params.image.buffer], { type: params.image.mimetype || 'image/png' });
     formData.append('image[]', imageBlob, 'image.png');
 
@@ -70,8 +77,9 @@ export async function generateImageDirect(params, mode = 'generate') {
     formData.append('response_format', 'b64_json');
 
     if (params.mask) {
+      // Add mask - Node.js native FormData requires wrapping Buffer in Blob
       const maskBlob = new Blob([params.mask.buffer], { type: params.mask.mimetype || 'image/png' });
-      formData.append('mask[]', maskBlob, 'mask.png');
+      formData.append('mask', maskBlob, 'mask.png');
     }
 
     requestBody = formData;
@@ -209,7 +217,8 @@ export async function generateImage(params, mode = 'generate') {
     formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
     formData.append('prompt', promptString);
 
-    // Convert buffer to Blob for FormData
+    // Add image - Node.js native FormData requires wrapping Buffer in Blob
+    // Blob constructor accepts an array of Buffers and optional type
     const imageBlob = new Blob([params.image.buffer], { type: params.image.mimetype || 'image/png' });
     formData.append('image[]', imageBlob, 'image.png');
 
@@ -218,8 +227,9 @@ export async function generateImage(params, mode = 'generate') {
     formData.append('response_format', 'b64_json');
 
     if (params.mask) {
+      // Add mask - Node.js native FormData requires wrapping Buffer in Blob
       const maskBlob = new Blob([params.mask.buffer], { type: params.mask.mimetype || 'image/png' });
-      formData.append('mask[]', maskBlob, 'mask.png');
+      formData.append('mask', maskBlob, 'mask.png');
     }
 
     requestBody = formData;

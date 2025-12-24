@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Image, Sparkles, History as HistoryIcon, List, Settings } from "lucide-react";
 import { Toaster } from "./hooks/useToast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
@@ -20,16 +20,16 @@ function App() {
     fetchGenerations();
   }, [fetchGenerations]);
 
-  const handleGenerated = () => {
+  const handleGenerated = useCallback(() => {
     // Switch to history tab after generation
     setActiveTab("history");
     fetchGenerations();
-  };
+  }, [fetchGenerations]);
 
-  const handleCreateMore = (generation) => {
+  const handleCreateMore = useCallback((generation) => {
     setCreateMoreSettings(generation);
     setActiveTab("text-to-image");
-  };
+  }, []);
 
   const tabs = [
     { value: "text-to-image", label: "Text to Image", icon: Sparkles },
