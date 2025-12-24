@@ -1160,8 +1160,17 @@ app.post('/sdapi/v1/options', async (req, res) => {
         await modelManager.startModel(modelId);
         console.log(`[API] Started model: ${modelId} (${model.name})`);
       }
+
+      // Return SD.next format response
+      return res.json({
+        updated: [{ sd_model_checkpoint: true }]
+      });
     }
-    res.json({ success: true });
+
+    // No sd_model_checkpoint in request
+    res.json({
+      updated: []
+    });
   } catch (error) {
     console.error('Error setting options:', error);
     res.status(500).json({ error: error.message });
@@ -1325,17 +1334,35 @@ app.post('/sdapi/v1/txt2img', async (req, res) => {
           const imagesData = await Promise.all(images.map(async (img) => {
             const fs = await import('fs/promises');
             try {
-              const buffer = await fs.readFile(img.path);
+              // img.file_path is the correct field name from the database schema
+              const buffer = await fs.readFile(img.file_path);
               return buffer.toString('base64');
-            } catch {
+            } catch (err) {
+              console.error(`[API] Failed to read image ${img.id}:`, err);
               return null;
             }
           }));
 
+          const validImages = imagesData.filter(Boolean);
+          if (validImages.length === 0) {
+            return res.status(500).json({ error: 'Failed to read generated images' });
+          }
+
+          // Return SD.next format response
           return res.json({
-            images: imagesData.filter(Boolean),
+            images: validImages,
             parameters: job,
-            info: JSON.stringify(job)
+            info: JSON.stringify({
+              prompt: job.prompt,
+              negative_prompt: job.negative_prompt,
+              width: job.width,
+              height: job.height,
+              steps: job.sample_steps,
+              cfg_scale: job.cfg_scale,
+              sampler_name: job.sampling_method,
+              seed: job.seed,
+              model: job.model
+            })
           });
         }
       }
