@@ -3,17 +3,19 @@
  * Tests the queue-based edit and variation functionality
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { startServer, stopServer } from './helpers/testServer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const TEST_IMAGE_DIR = path.join(__dirname, '../backend/data/input-test');
+const API_URL = 'http://127.0.0.1:3000';
 
 // Mock test data
 const createTestImageBuffer = () => {
@@ -26,6 +28,14 @@ const createTestImageBuffer = () => {
 };
 
 describe('Edit/Variation Queue Endpoints', () => {
+  beforeAll(async () => {
+    await startServer();
+  });
+
+  afterAll(async () => {
+    await stopServer();
+  });
+
   beforeEach(async () => {
     // Create test directory
     if (!existsSync(TEST_IMAGE_DIR)) {
@@ -49,7 +59,7 @@ describe('Edit/Variation Queue Endpoints', () => {
 
   describe('POST /api/queue/edit', () => {
     it('should reject request without image file', async () => {
-      const response = await fetch('http://127.0.0.1:3000/api/queue/edit', {
+      const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'multipart/form-data' },
         body: JSON.stringify({
@@ -71,7 +81,7 @@ describe('Edit/Variation Queue Endpoints', () => {
       const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
       formData.append('image', imageBlob, 'test.png');
 
-      const response = await fetch('http://127.0.0.1:3000/api/queue/edit', {
+      const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
         body: formData,
         // Don't set Content-Type header - let FormData set it with boundary
@@ -93,7 +103,7 @@ describe('Edit/Variation Queue Endpoints', () => {
       const maskBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
       formData.append('mask', maskBlob, 'mask.png');
 
-      const response = await fetch('http://127.0.0.1:3000/api/queue/edit', {
+      const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
         body: formData
       });
@@ -112,7 +122,7 @@ describe('Edit/Variation Queue Endpoints', () => {
       const imageBlob = new Blob([testBuffer], { type: 'image/png' });
       formData.append('image', imageBlob, 'test.png');
 
-      const response = await fetch('http://127.0.0.1:3000/api/queue/edit', {
+      const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
         body: formData
       });
@@ -125,7 +135,7 @@ describe('Edit/Variation Queue Endpoints', () => {
 
   describe('POST /api/queue/variation', () => {
     it('should reject request without image file', async () => {
-      const response = await fetch('http://127.0.0.1:3000/api/queue/variation', {
+      const response = await fetch(`${API_URL}/api/queue/variation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -146,7 +156,7 @@ describe('Edit/Variation Queue Endpoints', () => {
       const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
       formData.append('image', imageBlob, 'test.png');
 
-      const response = await fetch('http://127.0.0.1:3000/api/queue/variation', {
+      const response = await fetch(`${API_URL}/api/queue/variation`, {
         method: 'POST',
         body: formData
       });

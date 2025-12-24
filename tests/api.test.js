@@ -5,10 +5,11 @@
  * Useful for CI/CD and basic API validation.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
+import { startServer, stopServer } from './helpers/testServer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const API_URL = 'http://127.0.0.1:3000';
@@ -23,6 +24,14 @@ const createTestImageBuffer = () => {
 };
 
 describe('API Endpoints (No Model Required)', () => {
+  beforeAll(async () => {
+    await startServer();
+  });
+
+  afterAll(async () => {
+    await stopServer();
+  });
+
   describe('Health & Config', () => {
     it('GET /api/health should return ok status', async () => {
       const response = await fetch(`${API_URL}/api/health`);

@@ -9,7 +9,7 @@ import {
 } from "./ui/select";
 import { Button } from "./ui/button";
 import { cn } from "../lib/utils";
-import { useToast } from "../hooks/useToast";
+import { toast } from "sonner";
 
 const API_BASE = "/api/models";
 
@@ -37,7 +37,6 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
   const [error, setError] = useState(null);
-  const { addToast } = useToast();
 
   // Fetch available models (includes running status from backend)
   const fetchModels = useCallback(async () => {
@@ -126,11 +125,11 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
         throw new Error(`Failed to start model: ${response.statusText}`);
       }
       await fetchModels();
-      addToast("Model Starting", `Starting ${getModelById(modelId)?.name || modelId}...`, "default");
+      toast.success(`Starting ${getModelById(modelId)?.name || modelId}...`);
     } catch (err) {
       console.error("Error starting model:", err);
       setError(err.message);
-      addToast("Start Failed", err.message, "destructive");
+      toast.error(err.message);
     } finally {
       setActionInProgress(null);
     }
@@ -148,11 +147,11 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
         throw new Error(`Failed to stop model: ${response.statusText}`);
       }
       await fetchModels();
-      addToast("Model Stopped", `${getModelById(modelId)?.name || modelId} has been stopped`, "default");
+      toast.success(`${getModelById(modelId)?.name || modelId} has been stopped`);
     } catch (err) {
       console.error("Error stopping model:", err);
       setError(err.message);
-      addToast("Stop Failed", err.message, "destructive");
+      toast.error(err.message);
     } finally {
       setActionInProgress(null);
     }
@@ -163,11 +162,7 @@ export function ModelSelector({ currentModel, onModelChange, className = "", fil
     onModelChange?.(modelId);
     const model = getModelById(modelId);
     if (model) {
-      addToast(
-        "Model Selected",
-        `Selected ${model.name || model.id}`,
-        "default"
-      );
+      toast.success(`Selected ${model.name || model.id}`);
     }
   };
 

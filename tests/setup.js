@@ -1,16 +1,14 @@
-import { expect, afterEach } from 'vitest';
+import { expect, afterEach, vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import * as matchers from '@testing-library/jest-dom/matchers';
 
-// Only use testing-library in jsdom environment (React tests)
-try {
-  const { cleanup } = await import('@testing-library/react');
-  const matchers = await import('@testing-library/jest-dom/matchers');
+// Extend Vitest's expect with jest-dom matchers
+expect.extend(matchers);
 
-  expect.extend(matchers.default || matchers);
+// Cleanup after each test
+afterEach(() => {
+  cleanup();
+});
 
-  afterEach(() => {
-    cleanup();
-  });
-} catch (e) {
-  // @testing-library/react not available - skip cleanup
-  console.log('Testing library not available, skipping React cleanup');
-}
+// Don't mock fetch globally - let individual test files decide
+// Integration tests need real fetch, unit tests can mock it locally

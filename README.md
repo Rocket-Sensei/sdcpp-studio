@@ -26,7 +26,7 @@ While this application supports any OpenAI-compatible Images API, it is primaril
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - A Stable Diffusion API server (e.g., stable-diffusion.cpp)
 
 ### Installation

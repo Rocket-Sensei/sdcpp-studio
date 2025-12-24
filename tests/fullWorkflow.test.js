@@ -3,8 +3,6 @@
  *
  * End-to-end testing for the SD WebUI image generation pipeline.
  * Tests the complete flow from API call to image saved on disk.
- *
- * These tests require the backend server to be running.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -13,6 +11,7 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
+import { startServer, stopServer } from './helpers/testServer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.join(__dirname, '../..');
@@ -155,6 +154,14 @@ function verifyGenerationInDatabase(generationId) {
 
 // Tests
 describe.skip('Full Workflow Integration Tests', () => {
+  beforeAll(async () => {
+    await startServer();
+  });
+
+  afterAll(async () => {
+    await stopServer();
+  });
+
   describe('Backend Health', () => {
     it('should have backend server running', async () => {
       const isHealthy = await checkBackendHealth();

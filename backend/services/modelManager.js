@@ -14,6 +14,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import { spawn } from 'child_process';
+import { broadcastModelStatus } from './websocket.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -453,6 +454,12 @@ export class ModelManager {
           if (this._isServerReady(output)) {
             processEntry.status = ModelStatus.RUNNING;
             this.logger.info(`Model "${modelId}" is now running on port ${port}`);
+            // Broadcast model status change
+            broadcastModelStatus(modelId, ModelStatus.RUNNING, {
+              port,
+              execMode: model.exec_mode,
+              pid: processEntry.pid,
+            });
           }
         }
       });
@@ -546,11 +553,15 @@ export class ModelManager {
       }
 
       this.logger.info(`Model "${modelId}" stopped`);
+      // Broadcast model status change
+      broadcastModelStatus(modelId, ModelStatus.STOPPED, {});
       return true;
 
     } catch (error) {
       this.logger.error(`Error stopping model "${modelId}": ${error.message}`);
       processEntry.status = ModelStatus.ERROR;
+      // Broadcast model status change
+      broadcastModelStatus(modelId, ModelStatus.ERROR, { error: error.message });
       return false;
     }
   }
@@ -785,7 +796,14 @@ export class ModelManager {
 
     processEntry.exitCode = code;
     processEntry.signal = signal;
-    processEntry.status = code === 0 ? ModelStatus.STOPPED : ModelStatus.ERROR;
+    const newStatus = code === 0 ? ModelStatus.STOPPED : ModelStatus.ERROR;
+    processEntry.status = newStatus;
+
+    // Broadcast model status change
+    broadcastModelStatus(modelId, newStatus, {
+      exitCode: code,
+      signal,
+    });
 
     // Free the port
     if (processEntry.port) {
@@ -815,6 +833,9 @@ export class ModelManager {
       processEntry.status = ModelStatus.ERROR;
       processEntry.appendError(error.message);
     }
+
+    // Broadcast model status change
+    broadcastModelStatus(modelId, ModelStatus.ERROR, { error: error.message });
 
     // Call callback if provided
     if (this.onProcessError) {
@@ -862,6 +883,25 @@ export class ModelManager {
    */
   getAllProcesses() {
     return Array.from(this.processes.values());
+  }
+
+  /**
+   * Get model-specific generation parameters
+   * Returns default generation parameters for a model if defined in models.yml
+   * @param {string} modelId - Model identifier
+   * @returns {Object|null} Model-specific generation parameters or null
+   */
+  getModelGenerationParams(modelId) {
+    if (!this.configLoaded) {
+      this.loadConfig();
+    }
+
+    const model = this.getModel(modelId);
+    if (!model || !model.generation_params) {
+      return null;
+    }
+
+    return model.generation_params;
   }
 }
 

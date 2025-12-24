@@ -9,7 +9,7 @@ import { Switch } from "./ui/switch";
 import { Slider } from "./ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
-import { useToast } from "../hooks/useToast";
+import { toast } from "sonner";
 import { ModelSelector } from "./ModelSelector";
 
 const SIZES = [
@@ -55,7 +55,6 @@ const CLIP_SKIP_OPTIONS = [
 ];
 
 export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
-  const { addToast } = useToast();
   const { generateQueued, isLoading } = useImageGeneration();
 
   const fileInputRef = useRef(null);
@@ -67,6 +66,7 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
   const [sourceImage, setSourceImage] = useState(null);
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
   const [useQueue, setUseQueue] = useState(true);
+  const [seed, setSeed] = useState("");
 
   // SD.cpp Advanced Settings
   const [cfgScale, setCfgScale] = useState(2.5);
@@ -83,12 +83,12 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      addToast("Error", "Please select an image file", "destructive");
+      toast.error("Please select an image file");
       return;
     }
 
     if (file.size > 50 * 1024 * 1024) {
-      addToast("Error", "Image size must be less than 50MB", "destructive");
+      toast.error("Image size must be less than 50MB");
       return;
     }
 
@@ -112,12 +112,12 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      addToast("Error", "Please enter a prompt", "destructive");
+      toast.error("Please enter a prompt");
       return;
     }
 
     if (!sourceImage) {
-      addToast("Error", "Please select a source image", "destructive");
+      toast.error("Please select a source image");
       return;
     }
 
@@ -129,6 +129,7 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
         negative_prompt: negativePrompt,
         size,
         image: sourceImage,
+        seed: seed || undefined, // Pass seed if provided
         // SD.cpp Advanced Settings
         cfg_scale: cfgScale,
         sampling_method: samplingMethod,
@@ -136,10 +137,10 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
         clip_skip: clipSkip,
       });
 
-      addToast("Success", `Job added to queue! Check the Queue tab for progress.`);
+      toast.success(`Job added to queue! Check Queue & History for progress.`);
       if (onGenerated) onGenerated();
     } catch (err) {
-      addToast("Error", err.message, "destructive");
+      toast.error(err.message);
     }
   };
 
@@ -384,6 +385,21 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
               onCheckedChange={setUseQueue}
               disabled={isLoading}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="seed">Seed (optional, for reproducibility)</Label>
+            <Input
+              id="seed"
+              type="number"
+              placeholder="Leave empty for random seed"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value)}
+              disabled={isLoading}
+            />
+            <p className="text-xs text-muted-foreground">
+              Each generation uses a random seed. Set a seed to reproduce the same image.
+            </p>
           </div>
         </div>
 

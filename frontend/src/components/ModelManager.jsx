@@ -28,7 +28,7 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { Progress } from "./ui/progress";
-import { useToast } from "../hooks/useToast";
+import { toast } from "sonner";
 import { cn } from "../lib/utils";
 
 // Model status constants
@@ -95,7 +95,6 @@ export function ModelManager() {
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [modelFilesStatus, setModelFilesStatus] = useState({});
-  const { addToast } = useToast();
 
   // Fetch all models
   const fetchModels = useCallback(async () => {
@@ -117,12 +116,12 @@ export function ModelManager() {
       }
     } catch (error) {
       console.error("Error fetching models:", error);
-      addToast("Error", "Failed to load models", "destructive");
+      toast.error("Failed to load models");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [addToast]);
+  }, []);
 
   // Fetch model files status
   const fetchModelFilesStatus = useCallback(async (modelId) => {
@@ -154,7 +153,7 @@ export function ModelManager() {
         method: "POST",
       });
       if (response.ok) {
-        addToast("Success", `Model ${modelId} is starting`, "default");
+        toast.success(`Model ${modelId} is starting`);
         await fetchModels();
       } else {
         const error = await response.json();
@@ -162,7 +161,7 @@ export function ModelManager() {
       }
     } catch (error) {
       console.error("Error starting model:", error);
-      addToast("Error", error.message, "destructive");
+      toast.error(error.message);
     } finally {
       setActionInProgress((prev) => ({ ...prev, [modelId]: null }));
     }
@@ -176,7 +175,7 @@ export function ModelManager() {
         method: "POST",
       });
       if (response.ok) {
-        addToast("Success", `Model ${modelId} is stopping`, "default");
+        toast.success(`Model ${modelId} is stopping`);
         await fetchModels();
       } else {
         const error = await response.json();
@@ -184,7 +183,7 @@ export function ModelManager() {
       }
     } catch (error) {
       console.error("Error stopping model:", error);
-      addToast("Error", error.message, "destructive");
+      toast.error(error.message);
     } finally {
       setActionInProgress((prev) => ({ ...prev, [modelId]: null }));
     }
@@ -223,7 +222,7 @@ export function ModelManager() {
     } catch (error) {
       console.error("Error downloading model:", error);
       setDownloadProgress({ status: DOWNLOAD_STATUS.FAILED, error: error.message });
-      addToast("Error", error.message, "destructive");
+      toast.error(error.message);
     }
   };
 
@@ -252,7 +251,7 @@ export function ModelManager() {
           ) {
             clearInterval(interval);
             if (data.status === DOWNLOAD_STATUS.COMPLETED) {
-              addToast("Success", "Model downloaded successfully", "success");
+              toast.success("Model downloaded successfully");
               // Refresh file status for this model
               if (modelId) {
                 fetchModelFilesStatus(modelId);
@@ -276,7 +275,7 @@ export function ModelManager() {
           method: "DELETE",
         });
         setDownloadProgress({ status: DOWNLOAD_STATUS.CANCELLED });
-        addToast("Cancelled", "Download cancelled", "default");
+        toast.success("Download cancelled");
       } catch (error) {
         console.error("Error cancelling download:", error);
       }

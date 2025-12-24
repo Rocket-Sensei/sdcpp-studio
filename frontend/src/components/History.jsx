@@ -4,11 +4,10 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { useGenerations } from "../hooks/useImageGeneration";
-import { useToast } from "../hooks/useToast";
+import { toast } from "sonner";
 import { formatDate } from "../lib/utils";
 
 export function History({ onCreateMore }) {
-  const { addToast } = useToast();
   const { fetchGenerations, deleteGeneration, isLoading, generations } = useGenerations();
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -21,9 +20,9 @@ export function History({ onCreateMore }) {
   const handleDelete = async (id) => {
     try {
       await deleteGeneration(id);
-      addToast("Success", "Generation deleted");
+      toast.success("Generation deleted");
     } catch (err) {
-      addToast("Error", err.message, "destructive");
+      toast.error(err.message);
     }
   };
 
@@ -36,7 +35,7 @@ export function History({ onCreateMore }) {
       const fullGeneration = await response.json();
 
       if (!fullGeneration.images || fullGeneration.images.length === 0) {
-        addToast("Error", "No images found", "destructive");
+        toast.error("No images found");
         return;
       }
 
@@ -52,7 +51,7 @@ export function History({ onCreateMore }) {
       });
       setIsDialogOpen(true);
     } catch (err) {
-      addToast("Error", "Failed to load image", "destructive");
+      toast.error("Failed to load image");
     }
   };
 
@@ -88,7 +87,7 @@ export function History({ onCreateMore }) {
       const generation = await response.json();
 
       if (!generation.images || generation.images.length === 0) {
-        addToast("Error", "No images found", "destructive");
+        toast.error("No images found");
         return;
       }
 
@@ -106,9 +105,9 @@ export function History({ onCreateMore }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      addToast("Success", "Image downloaded");
+      toast.success("Image downloaded");
     } catch (err) {
-      addToast("Error", err.message, "destructive");
+      toast.error(err.message);
     }
   };
 

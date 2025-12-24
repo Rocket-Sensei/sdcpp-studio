@@ -5,6 +5,7 @@ import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
 import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
 import { loggedFetch } from '../utils/logger.js';
+import { broadcastQueueEvent, broadcastGenerationComplete } from './websocket.js';
 
 let isProcessing = false;
 let currentJob = null;
@@ -79,6 +80,7 @@ async function processQueue() {
   try {
     // Update status to processing
     updateGenerationStatus(job.id, GenerationStatus.PROCESSING);
+    broadcastQueueEvent({ ...job, status: GenerationStatus.PROCESSING }, 'job_updated');
 
     // Get model configuration
     // Use type-specific default if no model specified
@@ -131,12 +133,24 @@ async function processQueue() {
     // Update status to completed (generation_id is now the same as job.id)
     updateGenerationStatus(job.id, GenerationStatus.COMPLETED);
 
+    // Broadcast completion events
+    broadcastQueueEvent({ ...job, status: GenerationStatus.COMPLETED }, 'job_completed');
+    broadcastGenerationComplete({
+      id: job.id,
+      status: GenerationStatus.COMPLETED,
+      type: job.type,
+      prompt: job.prompt,
+      created_at: job.created_at,
+      imageCount: result?.imageCount || 0,
+    });
+
     console.log(`Job ${job.id} completed successfully`);
   } catch (error) {
     console.error(`Job ${job.id} failed:`, error);
     updateGenerationStatus(job.id, GenerationStatus.FAILED, {
       error: error.message,
     });
+    broadcastQueueEvent({ ...job, status: GenerationStatus.FAILED, error: error.message }, 'job_failed');
   } finally {
     isProcessing = false;
     currentJob = null;
@@ -273,6 +287,9 @@ async function processGenerateJob(job, modelConfig) {
   // Update progress
   updateGenerationProgress(job.id, 0.15, 'Preparing generation parameters...');
 
+  // Get model-specific default parameters (if any)
+  const modelParams = modelManager.getModelGenerationParams(modelId);
+
   const params = {
     prompt: job.prompt,
     negative_prompt: job.negative_prompt,
@@ -281,6 +298,11 @@ async function processGenerateJob(job, modelConfig) {
     n: job.n,
     quality: job.quality,
     style: job.style,
+    // SD.cpp Advanced Settings - use job values, fallback to model defaults, then undefined
+    cfg_scale: job.cfg_scale ?? modelParams?.cfg_scale ?? undefined,
+    sampling_method: job.sampling_method ?? modelParams?.sampling_method ?? undefined,
+    sample_steps: job.sample_steps ?? modelParams?.sample_steps ?? undefined,
+    clip_skip: job.clip_skip ?? modelParams?.clip_skip ?? undefined,
   };
 
   updateGenerationProgress(job.id, 0.25, 'Generating image...');
@@ -306,8 +328,11 @@ async function processGenerateJob(job, modelConfig) {
   // Generation record already exists (created when queued), just save images
   updateGenerationProgress(job.id, 0.85, 'Saving images...');
 
+  let imageCount = 0;
+
   // Save images
   if (response.data && response.data.length > 0) {
+    imageCount = response.data.length;
     for (let i = 0; i < response.data.length; i++) {
       const imageData = response.data[i];
       const imageId = randomUUID();
@@ -325,7 +350,7 @@ async function processGenerateJob(job, modelConfig) {
     }
   }
 
-  return { generationId };
+  return { generationId, imageCount };
 }
 
 /**
@@ -367,9 +392,10 @@ async function processHTTPGeneration(job, modelConfig, params) {
   if (params.clip_skip !== undefined && extraArgs.clip_skip === undefined) {
     extraArgs.clip_skip = params.clip_skip;
   }
-
-  // Generate random seed if not provided
-  if (!extraArgs.seed) {
+  // Use seed from params if provided, otherwise use existing extraArgs.seed, or generate random
+  if (params.seed !== null && params.seed !== undefined) {
+    extraArgs.seed = params.seed;
+  } else if (!extraArgs.seed) {
     extraArgs.seed = Math.floor(Math.random() * 4294967295);
   }
 
@@ -486,6 +512,9 @@ async function processEditJob(job, modelConfig) {
   // Load the input image from disk
   const imageBuffer = await readFile(job.input_image_path);
 
+  // Get model-specific default parameters (if any)
+  const modelParams = modelManager.getModelGenerationParams(modelId);
+
   // Prepare params for generateImageDirect
   const params = {
     model: modelId,
@@ -497,7 +526,12 @@ async function processEditJob(job, modelConfig) {
     image: {
       buffer: imageBuffer,
       mimetype: job.input_image_mime_type || 'image/png'
-    }
+    },
+    // SD.cpp Advanced Settings - use job values, fallback to model defaults, then undefined
+    cfg_scale: job.cfg_scale ?? modelParams?.cfg_scale ?? undefined,
+    sampling_method: job.sampling_method ?? modelParams?.sampling_method ?? undefined,
+    sample_steps: job.sample_steps ?? modelParams?.sample_steps ?? undefined,
+    clip_skip: job.clip_skip ?? modelParams?.clip_skip ?? undefined,
   };
 
   // Load mask if provided
@@ -534,7 +568,10 @@ async function processEditJob(job, modelConfig) {
   // Generation record already exists (created when queued), just save images
   updateGenerationProgress(job.id, 0.85, 'Saving images...');
 
+  let imageCount = 0;
+
   if (response.data && response.data.length > 0) {
+    imageCount = response.data.length;
     for (let i = 0; i < response.data.length; i++) {
       const imageData = response.data[i];
       const imageId = randomUUID();
@@ -552,7 +589,7 @@ async function processEditJob(job, modelConfig) {
     }
   }
 
-  return { generationId };
+  return { generationId, imageCount };
 }
 
 /**
@@ -575,6 +612,9 @@ async function processVariationJob(job, modelConfig) {
   // Load the input image from disk
   const imageBuffer = await readFile(job.input_image_path);
 
+  // Get model-specific default parameters (if any)
+  const modelParams = modelManager.getModelGenerationParams(modelId);
+
   // Prepare params for generateImageDirect
   const params = {
     model: modelId,
@@ -586,7 +626,12 @@ async function processVariationJob(job, modelConfig) {
     image: {
       buffer: imageBuffer,
       mimetype: job.input_image_mime_type || 'image/png'
-    }
+    },
+    // SD.cpp Advanced Settings - use job values, fallback to model defaults, then undefined
+    cfg_scale: job.cfg_scale ?? modelParams?.cfg_scale ?? undefined,
+    sampling_method: job.sampling_method ?? modelParams?.sampling_method ?? undefined,
+    sample_steps: job.sample_steps ?? modelParams?.sample_steps ?? undefined,
+    clip_skip: job.clip_skip ?? modelParams?.clip_skip ?? undefined,
   };
 
   updateGenerationProgress(job.id, 0.25, 'Generating variation...');
@@ -615,7 +660,10 @@ async function processVariationJob(job, modelConfig) {
   // Generation record already exists (created when queued), just save images
   updateGenerationProgress(job.id, 0.85, 'Saving images...');
 
+  let imageCount = 0;
+
   if (response.data && response.data.length > 0) {
+    imageCount = response.data.length;
     for (let i = 0; i < response.data.length; i++) {
       const imageData = response.data[i];
       const imageId = randomUUID();
@@ -633,5 +681,5 @@ async function processVariationJob(job, modelConfig) {
     }
   }
 
-  return { generationId };
+  return { generationId, imageCount };
 }

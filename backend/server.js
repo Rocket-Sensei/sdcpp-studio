@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { config } from 'dotenv';
+import http from 'http';
 import { initializeDatabase, getImagesDir, getInputImagesDir } from './db/database.js';
 import { runMigrations } from './db/migrations.js';
 import { randomUUID } from 'crypto';
@@ -28,6 +29,9 @@ import { modelManager } from './services/modelManager.js';
 import { processTracker } from './services/processTracker.js';
 import { modelDownloader, getDownloadMethod } from './services/modelDownloader.js';
 import { ensurePngFormat } from './utils/imageUtils.js';
+
+// WebSocket for real-time updates
+import { initializeWebSocket, broadcastGenerationComplete, broadcastModelStatus } from './services/websocket.js';
 
 // Load environment variables from .env file
 const envResult = config({
@@ -232,6 +236,7 @@ app.post('/api/queue/generate', async (req, res) => {
       quality: req.body.quality,
       style: req.body.style,
       model: req.body.model,
+      seed: req.body.seed,
       status: GenerationStatus.PENDING,
       // SD.cpp Advanced Settings
       cfg_scale: req.body.cfg_scale,
@@ -273,6 +278,7 @@ app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { nam
       n: req.body.n,
       source_image_id: req.body.source_image_id,
       model: req.body.model,
+      seed: req.body.seed,
       status: GenerationStatus.PENDING,
       input_image_path: imagePath,
       input_image_mime_type: 'image/png',
@@ -326,6 +332,7 @@ app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
       size: req.body.size,
       n: req.body.n,
       model: req.body.model,
+      seed: req.body.seed,
       status: GenerationStatus.PENDING,
       input_image_path: imagePath,
       input_image_mime_type: 'image/png',
@@ -853,9 +860,16 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
-app.listen(PORT, HOST, async () => {
+// Create HTTP server and attach WebSocket
+const server = http.createServer(app);
+
+// Initialize WebSocket server
+const wsServer = initializeWebSocket(server);
+
+server.listen(PORT, HOST, async () => {
   console.log(`Server running on http://${HOST}:${PORT}`);
   console.log(`SD API endpoint: ${process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1231/v1'}`);
+  console.log(`WebSocket server initialized at ws://${HOST}:${PORT}/ws`);
 
   // Initialize model manager
   try {

@@ -99,6 +99,8 @@ models:
           repo: "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF"
 
   # ==================== Z-Image Turbo (CLI Mode) ====================
+  # NOTE: Z-Image-Turbo is a distilled model that does not rely on classifier-free guidance.
+  # Recommended settings: cfg_scale=0.0-1.0 (typically 0.0), steps=4-9 (typically 9)
   z-image-turbo:
     name: "Z-Image Turbo"
     description: "Z-Image Turbo - fast text-to-image model with 4GB VRAM support"
@@ -114,8 +116,7 @@ models:
       - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
       - "-p"
       - "A cinematic photograph"
-      - "--cfg-scale"
-      - "1.0"
+      # Note: cfg-scale is no longer hardcoded - set dynamically based on model generation_params
       - "-v"
       - "--offload-to-cpu"
       - "--diffusion-fa"
@@ -128,6 +129,12 @@ models:
     exec_mode: "cli"
     model_type: "text-to-image"
     default_size: "1024x1024"
+    # Model-specific default parameters for z-image-turbo
+    # These are applied when this model is selected
+    generation_params:
+      cfg_scale: 0.0  # Z-Image-Turbo doesn't rely on classifier-free guidance
+      sample_steps: 9  # Ultra-fast distilled model, uses 4-9 steps
+      sampling_method: "euler"
     huggingface:
       repo: "leejet/Z-Image-Turbo-GGUF"
       files:
@@ -139,6 +146,57 @@ models:
         - path: "Qwen3-4B-Instruct-2507-Q8_0.gguf"
           dest: "./models/"
           repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF"
+
+  # ==================== Copax Timeless XL+Z1 (CLI Mode) ====================
+  # NOTE: Based on Z-Image-Turbo, uses distilled settings.
+  # Recommended: cfg_scale=1.0, steps=14, sampling=res_2s
+  copax-timeless-xlz1:
+    name: "Copax Timeless XL+Z1"
+    description: "Copax Timeless XL+Z1 - SDXL/Z-Image hybrid model for high quality outputs"
+    capabilities: ["text-to-image"]
+    command: "./bin/sd-cli"
+    args:
+      - "--diffusion-model"
+      - "./models/copaxTimeless_xplusZ1.safetensors"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--llm"
+      - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-p"
+      - "A cinematic photograph"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--diffusion-fa"
+      - "-H"
+      - "1024"
+      - "-W"
+      - "1024"
+    api: null  # CLI mode
+    mode: "on_demand"
+    exec_mode: "cli"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    # Model-specific default parameters for copax-timeless-xlz1
+    # Based on Z-Image-Turbo distilled settings
+    generation_params:
+      cfg_scale: 1.0  # Distilled CFG Scale
+      sample_steps: 14  # Recommended steps
+      sampling_method: "res_2s"  # Recommended sampling method
+    huggingface:
+      repo: "copax/CopaxTimelessXLZ1"
+      files:
+        - path: "copaxTimeless_xplusZ1.safetensors"
+          dest: "./models/"
+        - path: "ae.safetensors"
+          dest: "./models/"
+          repo: "black-forest-labs/FLUX.1-schnell"
+        - path: "Qwen3-4B-Instruct-2507-Q8_0.gguf"
+          dest: "./models/"
+          repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF"
+    # Civitai download source
+    civitai:
+      model_id: "2466559"
+      download_url: "https://civitai.com/api/download/models/2466559?type=Model&format=SafeTensor&size=pruned&fp=fp8"
 
   # ==================== Flux Models ====================
   fluxed-up-flux:

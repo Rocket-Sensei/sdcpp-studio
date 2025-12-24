@@ -9,7 +9,7 @@ import { Slider } from "./ui/slider";
 import { Switch } from "./ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
-import { useToast } from "../hooks/useToast";
+import { toast } from "sonner";
 import { ModelSelector } from "./ModelSelector";
 
 const SIZES = [
@@ -68,7 +68,6 @@ const CLIP_SKIP_OPTIONS = [
 ];
 
 export function TextToImage({ onGenerated, settings, selectedModel, onModelChange }) {
-  const { addToast } = useToast();
   const { generateQueued, isLoading, result } = useImageGeneration();
 
   const [prompt, setPrompt] = useState("");
@@ -102,7 +101,7 @@ export function TextToImage({ onGenerated, settings, selectedModel, onModelChang
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      addToast("Error", "Please enter a prompt", "destructive");
+      toast.error("Please enter a prompt");
       return;
     }
 
@@ -116,6 +115,7 @@ export function TextToImage({ onGenerated, settings, selectedModel, onModelChang
         n,
         quality,
         style,
+        seed: seed || undefined, // Pass seed if provided
         // SD.cpp Advanced Settings
         cfg_scale: cfgScale,
         sampling_method: samplingMethod,
@@ -125,14 +125,14 @@ export function TextToImage({ onGenerated, settings, selectedModel, onModelChang
 
       if (useQueue) {
         await generateQueued(params);
-        addToast("Success", "Job added to queue! Check the Queue tab for progress.");
+        toast.success("Job added to queue! Check Queue & History for progress.");
       } else {
         await generateQueued(params);
-        addToast("Success", "Image generated successfully!");
+        toast.success("Image generated successfully!");
         if (onGenerated) onGenerated();
       }
     } catch (err) {
-      addToast("Error", err.message, "destructive");
+      toast.error(err.message);
     }
   };
 

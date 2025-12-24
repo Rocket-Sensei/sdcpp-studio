@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useImageGeneration } from '../frontend/src/hooks/useImageGeneration';
 
-// Mock fetch globally
+// Set up fetch mock for this test file
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 

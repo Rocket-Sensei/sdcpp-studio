@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import {
   Loader2,
   Trash2,
@@ -14,13 +14,17 @@ import {
   Clock,
   XCircle,
   CheckCircle2,
+  Wifi,
+  WifiOff,
+  Cpu,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Badge } from "./ui/badge";
 import { useGenerations } from "../hooks/useImageGeneration";
-import { useToast } from "../hooks/useToast";
+import { toast } from "sonner";
+import { useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
 import { formatDate } from "../lib/utils";
 
 const GENERATION_STATUS = {
@@ -61,18 +65,158 @@ const STATUS_CONFIG = {
   },
 };
 
+// Helper functions - defined outside component to avoid recreation on each render
+const getStatusConfig = (status) => {
+  return STATUS_CONFIG[status] || STATUS_CONFIG[GENERATION_STATUS.PENDING];
+};
+
+const isPendingOrProcessing = (status) => {
+  return status === GENERATION_STATUS.PENDING || status === GENERATION_STATUS.PROCESSING;
+};
+
+// Thumbnail component moved outside parent to prevent remounting on parent re-renders
+// Using memo to prevent unnecessary re-renders when generation props haven't changed
+// This is critical because the parent polls every 3 seconds and would otherwise cause
+// all thumbnails to remount and reload their images
+const Thumbnail = memo(function Thumbnail({ generation }) {
+  const [src, setSrc] = useState(null);
+  const [imageCount, setImageCount] = useState(0);
+
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        const response = await fetch(`/api/generations/${generation.id}`);
+        if (!response.ok) return;
+
+        const gen = await response.json();
+        if (gen.images && gen.images.length > 0) {
+          setImageCount(gen.images.length);
+          const imgResponse = await fetch(`/api/images/${gen.images[0].id}`);
+          if (imgResponse.ok) {
+            const blob = await imgResponse.blob();
+            setSrc(URL.createObjectURL(blob));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load thumbnail", e);
+      }
+    };
+
+    // Only load images for completed generations
+    if (generation.status === GENERATION_STATUS.COMPLETED) {
+      loadImages();
+    }
+  }, [generation.id, generation.status]);
+
+  // Show preloader for pending/processing generations
+  if (isPendingOrProcessing(generation.status)) {
+    return (
+      <div className="aspect-square bg-muted rounded-lg flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-2" />
+        <span className="text-xs text-muted-foreground">Generating...</span>
+      </div>
+    );
+  }
+
+  // Show failed state
+  if (generation.status === GENERATION_STATUS.FAILED || generation.status === GENERATION_STATUS.CANCELLED) {
+    return (
+      <div className="aspect-square bg-destructive/10 rounded-lg flex flex-col items-center justify-center">
+        <XCircle className="h-8 w-8 text-destructive mb-2" />
+        <span className="text-xs text-destructive">
+          {generation.status === GENERATION_STATUS.FAILED ? "Failed" : "Cancelled"}
+        </span>
+      </div>
+    );
+  }
+
+  if (!src) {
+    return (
+      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
+        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <img src={src} alt={generation.prompt} className="w-full h-full object-cover" />
+      {imageCount > 1 && (
+        <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
+          {imageCount}
+        </div>
+      )}
+    </div>
+  );
+});
+
 export function UnifiedQueue({ onCreateMore }) {
-  const { addToast } = useToast();
   const { fetchGenerations, isLoading, generations } = useGenerations();
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [models, setModels] = useState({});
 
-  // Refresh generations on mount and poll for updates
+  // Fetch models on mount to get model names
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await fetch('/api/models');
+        if (response.ok) {
+          const data = await response.json();
+          // Create a map of model ID to model name
+          const modelMap = {};
+          if (data.models) {
+            data.models.forEach(model => {
+              modelMap[model.id] = model.name || model.id;
+            });
+          }
+          setModels(modelMap);
+        }
+      } catch (error) {
+        console.error('Failed to fetch models:', error);
+      }
+    };
+    fetchModels();
+  }, []);
+
+  // Helper function to get model name from model ID
+  const getModelName = useCallback((modelId) => {
+    if (!modelId) return 'Unknown Model';
+    return models[modelId] || modelId;
+  }, [models]);
+
+  // WebSocket connection for real-time updates
+  const { isConnected: isWsConnected } = useWebSocket({
+    channels: [WS_CHANNELS.QUEUE, WS_CHANNELS.GENERATIONS],
+    onMessage: (message) => {
+      // Refresh generations when receiving relevant WebSocket messages
+      if (message.channel === WS_CHANNELS.QUEUE) {
+        // Queue updates: job_created, job_updated, job_completed, job_failed
+        if (message.type === 'job_updated' ||
+            message.type === 'job_completed' ||
+            message.type === 'job_failed') {
+          fetchGenerations();
+        }
+      } else if (message.channel === WS_CHANNELS.GENERATIONS) {
+        // Generation completions
+        if (message.type === 'generation_complete') {
+          fetchGenerations();
+        }
+      }
+    },
+    onConnectionChange: (isConnected) => {
+      if (isConnected) {
+        console.log('[UnifiedQueue] WebSocket connected');
+      } else {
+        console.log('[UnifiedQueue] WebSocket disconnected');
+      }
+    },
+  });
+
+  // Initial fetch on mount
   useEffect(() => {
     fetchGenerations();
-    const interval = setInterval(fetchGenerations, 3000); // Poll every 3 seconds
-    return () => clearInterval(interval);
-  }, [fetchGenerations]);
+  }, []); // Only fetch once on mount
 
   const handleCancel = async (id) => {
     try {
@@ -80,13 +224,13 @@ export function UnifiedQueue({ onCreateMore }) {
         method: "DELETE",
       });
       if (response.ok) {
-        addToast("Success", "Generation cancelled");
+        toast.success("Generation cancelled");
         fetchGenerations();
       } else {
         throw new Error("Failed to cancel");
       }
     } catch (error) {
-      addToast("Error", error.message, "destructive");
+      toast.error(error.message);
     }
   };
 
@@ -96,13 +240,13 @@ export function UnifiedQueue({ onCreateMore }) {
         method: "DELETE",
       });
       if (response.ok) {
-        addToast("Success", "Generation deleted");
+        toast.success("Generation deleted");
         fetchGenerations();
       } else {
         throw new Error("Failed to delete");
       }
     } catch (error) {
-      addToast("Error", error.message, "destructive");
+      toast.error(error.message);
     }
   };
 
@@ -114,7 +258,7 @@ export function UnifiedQueue({ onCreateMore }) {
       const fullGeneration = await response.json();
 
       if (!fullGeneration.images || fullGeneration.images.length === 0) {
-        addToast("Error", "No images found", "destructive");
+        toast.error("No images found");
         return;
       }
 
@@ -130,7 +274,7 @@ export function UnifiedQueue({ onCreateMore }) {
       });
       setIsDialogOpen(true);
     } catch (err) {
-      addToast("Error", "Failed to load image", "destructive");
+      toast.error("Failed to load image");
     }
   };
 
@@ -142,7 +286,7 @@ export function UnifiedQueue({ onCreateMore }) {
       const generation = await response.json();
 
       if (!generation.images || generation.images.length === 0) {
-        addToast("Error", "No images found", "destructive");
+        toast.error("No images found");
         return;
       }
 
@@ -160,9 +304,9 @@ export function UnifiedQueue({ onCreateMore }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      addToast("Success", "Image downloaded");
+      toast.success("Image downloaded");
     } catch (err) {
-      addToast("Error", err.message, "destructive");
+      toast.error(err.message);
     }
   };
 
@@ -190,92 +334,21 @@ export function UnifiedQueue({ onCreateMore }) {
     }
   };
 
-  const getStatusConfig = (status) => {
-    return STATUS_CONFIG[status] || STATUS_CONFIG[GENERATION_STATUS.PENDING];
-  };
-
-  const isPendingOrProcessing = (status) => {
-    return status === GENERATION_STATUS.PENDING || status === GENERATION_STATUS.PROCESSING;
-  };
-
-  // Thumbnail component that handles both completed and pending generations
-  const Thumbnail = ({ generation }) => {
-    const [src, setSrc] = useState(null);
-    const [imageCount, setImageCount] = useState(0);
-
-    useEffect(() => {
-      const loadImages = async () => {
-        try {
-          const response = await fetch(`/api/generations/${generation.id}`);
-          if (!response.ok) return;
-
-          const gen = await response.json();
-          if (gen.images && gen.images.length > 0) {
-            setImageCount(gen.images.length);
-            const imgResponse = await fetch(`/api/images/${gen.images[0].id}`);
-            if (imgResponse.ok) {
-              const blob = await imgResponse.blob();
-              setSrc(URL.createObjectURL(blob));
-            }
-          }
-        } catch (e) {
-          console.error("Failed to load thumbnail", e);
-        }
-      };
-
-      // Only load images for completed generations
-      if (generation.status === GENERATION_STATUS.COMPLETED) {
-        loadImages();
-      }
-    }, [generation.id, generation.status]);
-
-    // Show preloader for pending/processing generations
-    if (isPendingOrProcessing(generation.status)) {
-      return (
-        <div className="aspect-square bg-muted rounded-lg flex flex-col items-center justify-center">
-          <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-2" />
-          <span className="text-xs text-muted-foreground">Generating...</span>
-        </div>
-      );
-    }
-
-    // Show failed state
-    if (generation.status === GENERATION_STATUS.FAILED || generation.status === GENERATION_STATUS.CANCELLED) {
-      return (
-        <div className="aspect-square bg-destructive/10 rounded-lg flex flex-col items-center justify-center">
-          <XCircle className="h-8 w-8 text-destructive mb-2" />
-          <span className="text-xs text-destructive">
-            {generation.status === GENERATION_STATUS.FAILED ? "Failed" : "Cancelled"}
-          </span>
-        </div>
-      );
-    }
-
-    if (!src) {
-      return (
-        <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-          <ImageIcon className="h-8 w-8 text-muted-foreground" />
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative">
-        <img src={src} alt={generation.prompt} className="w-full h-full object-cover" />
-        {imageCount > 1 && (
-          <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
-            {imageCount}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   if (generations.length === 0 && !isLoading) {
     return (
       <Card>
         <CardContent className="py-12">
           <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              {isWsConnected ? (
+                <Wifi className="h-4 w-4 text-green-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="text-xs text-muted-foreground">
+                {isWsConnected ? 'Real-time updates enabled' : 'Real-time updates disconnected'}
+              </span>
+            </div>
             <ImageIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No generations yet</h3>
             <p className="text-muted-foreground">
@@ -289,6 +362,18 @@ export function UnifiedQueue({ onCreateMore }) {
 
   return (
     <>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {isWsConnected ? (
+            <Wifi className="h-4 w-4 text-green-500" title="Real-time updates enabled" />
+          ) : (
+            <WifiOff className="h-4 w-4 text-muted-foreground" title="Real-time updates disconnected" />
+          )}
+          <span className="text-xs text-muted-foreground">
+            {isWsConnected ? 'Live' : 'Offline'}
+          </span>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {generations.map((generation) => {
           const config = getStatusConfig(generation.status);
@@ -332,6 +417,10 @@ export function UnifiedQueue({ onCreateMore }) {
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                   <Calendar className="h-3 w-3" />
                   <span>{formatDate(generation.created_at)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <Cpu className="h-3 w-3" />
+                  <span>{getModelName(generation.model)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                   <Box className="h-3 w-3" />
@@ -406,7 +495,7 @@ export function UnifiedQueue({ onCreateMore }) {
           <DialogHeader>
             <DialogTitle>{selectedImage?.prompt}</DialogTitle>
             <DialogDescription>
-              {selectedImage?.size} • {selectedImage?.width}x{selectedImage?.height} • Seed: {selectedImage?.seed || "Random"}
+              {getModelName(selectedImage?.model)} • {selectedImage?.size} • {selectedImage?.width}x{selectedImage?.height} • Seed: {selectedImage?.seed || "Random"}
               {selectedImage?.images && selectedImage.images.length > 1 && (
                 <span className="ml-2">• Image {selectedImage.currentImageIndex + 1} of {selectedImage.images.length}</span>
               )}

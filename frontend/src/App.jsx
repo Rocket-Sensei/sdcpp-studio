@@ -1,16 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
-import { Image, Sparkles, List, Settings } from "lucide-react";
-import { Toaster } from "./hooks/useToast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Sparkles } from "lucide-react";
+import { Toaster } from "./components/ui/sonner";
 import { TextToImage } from "./components/TextToImage";
 import { ImageToImage } from "./components/ImageToImage";
 import { UnifiedQueue } from "./components/UnifiedQueue";
 import { ModelManager } from "./components/ModelManager";
-import { Button } from "./components/ui/button";
+import { Navigation } from "./components/Navigation";
 import { useGenerations } from "./hooks/useImageGeneration";
 
 function App() {
-  const [activeTab, setActiveTab] = useState("text-to-image");
+  const navigate = useNavigate();
+  const location = useLocation();
   const [createMoreSettings, setCreateMoreSettings] = useState(null);
   const [currentModel, setCurrentModel] = useState(null);
   const { fetchGenerations } = useGenerations();
@@ -20,89 +21,93 @@ function App() {
   }, [fetchGenerations]);
 
   const handleGenerated = useCallback(() => {
-    // Switch to queue tab after generation (shows active jobs and recent generations)
-    setActiveTab("queue");
+    // Navigate to gallery after generation (shows active jobs and recent generations)
+    navigate("/gallery");
     fetchGenerations();
-  }, [fetchGenerations]);
+  }, [navigate, fetchGenerations]);
 
   const handleCreateMore = useCallback((generation) => {
     setCreateMoreSettings(generation);
-    setActiveTab("text-to-image");
-  }, []);
-
-  const tabs = [
-    { value: "text-to-image", label: "Text to Image", icon: Sparkles },
-    { value: "image-to-image", label: "Image to Image", icon: Image },
-    { value: "queue", label: "Queue & History", icon: List },
-    { value: "models", label: "Models", icon: Settings },
-  ];
+    navigate("/text-to-image");
+  }, [navigate]);
 
   return (
-    <Toaster>
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between gap-4">
-              {/* Logo */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h1 className="text-lg font-bold hidden sm:block">SD WebUI</h1>
-              </div>
-
-              {/* Navigation Tabs */}
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-                <TabsList className="grid w-full grid-cols-4 bg-muted/50 h-9">
-                  {tabs.map((tab) => (
-                    <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-sm">
-                      <tab.icon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Logo */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h1 className="text-lg font-bold hidden sm:block">SD WebUI</h1>
             </div>
+
+            {/* Navigation */}
+            <Navigation />
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsContent value="text-to-image" className="max-w-2xl mx-auto mt-0">
-              <TextToImage
-                onGenerated={handleGenerated}
-                settings={createMoreSettings}
-                selectedModel={currentModel}
-                onModelChange={setCurrentModel}
-              />
-            </TabsContent>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <Routes>
+          <Route
+            path="/text-to-image"
+            element={
+              <div className="max-w-2xl mx-auto">
+                <TextToImage
+                  onGenerated={handleGenerated}
+                  settings={createMoreSettings}
+                  selectedModel={currentModel}
+                  onModelChange={setCurrentModel}
+                />
+              </div>
+            }
+          />
+          <Route
+            path="/image-to-image"
+            element={
+              <div className="max-w-2xl mx-auto">
+                <ImageToImage
+                  onGenerated={handleGenerated}
+                  selectedModel={currentModel}
+                  onModelChange={setCurrentModel}
+                />
+              </div>
+            }
+          />
+          <Route
+            path="/gallery"
+            element={
+              <div className="max-w-6xl mx-auto">
+                <UnifiedQueue onCreateMore={handleCreateMore} />
+              </div>
+            }
+          />
+          <Route
+            path="/models"
+            element={
+              <div className="max-w-4xl mx-auto">
+                <ModelManager />
+              </div>
+            }
+          />
+          {/* Default route - redirect to /text-to-image */}
+          <Route path="/" element={<Navigate to="/text-to-image" replace />} />
+        </Routes>
+      </main>
 
-            <TabsContent value="image-to-image" className="max-w-2xl mx-auto mt-0">
-              <ImageToImage
-                onGenerated={handleGenerated}
-                selectedModel={currentModel}
-                onModelChange={setCurrentModel}
-              />
-            </TabsContent>
+      {/* Footer */}
+      <footer className="border-t border-border py-4 mt-8">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          SD WebUI - OpenAI-Compatible Image Generation Interface
+        </div>
+      </footer>
 
-            <TabsContent value="queue" className="max-w-6xl mx-auto mt-0">
-              <UnifiedQueue onCreateMore={handleCreateMore} />
-            </TabsContent>
-
-            <TabsContent value="models" className="max-w-4xl mx-auto mt-0">
-              <ModelManager />
-            </TabsContent>
-          </Tabs>
-        </main>
-
-        {/* Footer */}
-        <footer className="border-t border-border py-4 mt-8">
-          <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-            SD WebUI - OpenAI-Compatible Image Generation Interface
-          </div>
-        </footer>
-      </div>
-    </Toaster>
+      {/* Toast notifications */}
+      <Toaster />
+    </div>
   );
 }
 
