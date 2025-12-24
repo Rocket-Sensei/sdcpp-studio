@@ -1,0 +1,45 @@
+models:
+  # ==================== Flux Models ====================
+  fluxed-up-flux:
+    name: "FluxedUp Flux"
+    description: "High quality flux model with NSFW support"
+    capabilities: ["text-to-image"]
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/fluxedUpFluxNSFW_v51Q4KSV2.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--clip-on-cpu"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1234
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+
+  fux-capacity:
+    name: "fuxCapacityNSFW"
+    description: "High quality flux model with NSFW support"
+    capabilities: ["text-to-image"]
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/fuxCapacityNSFWPornFlux_30FP8.safetensors"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--clip-on-cpu"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1235
+    model_type: "text-to-image"
+    default_size: "1024x1024"

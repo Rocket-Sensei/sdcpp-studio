@@ -1,0 +1,38 @@
+# Stable Diffusion Models
+models:
+  # ==================== Stable Diffusion Models ====================
+  sd15-base:
+    name: "SD 1.5 Base"
+    description: "Stable Diffusion 1.5 base model"
+    capabilities: ["text-to-image"]
+    command: "./bin/sd-server"
+    args:
+      - "./models/v1-5-pruned-emaonly-fp16.safetensors"
+    mode: "preload"
+    exec_mode: "server"
+    port: 1235
+    model_type: "text-to-image"
+    default_size: "512x512"
+    huggingface:
+      repo: "runwayml/stable-diffusion-v1-5"
+      files:
+        - path: "v1-5-pruned-emaonly-fp16.safetensors"
+          dest: "./models/"
+
+  sdxl-turbo:
+    name: "SDXL Turbo"
+    description: "Fast SDXL Turbo for quick generations"
+    capabilities: ["text-to-image"]
+    command: "./bin/sd-cli"
+    args:
+      - "-m"
+      - "./models/sd_xl_turbo_1.0_fp16.safetensors"
+    mode: "on_demand"
+    exec_mode: "cli"
+    model_type: "text-to-image"
+    default_size: "512x512"
+    huggingface:
+      repo: "stabilityai/sdxl-turbo"
+      files:
+        - path: "sd_xl_turbo_1.0_fp16.safetensors"
+          dest: "./models/"

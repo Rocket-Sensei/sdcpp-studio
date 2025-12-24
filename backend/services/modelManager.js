@@ -24,16 +24,8 @@ const PROJECT_ROOT = path.join(__dirname, '../..');  // Project root (two levels
 const DEFAULT_CONFIG_PATH = path.join(__dirname, '../config/models.yml');
 const CONFIG_DIR = path.join(__dirname, '../config');
 
-// Default config files to load (in order - later configs override earlier ones)
-const DEFAULT_CONFIG_FILES = [
-  'settings.yml',      // Global settings (default models, etc.)
-  'upscalers.yml',     // Upscaler configurations
-  'models-qwen-cli.yml',
-  'models-qwen-image.yml',
-  'models-qwen-edit.yml',
-  'models-z-turbo.yml',
-  'models-copax.yml'
-];
+// Files that are NOT model configs (loaded in specific order)
+const NON_MODEL_CONFIGS = ['settings.yml', 'upscalers.yml'];
 
 // Model status constants
 export const ModelStatus = {
@@ -165,12 +157,8 @@ export class ModelManager {
     } else if (options.configPath) {
       this.configPaths = [options.configPath];
     } else {
-      // Use default multi-config setup
-      this.configPaths = DEFAULT_CONFIG_FILES.map(f => path.join(CONFIG_DIR, f));
-      // Fall back to single config if directory doesn't exist
-      if (!fs.existsSync(CONFIG_DIR)) {
-        this.configPaths = [DEFAULT_CONFIG_PATH];
-      }
+      // Auto-detect all YAML config files in the config directory
+      this.configPaths = this._discoverConfigFiles();
     }
     this.logger = new Logger(options.logPrefix || '[ModelManager]');
 
@@ -794,6 +782,47 @@ export class ModelManager {
     const port = this.nextAvailablePort;
     this.nextAvailablePort++;
     return port;
+  }
+
+  /**
+   * Auto-discover all YAML config files in the config directory
+   * @returns {Array<string>} Array of config file paths in load order
+   * @private
+   */
+  _discoverConfigFiles() {
+    // Fall back to single config if directory doesn't exist
+    if (!fs.existsSync(CONFIG_DIR)) {
+      this.logger.warn(`Config directory not found: ${CONFIG_DIR}, using fallback`);
+      return [DEFAULT_CONFIG_PATH];
+    }
+
+    const files = fs.readdirSync(CONFIG_DIR).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+
+    // Separate into special configs and model configs
+    const specialConfigs = [];
+    const modelConfigs = [];
+
+    for (const file of files) {
+      if (NON_MODEL_CONFIGS.includes(file)) {
+        specialConfigs.push(file);
+      } else {
+        modelConfigs.push(file);
+      }
+    }
+
+    // Sort: settings.yml first, upscalers.yml second, then model configs alphabetically
+    specialConfigs.sort((a, b) => {
+      if (a === 'settings.yml') return -1;
+      if (b === 'settings.yml') return 1;
+      if (a === 'upscalers.yml') return -1;
+      if (b === 'upscalers.yml') return 1;
+      return a.localeCompare(b);
+    });
+
+    modelConfigs.sort();
+
+    const allConfigs = [...specialConfigs, ...modelConfigs];
+    return allConfigs.map(f => path.join(CONFIG_DIR, f));
   }
 
   /**

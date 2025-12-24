@@ -1,0 +1,16 @@
+# External API Models
+# Example configuration for using external OpenAI-compatible APIs
+# No local server is started - requests go directly to the external API
+models:
+  flux2:
+    name: "black-forest-labs/FLUX.2-pro"
+    description: "External API"
+    capabilities: ["text-to-image"]
+    command: null  # No command needed for API mode
+    args: []
+    api: "http://example.com"  # External API endpoint
+    api_key: "example"
+    mode: "on_demand"
+    exec_mode: "api"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
