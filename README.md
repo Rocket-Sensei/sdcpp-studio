@@ -47,12 +47,14 @@ npm test
 
 ### Configuration
 
-Set the `SD_API_ENDPOINT` environment variable to point to your Stable Diffusion API:
-
-```bash
-export SD_API_ENDPOINT="http://192.168.2.180:1234/v1"
-npm run dev:backend
-```
+Models are configured in `backend/config/models.yml`. Each model specifies:
+- `id`: Internal identifier
+- `name`: Display name
+- `type`: Model type (`text_to_image`, `image_to_image`)
+- `exec_mode`: Execution mode (`server`, `cli`, `api`)
+- `api`: API endpoint (for `api` mode)
+- `api_key`: API key (if required)
+- `model_path`: Path to model file (for `server`/`cli` modes)
 
 ## API Endpoints
 

@@ -239,6 +239,5 @@ User submits form
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
-| `SD_API_ENDPOINT` | SD-CPP API endpoint | `http://192.168.2.180:1234/v1` |
 | `DB_PATH` | SQLite database path | `backend/data/sd-webui.db` |
 | `IMAGES_DIR` | Images storage directory | `backend/data/images` |
