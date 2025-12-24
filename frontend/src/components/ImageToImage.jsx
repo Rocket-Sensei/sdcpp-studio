@@ -113,6 +113,7 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
             currentModel={selectedModel}
             onModelChange={onModelChange}
             className="w-full"
+            filterCapabilities={['image-to-image']}
           />
         </div>
 

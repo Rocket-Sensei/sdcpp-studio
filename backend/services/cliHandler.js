@@ -12,6 +12,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
+import { logCliCommand, logCliOutput, logCliError } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,6 +133,10 @@ class CLIHandler {
 
     console.log(`[CLIHandler] Executing command: ${command.join(' ')}`);
 
+    // Log the CLI command
+    const [cmd, ...args] = command;
+    logCliCommand(cmd, args, { cwd: PROJECT_ROOT });
+
     try {
       // Execute the CLI command
       const result = await this.executeCommand(command);
@@ -149,6 +154,7 @@ class CLIHandler {
 
       return imageBuffer;
     } catch (error) {
+      logCliError(error);
       console.error(`[CLIHandler] Image generation failed:`, error);
       throw new Error(`CLI generation failed: ${error.message}`);
     }
@@ -255,6 +261,9 @@ class CLIHandler {
       });
 
       child.on('close', (code) => {
+        // Log CLI output
+        logCliOutput(stdout, stderr, code);
+
         if (code === 0) {
           resolve(stdout + stderr);
         } else {
@@ -267,6 +276,7 @@ class CLIHandler {
       });
 
       child.on('error', (error) => {
+        logCliError(error);
         reject(new Error(
           `Failed to spawn command: ${error.message}\n` +
           `Command: ${command.join(' ')}`

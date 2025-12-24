@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { createGeneration, createGeneratedImage } from '../db/queries.js';
 import { getModelManager } from './modelManager.js';
+import { loggedFetch } from '../utils/logger.js';
 
 const modelManager = getModelManager();
 const SD_API_ENDPOINT = process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1234/v1';
@@ -145,7 +146,7 @@ export async function generateImageDirect(params, mode = 'generate') {
   }
 
   // Make API request
-  const response = await fetch(endpoint, {
+  const response = await loggedFetch(endpoint, {
     method: 'POST',
     headers,
     body: isFormData ? requestBody : JSON.stringify(requestBody)
@@ -293,7 +294,7 @@ export async function generateImage(params, mode = 'generate') {
   }
 
   // Make API request
-  const response = await fetch(endpoint, {
+  const response = await loggedFetch(endpoint, {
     method: 'POST',
     headers,
     body: isFormData ? requestBody : JSON.stringify(requestBody)
@@ -331,7 +332,7 @@ export async function generateImage(params, mode = 'generate') {
     if (imageData.b64_json) {
       buffer = Buffer.from(imageData.b64_json, 'base64');
     } else if (imageData.url) {
-      const imageResponse = await fetch(imageData.url);
+      const imageResponse = await loggedFetch(imageData.url);
       buffer = Buffer.from(await imageResponse.arrayBuffer());
     }
 

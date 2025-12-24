@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
 import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
+import { loggedFetch } from '../utils/logger.js';
 
 let isProcessing = false;
 let currentJob = null;
@@ -81,7 +82,12 @@ async function processQueue() {
     updateJobStatus(job.id, QueueStatus.PROCESSING);
 
     // Get model configuration
-    const modelId = job.model || modelManager.defaultModelId;
+    // Use type-specific default if no model specified
+    let modelId = job.model;
+    if (!modelId) {
+      const defaultModel = modelManager.getDefaultModelForType(job.type);
+      modelId = defaultModel?.id || modelManager.defaultModelId;
+    }
     if (!modelId) {
       throw new Error('No model specified and no default model configured');
     }
@@ -233,7 +239,7 @@ async function waitForServerReady(apiUrl, timeout = 30000) {
   while (Date.now() - startTime < timeout) {
     try {
       // Check /v1/models endpoint - sdcpp returns list of models when loaded
-      const response = await fetch(modelsUrl, {
+      const response = await loggedFetch(modelsUrl, {
         method: 'GET',
         signal: AbortSignal.timeout(5000)
       });
@@ -421,7 +427,7 @@ async function processHTTPGeneration(job, modelConfig, params) {
     console.log(`[QueueProcessor] Using API key for authentication`);
   }
 
-  const response = await fetch(endpoint, {
+  const response = await loggedFetch(endpoint, {
     method: 'POST',
     headers,
     body: JSON.stringify(requestBody)

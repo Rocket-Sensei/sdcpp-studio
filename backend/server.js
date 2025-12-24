@@ -18,6 +18,7 @@ import { startQueueProcessor } from './services/queueProcessor.js';
 import { modelManager } from './services/modelManager.js';
 import { processTracker } from './services/processTracker.js';
 import { modelDownloader, getDownloadMethod } from './services/modelDownloader.js';
+import { ensurePngFormat } from './utils/imageUtils.js';
 
 // Load environment variables from .env file
 const envResult = config({
@@ -241,10 +242,12 @@ app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { nam
     }
 
     // Save uploaded image to disk
+    // Convert webp to PNG for sdcpp compatibility
     const inputImagesDir = getInputImagesDir();
     const imageFilename = `${randomUUID()}.png`;
     const imagePath = path.join(inputImagesDir, imageFilename);
-    await writeFile(imagePath, imageFile.buffer);
+    const pngBuffer = await ensurePngFormat(imageFile.buffer, imageFile.mimetype);
+    await writeFile(imagePath, pngBuffer);
 
     const params = {
       type: 'edit',
@@ -254,7 +257,7 @@ app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { nam
       n: req.body.n,
       source_image_id: req.body.source_image_id,
       input_image_path: imagePath,
-      input_image_mime_type: imageFile.mimetype,
+      input_image_mime_type: 'image/png',
     };
 
     // Handle optional mask upload
@@ -262,9 +265,10 @@ app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { nam
     if (maskFile) {
       const maskFilename = `${randomUUID()}_mask.png`;
       const maskPath = path.join(inputImagesDir, maskFilename);
-      await writeFile(maskPath, maskFile.buffer);
+      const maskPngBuffer = await ensurePngFormat(maskFile.buffer, maskFile.mimetype);
+      await writeFile(maskPath, maskPngBuffer);
       params.mask_image_path = maskPath;
-      params.mask_image_mime_type = maskFile.mimetype;
+      params.mask_image_mime_type = 'image/png';
     }
 
     // Only include model if provided
@@ -287,10 +291,12 @@ app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
     }
 
     // Save uploaded image to disk
+    // Convert webp to PNG for sdcpp compatibility
     const inputImagesDir = getInputImagesDir();
     const imageFilename = `${randomUUID()}.png`;
     const imagePath = path.join(inputImagesDir, imageFilename);
-    await writeFile(imagePath, req.file.buffer);
+    const pngBuffer = await ensurePngFormat(req.file.buffer, req.file.mimetype);
+    await writeFile(imagePath, pngBuffer);
 
     const params = {
       type: 'variation',
@@ -300,7 +306,7 @@ app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
       n: req.body.n,
       source_image_id: req.body.source_image_id,
       input_image_path: imagePath,
-      input_image_mime_type: req.file.mimetype,
+      input_image_mime_type: 'image/png',
     };
 
     // Only include model if provided
@@ -379,7 +385,8 @@ app.get('/api/models', async (req, res) => {
     // getAllModels() returns an array, so we need to handle it properly
     res.json({
       models: models,
-      default: modelManager.getDefaultModel()
+      default: modelManager.getDefaultModel(),
+      default_models: modelManager.defaultModels
     });
   } catch (error) {
     console.error('Error fetching models:', error);

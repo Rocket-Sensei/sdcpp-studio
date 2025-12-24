@@ -153,6 +153,7 @@ export class ModelManager {
     this.models = new Map(); // modelId -> model config
     this.processes = new Map(); // modelId -> ProcessEntry
     this.defaultModelId = null;
+    this.defaultModels = null; // Map of job type to default model ID
     this.configLoaded = false;
     this.isShuttingDown = false;
 
@@ -190,9 +191,15 @@ export class ModelManager {
         throw new Error('Invalid configuration: empty or not an object');
       }
 
-      // Parse default model
-      this.defaultModelId = config.default || null;
+      // Parse default model configuration
+      // Support both legacy 'default' and new 'default_model' and 'default_models'
+      this.defaultModelId = config.default_model || config.default || null;
+      this.defaultModels = config.default_models || null;
+
       this.logger.info(`Default model: ${this.defaultModelId || 'none'}`);
+      if (this.defaultModels) {
+        this.logger.info(`Type-specific defaults: ${JSON.stringify(this.defaultModels)}`);
+      }
 
       // Parse models
       const modelsConfig = config.models || {};
@@ -230,6 +237,18 @@ export class ModelManager {
         } else if (!Array.isArray(modelConfig.args)) {
           this.logger.warn(`Model "${modelId}" args is not an array, converting`);
           modelConfig.args = [modelConfig.args];
+        }
+
+        // Ensure capabilities is an array, default to text-to-image if not specified
+        if (!modelConfig.capabilities) {
+          // Infer capabilities from model_type if available
+          if (modelConfig.model_type === 'image-to-image') {
+            modelConfig.capabilities = ['image-to-image', 'text-to-image'];
+          } else {
+            modelConfig.capabilities = ['text-to-image'];
+          }
+        } else if (!Array.isArray(modelConfig.capabilities)) {
+          modelConfig.capabilities = [modelConfig.capabilities];
         }
 
         // Store model config
@@ -310,6 +329,39 @@ export class ModelManager {
     }
 
     return this.getModel(this.defaultModelId);
+  }
+
+  /**
+   * Get default model for a specific job type
+   * @param {string} jobType - Job type ('generate', 'edit', 'variation')
+   * @returns {Object|null} Default model configuration or null
+   */
+  getDefaultModelForType(jobType) {
+    if (!this.configLoaded) {
+      this.loadConfig();
+    }
+
+    // Map job types to default_models keys
+    const typeMap = {
+      'generate': 'text_to_image',
+      'edit': 'image_to_image',
+      'variation': 'image_to_image'
+    };
+
+    const typeKey = typeMap[jobType];
+    if (!typeKey) {
+      // No specific type mapping, use global default
+      return this.getDefaultModel();
+    }
+
+    // Check if we have a type-specific default
+    if (this.defaultModels && this.defaultModels[typeKey]) {
+      const modelId = this.defaultModels[typeKey];
+      return this.getModel(modelId);
+    }
+
+    // Fall back to global default
+    return this.getDefaultModel();
   }
 
   /**

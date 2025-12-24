@@ -30,8 +30,9 @@ const MODEL_STATUS = {
  * @param {string} props.currentModel - Currently selected model ID
  * @param {function} props.onModelChange - Callback when model selection changes
  * @param {string} props.className - Additional CSS classes
+ * @param {Array<string>} props.filterCapabilities - Optional capability filter (e.g., ['image-to-image'])
  */
-export function ModelSelector({ currentModel, onModelChange, className = "" }) {
+export function ModelSelector({ currentModel, onModelChange, className = "", filterCapabilities = null }) {
   const [models, setModels] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
@@ -46,7 +47,18 @@ export function ModelSelector({ currentModel, onModelChange, className = "" }) {
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
       const data = await response.json();
-      setModels(data.models || []);
+
+      // Filter models by capabilities if filterCapabilities is provided
+      let filteredModels = data.models || [];
+      if (filterCapabilities && Array.isArray(filterCapabilities)) {
+        filteredModels = filteredModels.filter(model => {
+          const modelCapabilities = model.capabilities || [];
+          // Check if model has at least one of the required capabilities
+          return filterCapabilities.some(cap => modelCapabilities.includes(cap));
+        });
+      }
+
+      setModels(filteredModels);
 
       // Set default model if none selected
       if (!currentModel && data.default) {
@@ -59,7 +71,7 @@ export function ModelSelector({ currentModel, onModelChange, className = "" }) {
       console.error("Error fetching models:", err);
       setError(err.message);
     }
-  }, [currentModel, onModelChange]);
+  }, [currentModel, onModelChange, filterCapabilities]);
 
   // Initial data load
   useEffect(() => {
