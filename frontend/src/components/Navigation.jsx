@@ -1,17 +1,18 @@
 import { NavLink } from "react-router-dom";
-import { Sparkles, Image, List, Settings } from "lucide-react";
+import { Sparkles, Image, List, Settings, Maximize } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const navItems = [
   { to: "/text-to-image", label: "Text to Image", icon: Sparkles },
   { to: "/image-to-image", label: "Image to Image", icon: Image },
+  { to: "/upscale", label: "Upscale", icon: Maximize },
   { to: "/gallery", label: "Gallery", icon: List },
   { to: "/models", label: "Models", icon: Settings },
 ];
 
 export function Navigation() {
   return (
-    <nav className="grid grid-cols-4 bg-muted/50 rounded-lg p-1 gap-1">
+    <nav className="grid grid-cols-5 bg-muted/50 rounded-lg p-1 gap-1">
       {navItems.map((item) => (
         <NavLink
           key={item.to}

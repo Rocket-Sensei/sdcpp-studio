@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { Toaster } from "./components/ui/sonner";
 import { TextToImage } from "./components/TextToImage";
 import { ImageToImage } from "./components/ImageToImage";
+import { Upscaler } from "./components/Upscaler";
 import { UnifiedQueue } from "./components/UnifiedQueue";
 import { ModelManager } from "./components/ModelManager";
 import { Navigation } from "./components/Navigation";
@@ -74,6 +75,14 @@ function App() {
                   selectedModel={currentModel}
                   onModelChange={setCurrentModel}
                 />
+              </div>
+            }
+          />
+          <Route
+            path="/upscale"
+            element={
+              <div className="max-w-2xl mx-auto">
+                <Upscaler />
               </div>
             }
           />

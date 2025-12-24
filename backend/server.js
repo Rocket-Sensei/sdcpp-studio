@@ -1354,6 +1354,146 @@ app.post('/sdapi/v1/txt2img', async (req, res) => {
   }
 });
 
+// ========== SD.next Upscaler API Endpoints ==========
+
+/**
+ * GET /sdapi/v1/upscalers
+ * Get list of available upscalers
+ * Compatible with SD.next / Automatic1111 API
+ */
+app.get('/sdapi/v1/upscalers', (req, res) => {
+  try {
+    const { getAvailableUpscalers } = import('./services/upscalerService.js');
+    getAvailableUpscalers().then(upscalers => {
+      res.json(upscalers);
+    });
+  } catch (error) {
+    console.error('Error fetching upscalers:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /sdapi/v1/extra-single-image
+ * Upscale a single image
+ * Compatible with SD.next / Automatic1111 API
+ */
+app.post('/sdapi/v1/extra-single-image', async (req, res) => {
+  try {
+    const { upscaleImage } = await import('./services/upscalerService.js');
+
+    const {
+      image, // Base64 string
+      resize_mode = 0,
+      show_extras_results = true,
+      gfpgan_visibility = 0,
+      codeformer_visibility = 0,
+      codeformer_weight = 0,
+      upscaling_resize = 2.0,
+      upscaling_resize_w = 512,
+      upscaling_resize_h = 512,
+      upscaling_crop = true,
+      upscaler_1 = 'RealESRGAN 4x+',
+      upscaler_2 = 'None',
+      extras_upscaler_2_visibility = 0
+    } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: 'Missing required field: image' });
+    }
+
+    // Upscale the image
+    const resultBuffer = await upscaleImage(image, {
+      resize_mode,
+      upscaling_resize,
+      upscaling_resize_w,
+      upscaling_resize_h,
+      upscaling_crop,
+      upscaler_1,
+      upscaler_2,
+      extras_upscaler_2_visibility,
+      gfpgan_visibility,
+      codeformer_visibility,
+      codeformer_weight
+    });
+
+    // Convert to base64
+    const base64Image = resultBuffer.toString('base64');
+
+    res.json({
+      image: base64Image,
+      html_info: `<div>Upscaled with ${upscaler_1}</div>`
+    });
+  } catch (error) {
+    console.error('Error in extra-single-image:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /sdapi/v1/extra-batch-images
+ * Upscale multiple images in batch
+ * Compatible with SD.next / Automatic1111 API
+ */
+app.post('/sdapi/v1/extra-batch-images', async (req, res) => {
+  try {
+    const { upscaleImage } = await import('./services/upscalerService.js');
+
+    const {
+      imageList, // Array of { data: base64, name: string }
+      resize_mode = 0,
+      show_extras_results = true,
+      gfpgan_visibility = 0,
+      codeformer_visibility = 0,
+      codeformer_weight = 0,
+      upscaling_resize = 2.0,
+      upscaling_resize_w = 512,
+      upscaling_resize_h = 512,
+      upscaling_crop = true,
+      upscaler_1 = 'RealESRGAN 4x+',
+      upscaler_2 = 'None',
+      extras_upscaler_2_visibility = 0
+    } = req.body;
+
+    if (!imageList || !Array.isArray(imageList) || imageList.length === 0) {
+      return res.status(400).json({ error: 'Missing required field: imageList (array)' });
+    }
+
+    // Upscale all images
+    const results = await Promise.all(
+      imageList.map(async (img) => {
+        try {
+          const resultBuffer = await upscaleImage(img.data, {
+            resize_mode,
+            upscaling_resize,
+            upscaling_resize_w,
+            upscaling_resize_h,
+            upscaling_crop,
+            upscaler_1,
+            upscaler_2,
+            extras_upscaler_2_visibility,
+            gfpgan_visibility,
+            codeformer_visibility,
+            codeformer_weight
+          });
+          return resultBuffer.toString('base64');
+        } catch (err) {
+          console.error(`Error upscaling image ${img.name}:`, err);
+          return null;
+        }
+      })
+    );
+
+    res.json({
+      images: results.filter(Boolean),
+      html_info: `<div>Upscaled ${results.filter(Boolean).length} images with ${upscaler_1}</div>`
+    });
+  } catch (error) {
+    console.error('Error in extra-batch-images:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Serve frontend for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
