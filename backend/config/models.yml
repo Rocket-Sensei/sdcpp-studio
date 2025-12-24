@@ -230,8 +230,8 @@ models:
     capabilities: ["text-to-image"]
     command: null  # No command needed for API mode
     args: []
-    api: "https://api.together.xyz/v1"  # External API endpoint
-    api_key: "tgp_v1_EcmZ5OOBJ2NvG-58oRJVYLI4qdrtHLtXSAjBzF7EF4Q"
+    api: ""  # External API endpoint
+    api_key: ""
     mode: "on_demand"  # Load strategy - always on demand for API mode
     exec_mode: "api"  # Execution mode - no local server
     model_type: "text-to-image"
