@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { config } from 'dotenv';
 import { initializeDatabase, getImagesDir, getInputImagesDir } from './db/database.js';
+import { runMigrations } from './db/migrations.js';
 import { randomUUID } from 'crypto';
 import { writeFile } from 'fs/promises';
 import { generateImage } from './services/imageService.js';
@@ -68,6 +69,9 @@ const upload = multer({
 
 // Initialize database
 initializeDatabase();
+
+// Run migrations
+await runMigrations();
 
 // API Routes
 
