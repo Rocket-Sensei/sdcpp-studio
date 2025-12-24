@@ -1388,12 +1388,11 @@ app.post('/sdapi/v1/txt2img', async (req, res) => {
  * Get list of available upscalers
  * Compatible with SD.next / Automatic1111 API
  */
-app.get('/sdapi/v1/upscalers', (req, res) => {
+app.get('/sdapi/v1/upscalers', async (req, res) => {
   try {
-    const { getAvailableUpscalers } = import('./services/upscalerService.js');
-    getAvailableUpscalers().then(upscalers => {
-      res.json(upscalers);
-    });
+    const { getAvailableUpscalers } = await import('./services/upscalerService.js');
+    const upscalers = getAvailableUpscalers();
+    res.json(upscalers);
   } catch (error) {
     console.error('Error fetching upscalers:', error);
     res.status(500).json({ error: error.message });
