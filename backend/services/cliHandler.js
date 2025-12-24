@@ -224,11 +224,22 @@ class CLIHandler {
       cmd.push(...styleArgs);
     }
 
-    // CFG Scale (can be made configurable)
-    cmd.push('--cfg-scale', '7.0');
+    // SD.cpp Advanced Settings (use params if provided, otherwise use defaults)
+    const cfgScale = params.cfg_scale ?? 7.0;
+    cmd.push('--cfg-scale', cfgScale.toString());
 
-    // Sampling method (can be made configurable)
-    cmd.push('--sampling-method', 'euler');
+    const samplingMethod = params.sampling_method ?? 'euler';
+    cmd.push('--sampling-method', samplingMethod);
+
+    // Sample steps (if explicitly provided, override quality-based mapping)
+    if (params.sample_steps !== undefined) {
+      cmd.push('--steps', params.sample_steps.toString());
+    }
+
+    // CLIP skip (if provided)
+    if (params.clip_skip !== undefined && params.clip_skip !== -1) {
+      cmd.push('--clip-skip', params.clip_skip.toString());
+    }
 
     return cmd;
   }

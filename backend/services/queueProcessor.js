@@ -354,6 +354,20 @@ async function processHTTPGeneration(job, modelConfig, params) {
     }
   }
 
+  // Add SD.cpp advanced settings from params if not already in extraArgs
+  if (params.cfg_scale !== undefined && extraArgs.cfg_scale === undefined) {
+    extraArgs.cfg_scale = params.cfg_scale;
+  }
+  if (params.sampling_method !== undefined && extraArgs.sampling_method === undefined) {
+    extraArgs.sampling_method = params.sampling_method;
+  }
+  if (params.sample_steps !== undefined && extraArgs.sample_steps === undefined) {
+    extraArgs.sample_steps = params.sample_steps;
+  }
+  if (params.clip_skip !== undefined && extraArgs.clip_skip === undefined) {
+    extraArgs.clip_skip = params.clip_skip;
+  }
+
   // Generate random seed if not provided
   if (!extraArgs.seed) {
     extraArgs.seed = Math.floor(Math.random() * 4294967295);

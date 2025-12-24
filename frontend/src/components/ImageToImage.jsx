@@ -1,11 +1,12 @@
 import { useState, useRef, useMemo } from "react";
-import { Upload, Image as ImageIcon, Sparkles, X, List } from "lucide-react";
+import { Upload, Image as ImageIcon, Sparkles, X, List, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Switch } from "./ui/switch";
+import { Slider } from "./ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { useToast } from "../hooks/useToast";
@@ -23,6 +24,36 @@ const MODE_OPTIONS = [
   { value: "variation", label: "Variation" },
 ];
 
+const SAMPLING_METHODS = [
+  { value: "euler", label: "Euler" },
+  { value: "euler_a", label: "Euler Ancestral" },
+  { value: "ddim", label: "DDIM" },
+  { value: "plms", label: "PLMS" },
+  { value: "dpmpp_2m", label: "DPM++ 2M" },
+  { value: "dpmpp_2s_a", label: "DPM++ 2S Ancestral" },
+  { value: "dpmpp_sde", label: "DPM++ SDE" },
+  { value: "dpm_fast", label: "DPM Fast" },
+  { value: "dpm_adaptive", label: "DPM Adaptive" },
+  { value: "lcm", label: "LCM" },
+  { value: "tcd", label: "TCD" },
+];
+
+const CLIP_SKIP_OPTIONS = [
+  { value: "-1", label: "Auto (Model Default)" },
+  { value: "1", label: "Skip 1 layer" },
+  { value: "2", label: "Skip 2 layers" },
+  { value: "3", label: "Skip 3 layers" },
+  { value: "4", label: "Skip 4 layers" },
+  { value: "5", label: "Skip 5 layers" },
+  { value: "6", label: "Skip 6 layers" },
+  { value: "7", label: "Skip 7 layers" },
+  { value: "8", label: "Skip 8 layers" },
+  { value: "9", label: "Skip 9 layers" },
+  { value: "10", label: "Skip 10 layers" },
+  { value: "11", label: "Skip 11 layers" },
+  { value: "12", label: "Skip 12 layers" },
+];
+
 export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
   const { addToast } = useToast();
   const { generateQueued, isLoading } = useImageGeneration();
@@ -36,6 +67,13 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
   const [sourceImage, setSourceImage] = useState(null);
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
   const [useQueue, setUseQueue] = useState(true);
+
+  // SD.cpp Advanced Settings
+  const [cfgScale, setCfgScale] = useState(2.5);
+  const [samplingMethod, setSamplingMethod] = useState("euler");
+  const [sampleSteps, setSampleSteps] = useState(20);
+  const [clipSkip, setClipSkip] = useState("-1");
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   // Memoize filterCapabilities to prevent unnecessary ModelSelector re-renders
   const filterCapabilities = useMemo(() => ['image-to-image'], []);
@@ -91,6 +129,11 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
         negative_prompt: negativePrompt,
         size,
         image: sourceImage,
+        // SD.cpp Advanced Settings
+        cfg_scale: cfgScale,
+        sampling_method: samplingMethod,
+        sample_steps: sampleSteps,
+        clip_skip: clipSkip,
       });
 
       addToast("Success", `Job added to queue! Check the Queue tab for progress.`);
@@ -224,6 +267,105 @@ export function ImageToImage({ onGenerated, selectedModel, onModelChange }) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* SD.cpp Advanced Settings */}
+        <div className="space-y-4 pt-4 border-t border-border">
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full flex items-center justify-between p-0 h-auto"
+            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+          >
+            <span className="text-sm font-medium">Advanced SD.cpp Settings</span>
+            {showAdvancedSettings ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+
+          {showAdvancedSettings && (
+            <div className="space-y-4 pt-4">
+              {/* CFG Scale */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="cfg-scale">CFG Scale: {cfgScale.toFixed(1)}</Label>
+                </div>
+                <Slider
+                  id="cfg-scale"
+                  min={1}
+                  max={20}
+                  step={0.5}
+                  value={[cfgScale]}
+                  onValueChange={(v) => setCfgScale(v[0])}
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Classifier-free guidance scale. Higher = more prompt adherence, lower = more creativity.
+                </p>
+              </div>
+
+              {/* Sample Steps */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sample-steps">Sample Steps: {sampleSteps}</Label>
+                </div>
+                <Slider
+                  id="sample-steps"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={[sampleSteps]}
+                  onValueChange={(v) => setSampleSteps(v[0])}
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of denoising steps. More steps = higher quality but slower.
+                </p>
+              </div>
+
+              {/* Sampling Method */}
+              <div className="space-y-2">
+                <Label htmlFor="sampling-method">Sampling Method</Label>
+                <Select value={samplingMethod} onValueChange={setSamplingMethod} disabled={isLoading}>
+                  <SelectTrigger id="sampling-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SAMPLING_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  The sampling algorithm. Euler is fast and reliable.
+                </p>
+              </div>
+
+              {/* CLIP Skip */}
+              <div className="space-y-2">
+                <Label htmlFor="clip-skip">CLIP Skip</Label>
+                <Select value={clipSkip} onValueChange={setClipSkip} disabled={isLoading}>
+                  <SelectTrigger id="clip-skip">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CLIP_SKIP_OPTIONS.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Number of CLIP layers to skip. Can affect style and detail.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Advanced Options */}

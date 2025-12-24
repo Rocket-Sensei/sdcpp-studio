@@ -233,6 +233,11 @@ app.post('/api/queue/generate', async (req, res) => {
       style: req.body.style,
       model: req.body.model,
       status: GenerationStatus.PENDING,
+      // SD.cpp Advanced Settings
+      cfg_scale: req.body.cfg_scale,
+      sampling_method: req.body.sampling_method,
+      sample_steps: req.body.sample_steps,
+      clip_skip: req.body.clip_skip,
     };
     await createGeneration(params);
     res.json({ job_id: id, status: GenerationStatus.PENDING });
@@ -271,6 +276,11 @@ app.post('/api/queue/edit', upload.fields([{ name: 'image', maxCount: 1 }, { nam
       status: GenerationStatus.PENDING,
       input_image_path: imagePath,
       input_image_mime_type: 'image/png',
+      // SD.cpp Advanced Settings
+      cfg_scale: req.body.cfg_scale,
+      sampling_method: req.body.sampling_method,
+      sample_steps: req.body.sample_steps,
+      clip_skip: req.body.clip_skip,
     };
 
     // Handle optional mask upload
@@ -315,11 +325,15 @@ app.post('/api/queue/variation', upload.single('image'), async (req, res) => {
       negative_prompt: req.body.negative_prompt,
       size: req.body.size,
       n: req.body.n,
-      source_image_id: req.body.source_image_id,
       model: req.body.model,
       status: GenerationStatus.PENDING,
       input_image_path: imagePath,
       input_image_mime_type: 'image/png',
+      // SD.cpp Advanced Settings
+      cfg_scale: req.body.cfg_scale,
+      sampling_method: req.body.sampling_method,
+      sample_steps: req.body.sample_steps,
+      clip_skip: req.body.clip_skip,
     };
 
     await createGeneration(params);
