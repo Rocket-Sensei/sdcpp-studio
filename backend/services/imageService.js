@@ -64,7 +64,7 @@ export async function generateImageDirect(params, mode = 'generate') {
       promptString = `${finalPrompt}<negative_prompt>${negativePrompt}</negative_prompt>`;
     }
 
-    formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
+    formData.append('model', params.model || modelManager.getDefaultModel()?.id || 'qwen-image');
     formData.append('prompt', promptString);
 
     // Add image - Node.js native FormData requires wrapping Buffer in Blob
@@ -93,7 +93,7 @@ export async function generateImageDirect(params, mode = 'generate') {
     }
 
     requestBody = {
-      model: params.model || 'sd-cpp-local',
+      model: params.model || modelManager.getDefaultModel()?.id || 'qwen-image',
       prompt: promptString,
       n: params.n || 1,
       size: params.size || '512x512',
@@ -214,7 +214,7 @@ export async function generateImage(params, mode = 'generate') {
       promptString = `${finalPrompt}<negative_prompt>${negativePrompt}</negative_prompt>`;
     }
 
-    formData.append('model', params.model || 'sd-cpp-local'); // Note: legacy fallback, should use actual model ID from params
+    formData.append('model', params.model || modelManager.getDefaultModel()?.id || 'qwen-image');
     formData.append('prompt', promptString);
 
     // Add image - Node.js native FormData requires wrapping Buffer in Blob
@@ -243,7 +243,7 @@ export async function generateImage(params, mode = 'generate') {
     }
 
     requestBody = {
-      model: params.model || 'sd-cpp-local',
+      model: params.model || modelManager.getDefaultModel()?.id || 'qwen-image',
       prompt: promptString,
       n: params.n || 1,
       size: params.size || '512x512',
@@ -321,7 +321,7 @@ export async function generateImage(params, mode = 'generate') {
   await createGeneration({
     id: generationId,
     type: mode,
-    model: params.model || 'sd-cpp-local', // Note: legacy fallback, should use actual model ID
+    model: params.model || modelManager.getDefaultModel()?.id || 'qwen-image',
     prompt: processedPrompt,
     negative_prompt: negativePrompt,
     size: params.size || '512x512',

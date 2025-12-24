@@ -105,28 +105,25 @@ models:
     name: "Z-Image Turbo"
     description: "Z-Image Turbo - fast text-to-image model with 4GB VRAM support"
     capabilities: ["text-to-image"]
-    # CLI mode command (one-shot generation)
-    command: "./bin/sd-cli"
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    port: 1238
     args:
+      - "-l"
+      - "127.0.0.1"
+      - "--listen-port"
+      - "1238"
       - "--diffusion-model"
       - "./models/z_image_turbo-Q8_0.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--llm"
       - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
-      - "-p"
-      - "A cinematic photograph"
-      # Note: cfg-scale is no longer hardcoded - set dynamically based on model generation_params
       - "-v"
       - "--offload-to-cpu"
       - "--diffusion-fa"
-      - "-H"
-      - "1024"
-      - "-W"
-      - "1024"
     api: null  # CLI mode
-    mode: "on_demand"
-    exec_mode: "cli"
+    exec_mode: "server"
     model_type: "text-to-image"
     default_size: "1024x1024"
     # Model-specific default parameters for z-image-turbo

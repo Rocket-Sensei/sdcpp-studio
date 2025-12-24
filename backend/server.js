@@ -33,6 +33,9 @@ import { ensurePngFormat } from './utils/imageUtils.js';
 // WebSocket for real-time updates
 import { initializeWebSocket, broadcastGenerationComplete, broadcastModelStatus } from './services/websocket.js';
 
+// Debug logging utilities
+import { logApiRequest } from './utils/logger.js';
+
 // Load environment variables from .env file
 const envResult = config({
   path: path.join(dirname(fileURLToPath(import.meta.url)), '.env')
@@ -61,6 +64,28 @@ const HOST = process.env.HOST || '0.0.0.0';  // Default to all interfaces
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Request logging middleware (for API routes only)
+app.use((req, res, next) => {
+  // Only log API routes, skip static files and health checks
+  // Include both /api/* and /sdapi/* routes for SD.next compatibility
+  if ((req.path.startsWith('/api') || req.path.startsWith('/sdapi')) && req.path !== '/api/health') {
+    const startTime = Date.now();
+
+    // Log the request
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const url = `${protocol}://${host}${req.originalUrl}`;
+    logApiRequest(req.method, url, req.headers, req.body);
+
+    // Capture response when finished
+    res.on('finish', () => {
+      const elapsed = Date.now() - startTime;
+      console.log(`[API] Response: ${res.statusCode} (${elapsed}ms)`);
+    });
+  }
+  next();
+});
 
 // Serve static files from frontend build
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
@@ -96,9 +121,10 @@ app.get('/api/health', (req, res) => {
 
 // Get API config (for client to know the SD API endpoint)
 app.get('/api/config', (req, res) => {
+  const defaultModel = modelManager.getDefaultModel();
   res.json({
     sdApiEndpoint: process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1234/v1',
-    model: 'sd-cpp-local'
+    model: defaultModel?.id || 'qwen-image'
   });
 });
 
@@ -407,6 +433,142 @@ app.delete('/api/queue/:id', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ========== SD.next Compatible API Endpoints ==========
+
+/**
+ * Derive model type from model name or configuration
+ * @param {Object} model - Model configuration object
+ * @returns {string} Model type (sdxl, sd15, etc.)
+ */
+function deriveModelType(model) {
+  if (!model) {
+    return 'sd15';
+  }
+
+  // Check model name for XL indicators
+  const name = (model.name || '').toLowerCase();
+  if (name.includes('xl') || name.includes('sdxl')) {
+    return 'sdxl';
+  }
+
+  // Check model_type in config
+  if (model.model_type) {
+    const modelType = model.model_type.toLowerCase();
+    if (modelType.includes('xl') || modelType.includes('sdxl')) {
+      return 'sdxl';
+    }
+  }
+
+  // Check exec_mode for API models
+  if (model.exec_mode === 'api' && model.api) {
+    const api = model.api.toLowerCase();
+    if (api.includes('xl') || api.includes('sdxl')) {
+      return 'sdxl';
+    }
+  }
+
+  // Default to sd15
+  return 'sd15';
+}
+
+/**
+ * Extract model file path from model args
+ * Looks for --diffusion-model, --model, or -m flag values
+ * @param {Object} model - Model configuration object
+ * @returns {string|null} Model file path or null
+ */
+function extractModelPath(model) {
+  if (!model || !model.args || !Array.isArray(model.args)) {
+    return null;
+  }
+
+  const args = model.args;
+
+  // Look for --diffusion-model flag
+  const diffIndex = args.indexOf('--diffusion-model');
+  if (diffIndex !== -1 && diffIndex + 1 < args.length) {
+    return args[diffIndex + 1];
+  }
+
+  // Look for --model flag (used by some models like sd15-base)
+  const modelIndex = args.indexOf('--model');
+  if (modelIndex !== -1 && modelIndex + 1 < args.length) {
+    return args[modelIndex + 1];
+  }
+
+  // Look for -m flag (used by some CLI models)
+  const mIndex = args.indexOf('-m');
+  if (mIndex !== -1 && mIndex + 1 < args.length) {
+    return args[mIndex + 1];
+  }
+
+  // Also check for --diffusion-model=value format
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--diffusion-model=')) {
+      return arg.split('=')[1];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Helper function to extract filename from model args
+ * Looks for --diffusion-model, --model, or -m flag values
+ * @param {Array} args - Model arguments array
+ * @returns {string|null} Extracted filename or null
+ */
+function extractFilenameFromArgs(args) {
+  if (!args || !Array.isArray(args)) {
+    return null;
+  }
+
+  // Look for --diffusion-model flag
+  const diffIndex = args.indexOf('--diffusion-model');
+  if (diffIndex !== -1 && diffIndex + 1 < args.length) {
+    return args[diffIndex + 1];
+  }
+
+  // Look for --model flag (used by some models like sd15-base)
+  const modelIndex = args.indexOf('--model');
+  if (modelIndex !== -1 && modelIndex + 1 < args.length) {
+    return args[modelIndex + 1];
+  }
+
+  // Look for -m flag (used by some CLI models)
+  const mIndex = args.indexOf('-m');
+  if (mIndex !== -1 && mIndex + 1 < args.length) {
+    return args[mIndex + 1];
+  }
+
+  return null;
+}
+
+/**
+ * Helper function to determine model type from filename extension
+ * @param {string} filename - Model filename
+ * @returns {string|null} Model type (safetensors, ckpt, gguf, diffusers, etc.)
+ */
+function getModelTypeFromFilename(filename) {
+  if (!filename) {
+    return null;
+  }
+
+  const ext = path.extname(filename).toLowerCase();
+
+  const typeMap = {
+    '.safetensors': 'safetensors',
+    '.ckpt': 'ckpt',
+    '.gguf': 'gguf',
+    '.pt': 'pt',
+    '.pth': 'pth',
+    '.bin': 'diffusers'
+  };
+
+  return typeMap[ext] || null;
+}
 
 // ========== Model Management API Endpoints ==========
 
@@ -851,6 +1013,343 @@ app.post('/api/models/:id/download', async (req, res) => {
     });
   } catch (error) {
     console.error('Error starting download:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== SD.next Compatible API Endpoints ==========
+
+/**
+ * SD.cpp supported samplers mapped to SD.next-style names
+ * Each sampler has a name for display, optional aliases, and configuration options
+ */
+const SD_SAMPLERS = [
+  { name: 'Euler', aliases: ['euler'], options: {} },
+  { name: 'Euler a', aliases: ['euler_a', 'Euler Ancestral'], options: {} },
+  { name: 'DDIM', aliases: ['ddim'], options: {} },
+  { name: 'PLMS', aliases: ['plms'], options: {} },
+  { name: 'DPM++ 2M', aliases: ['dpmpp_2m', 'DPM++ 2M Karras'], options: {} },
+  { name: 'DPM++ 2S a', aliases: ['dpmpp_2s_a', 'DPM++ 2S Ancestral', 'DPM++ 2S Ancestral Karras'], options: {} },
+  { name: 'DPM++ SDE', aliases: ['dpmpp_sde', 'DPM++ SDE Karras'], options: {} },
+  { name: 'DPM Fast', aliases: ['dpm_fast'], options: {} },
+  { name: 'DPM Adaptive', aliases: ['dpm_adaptive'], options: {} },
+  { name: 'LCM', aliases: ['lcm'], options: {} },
+  { name: 'TCD', aliases: ['tcd'], options: {} },
+  { name: 'Heun', aliases: ['heun'], options: {} },
+  { name: 'DPM2', aliases: ['dpm2'], options: {} },
+  { name: 'DPM2 a', aliases: ['dpm2_a', 'DPM2 Ancestral'], options: {} },
+  { name: 'UniPC', aliases: ['unipc'], options: {} },
+  { name: 'LMS', aliases: ['lms'], options: {} },
+  { name: 'LMS Karras', aliases: ['lms_karras'], options: {} },
+];
+
+// ==================== SD.next/Automatic1111 Compatible API Endpoints ====================
+// These use the standard /sdapi/v1/ path that SillyTavern expects
+
+// GET /sdapi/v1/samplers - List available samplers
+app.get('/sdapi/v1/samplers', (req, res) => {
+  res.json(SD_SAMPLERS);
+});
+
+// GET /sdapi/v1/schedulers - List available schedulers (same as samplers for SD.cpp)
+app.get('/sdapi/v1/schedulers', (req, res) => {
+  res.json(SD_SAMPLERS);
+});
+
+// GET /sdapi/v1/sd-models - List all available models
+app.get('/sdapi/v1/sd-models', (req, res) => {
+  try {
+    const models = modelManager.getAllModels();
+    const result = models.map(model => {
+      // Extract filename from args
+      let filename = '';
+      if (model.args && Array.isArray(model.args)) {
+        const diffusionIdx = model.args.indexOf('--diffusion-model');
+        if (diffusionIdx !== -1 && model.args[diffusionIdx + 1]) {
+          filename = model.args[diffusionIdx + 1];
+        }
+      }
+      // Determine type from filename
+      let type = 'safetensors';
+      if (filename.endsWith('.ckpt')) type = 'ckpt';
+      else if (filename.endsWith('.gguf')) type = 'gguf';
+      else if (filename.endsWith('.safetensors')) type = 'safetensors';
+
+      return {
+        title: model.name,
+        model_name: model.id,
+        filename: filename,
+        type: type,
+        hash: null,
+        sha256: null,
+        config: null
+      };
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching models:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /sdapi/v1/options - Get current options (including model checkpoint)
+app.get('/sdapi/v1/options', (req, res) => {
+  try {
+    const runningModels = modelManager.getRunningModels();
+    const defaultModel = modelManager.getDefaultModel();
+
+    // Get the current model name (display name, not ID)
+    let currentModelName = '';
+    if (runningModels.length > 0) {
+      const runningModel = typeof runningModels[0] === 'string'
+        ? modelManager.getModel(runningModels[0])
+        : runningModels[0];
+      currentModelName = runningModel?.name || '';
+    } else if (defaultModel) {
+      currentModelName = defaultModel.name || '';
+    }
+
+    // Return options in SD.next format
+    res.json({
+      sd_model_checkpoint: currentModelName,
+      sd_vae: null,
+      // Add other common options as needed
+    });
+  } catch (error) {
+    console.error('Error fetching options:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /sdapi/v1/options - Set options (for set-model endpoint)
+app.post('/sdapi/v1/options', async (req, res) => {
+  try {
+    const { sd_model_checkpoint } = req.body;
+    if (sd_model_checkpoint) {
+      // Helper function to find model ID by name (for SillyTavern compatibility)
+      function findModelIdByName(modelNameOrId) {
+        if (!modelNameOrId) return null;
+
+        // First try as-is (might already be an ID)
+        const model = modelManager.getModel(modelNameOrId);
+        if (model) return modelNameOrId;
+
+        // Try to find by name match (case-insensitive, partial match)
+        const allModels = modelManager.getAllModels();
+        const found = allModels.find(m =>
+          m.name.toLowerCase() === modelNameOrId.toLowerCase() ||
+          m.id.toLowerCase() === modelNameOrId.toLowerCase() ||
+          m.name.toLowerCase().includes(modelNameOrId.toLowerCase()) ||
+          modelNameOrId.toLowerCase().includes(m.name.toLowerCase())
+        );
+        return found?.id || null;
+      }
+
+      // Map model name to ID
+      const modelId = findModelIdByName(sd_model_checkpoint);
+      if (!modelId) {
+        return res.status(400).json({
+          error: `Model not found: ${sd_model_checkpoint}`,
+          detail: `Available models: ${modelManager.getAllModels().map(m => m.name).join(', ')}`
+        });
+      }
+
+      // Start the model if not running
+      const model = modelManager.getModel(modelId);
+      if (model && !modelManager.isModelRunning(modelId)) {
+        await modelManager.startModel(modelId);
+        console.log(`[API] Started model: ${modelId} (${model.name})`);
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error setting options:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /sdapi/v1/progress - Get generation progress
+app.get('/sdapi/v1/progress', (req, res) => {
+  try {
+    const stats = getGenerationStats();
+    const jobs = getAllGenerations();
+    const processingJob = jobs.find(j => j.status === 'processing');
+
+    let progress = 0;
+    let state = { job_count: 0 };
+
+    if (processingJob) {
+      progress = processingJob.progress || 0;
+      state = {
+        job_count: stats.pending || 0,
+        job_no: stats.processing || 0
+      };
+    }
+
+    res.json({
+      progress: progress,
+      eta_relative: null,
+      state: state,
+      current_image: null,
+      textinfo: null
+    });
+  } catch (error) {
+    console.error('Error fetching progress:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /sdapi/v1/interrupt - Interrupt current generation
+app.post('/sdapi/v1/interrupt', (req, res) => {
+  try {
+    const jobs = getAllGenerations();
+    const processingJob = jobs.find(j => j.status === 'processing');
+    if (processingJob) {
+      cancelGeneration(processingJob.id);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error interrupting:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /sdapi/v1/txt2img - Text to image generation
+app.post('/sdapi/v1/txt2img', async (req, res) => {
+  try {
+    const {
+      prompt,
+      negative_prompt,
+      width,
+      height,
+      steps,
+      cfg_scale,
+      sampler_name,
+      seed,
+      n = 1,
+      // SD WebUI API compatibility fields
+      override_settings,
+      sd_model_checkpoint
+    } = req.body;
+
+    // Helper function to find model ID by name (for SillyTavern compatibility)
+    function findModelIdByName(modelNameOrId) {
+      if (!modelNameOrId) return null;
+
+      // First try as-is (might already be an ID)
+      const model = modelManager.getModel(modelNameOrId);
+      if (model) return modelNameOrId;
+
+      // Try to find by name match (case-insensitive, partial match)
+      const allModels = modelManager.getAllModels();
+      const found = allModels.find(m =>
+        m.name.toLowerCase() === modelNameOrId.toLowerCase() ||
+        m.id.toLowerCase() === modelNameOrId.toLowerCase() ||
+        m.name.toLowerCase().includes(modelNameOrId.toLowerCase()) ||
+        modelNameOrId.toLowerCase().includes(m.name.toLowerCase())
+      );
+      return found?.id || null;
+    }
+
+    // Determine model ID from request
+    // Priority: override_settings.sd_model_checkpoint > sd_model_checkpoint > running model > default
+    let modelId = null;
+
+    // Check override_settings first (SD WebUI API standard for per-request override)
+    if (override_settings && override_settings.sd_model_checkpoint) {
+      modelId = findModelIdByName(override_settings.sd_model_checkpoint);
+    }
+    // Check direct sd_model_checkpoint
+    else if (sd_model_checkpoint) {
+      modelId = findModelIdByName(sd_model_checkpoint);
+    }
+    // Check for currently running model
+    else {
+      const runningModels = modelManager.getRunningModels();
+      if (runningModels.length > 0) {
+        // getRunningModels returns objects with 'id' property
+        modelId = typeof runningModels[0] === 'string' ? runningModels[0] : runningModels[0]?.id;
+      }
+    }
+
+    // Fallback to default model if still not set
+    if (!modelId) {
+      const defaultModel = modelManager.getDefaultModel();
+      modelId = defaultModel?.id || modelManager.defaultModelId || 'qwen-image';
+    }
+
+    // Validate the model exists
+    const modelConfig = modelManager.getModel(modelId);
+    if (!modelConfig) {
+      return res.status(400).json({
+        error: `Invalid model: ${modelId}`,
+        detail: `Model '${modelId}' not found in configuration. Available models: ${modelManager.getAllModels().map(m => m.id).join(', ')}`
+      });
+    }
+
+    // Create generation job
+    const jobId = randomUUID();
+    const job = {
+      id: jobId,
+      type: 'generate',
+      model: modelId,  // Properly set the model
+      prompt: prompt || '',
+      negative_prompt: negative_prompt || '',
+      width: width || 1024,
+      height: height || 1024,
+      sample_steps: steps || 20,
+      cfg_scale: cfg_scale || 7.0,
+      sampling_method: sampler_name || 'euler',
+      seed: seed || -1,
+      n: n,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    };
+
+    // Add to queue
+    createGeneration(job);
+
+    // Wait for completion (simple polling)
+    const MAX_WAIT = 300; // 5 minutes
+    const POLL_INTERVAL = 500;
+    let attempts = 0;
+
+    while (attempts < MAX_WAIT) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      const generation = getGenerationById(jobId);
+
+      if (generation && generation.status === 'completed') {
+        const images = getImagesByGenerationId(jobId);
+        if (images && images.length > 0) {
+          // Read and encode images
+          const imagesData = await Promise.all(images.map(async (img) => {
+            const fs = await import('fs/promises');
+            try {
+              const buffer = await fs.readFile(img.path);
+              return buffer.toString('base64');
+            } catch {
+              return null;
+            }
+          }));
+
+          return res.json({
+            images: imagesData.filter(Boolean),
+            parameters: job,
+            info: JSON.stringify(job)
+          });
+        }
+      }
+
+      if (generation && generation.status === 'failed') {
+        return res.status(500).json({ error: 'Generation failed' });
+      }
+
+      attempts++;
+    }
+
+    res.status(500).json({ error: 'Generation timeout' });
+  } catch (error) {
+    console.error('Error in txt2img:', error);
     res.status(500).json({ error: error.message });
   }
 });

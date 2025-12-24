@@ -66,11 +66,18 @@ export function logApiRequest(method, url, headers = {}, body = null) {
       console.log(`[API] Content-Type: ${headers['Content-Type'] || 'application/json'}`);
       console.log('[API] Request body:', body);
     } else if (typeof body === 'object') {
-      const bodyStr = JSON.stringify(body, null, 2);
-      curlCmd += ` \\\n  -H 'Content-Type: ${headers['Content-Type'] || 'application/json'}'`;
-      curlCmd += ` \\\n  -d '${body.replace(/'/g, "'\"'\"'")}'`;
-      console.log(`[API] Content-Type: ${headers['Content-Type'] || 'application/json'}`);
-      console.log('[API] Request body:', bodyStr);
+      // Check if object is empty (like GET requests)
+      const isEmpty = body && Object.keys(body).length === 0;
+      if (isEmpty) {
+        // No body to log
+        console.log('[API] Request body: <empty>');
+      } else {
+        const bodyStr = JSON.stringify(body, null, 2);
+        curlCmd += ` \\\n  -H 'Content-Type: ${headers['Content-Type'] || 'application/json'}'`;
+        curlCmd += ` \\\n  -d '${bodyStr.replace(/'/g, "'\"'\"'")}'`;
+        console.log(`[API] Content-Type: ${headers['Content-Type'] || 'application/json'}`);
+        console.log('[API] Request body:', bodyStr);
+      }
     }
   }
 

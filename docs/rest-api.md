@@ -30,7 +30,7 @@ Get API configuration including SD API endpoint and default model.
 ```json
 {
   "sdApiEndpoint": "http://192.168.2.180:1234/v1",
-  "model": "sd-cpp-local"
+  "model": "qwen-image"
 }
 ```
 
@@ -48,6 +48,7 @@ Generate image(s) from text prompt (text-to-image).
 ```json
 {
   "prompt": "string (required)",
+  "model": "string (required, model ID from models.yml e.g., qwen-image, z-image-turbo)",
   "negative_prompt": "string (optional)",
   "size": "string (optional, default: 512x512)",
   "n": "number (optional, default: 1, min: 1, max: 10)",
@@ -145,7 +146,7 @@ Get all jobs in queue with statistics.
     {
       "id": "uuid",
       "type": "generate|edit|variation",
-      "model": "sd-cpp-local",
+      "model": "qwen-image",
       "prompt": "string",
       "negative_prompt": "string or null",
       "size": "512x512",
@@ -219,7 +220,7 @@ Get all generations (completed image generations).
   {
     "id": "uuid",
     "type": "generate|edit|variation",
-    "model": "sd-cpp-local",
+    "model": "qwen-image",
     "prompt": "string",
     "negative_prompt": "string or null",
     "size": "512x512",
@@ -243,7 +244,7 @@ Get a single generation with its images.
 {
   "id": "uuid",
   "type": "generate|edit|variation",
-  "model": "sd-cpp-local",
+  "model": "qwen-image",
   "prompt": "string",
   "negative_prompt": "string or null",
   "size": "512x512",

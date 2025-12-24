@@ -31,7 +31,7 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS generations (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
-      model TEXT NOT NULL DEFAULT 'sd-cpp-local',
+      model TEXT NOT NULL,
       prompt TEXT,
       negative_prompt TEXT,
       size TEXT,
@@ -73,7 +73,7 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS queue (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
-      model TEXT NOT NULL DEFAULT 'sd-cpp-local',
+      model TEXT NOT NULL,
       prompt TEXT,
       negative_prompt TEXT,
       size TEXT,

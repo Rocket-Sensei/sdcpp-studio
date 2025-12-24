@@ -18,6 +18,12 @@ export const GenerationStatus = {
  */
 export async function createGeneration(data) {
   const db = getDatabase();
+
+  // Model is required - use default from modelManager if not provided
+  if (!data.model) {
+    throw new Error('Model is required for generation. Please specify a model ID.');
+  }
+
   const stmt = db.prepare(`
     INSERT INTO generations (
       id, type, model, prompt, negative_prompt, size, seed, n,
@@ -30,7 +36,7 @@ export async function createGeneration(data) {
   return stmt.run(
     data.id,
     data.type,
-    data.model || 'sd-cpp-local',
+    data.model,
     data.prompt || null,
     data.negative_prompt || null,
     data.size || null,

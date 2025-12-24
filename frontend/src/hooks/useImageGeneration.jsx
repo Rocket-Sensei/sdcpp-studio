@@ -24,7 +24,7 @@ export function useImageGeneration() {
       if ((params.mode === 'edit' || params.mode === 'variation') && params.image) {
         const formData = new FormData();
         formData.append('image', params.image);
-        formData.append('model', params.model || 'sd-cpp-local');
+        formData.append('model', params.model);
         formData.append('prompt', params.prompt);
         formData.append('n', params.n || 1);
         formData.append('size', params.size || '512x512');
@@ -82,7 +82,7 @@ export function useImageGeneration() {
       if ((params.mode === 'edit' || params.mode === 'variation') && params.image) {
         const formData = new FormData();
         formData.append('image', params.image);
-        formData.append('model', params.model || 'sd-cpp-local');
+        formData.append('model', params.model);
         formData.append('prompt', params.prompt);
         formData.append('n', params.n || 1);
         formData.append('size', params.size || '512x512');
