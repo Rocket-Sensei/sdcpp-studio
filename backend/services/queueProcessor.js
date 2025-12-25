@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
 import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
-import { loggedFetch, createLogger } from '../utils/logger.js';
+import { loggedFetch, createLogger, createGenerationLogger } from '../utils/logger.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from './websocket.js';
 
 const logger = createLogger('queueProcessor');
@@ -77,7 +77,11 @@ async function processQueue() {
   isProcessing = true;
   currentJob = job;
 
+  // Create generation-specific logger for this job
+  const genLogger = createGenerationLogger(job.id, 'queueProcessor');
+
   logger.info({ jobId: job.id, prompt: job.prompt?.substring(0, 50) }, 'Processing job');
+  genLogger.info({ prompt: job.prompt?.substring(0, 50) }, 'Starting generation');
 
   try {
     // Update status to processing
@@ -101,6 +105,7 @@ async function processQueue() {
     }
 
     logger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
+    genLogger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
 
     // Prepare model based on execution mode
     if (modelConfig.exec_mode === ExecMode.SERVER) {
@@ -110,23 +115,25 @@ async function processQueue() {
       // For CLI mode, stop any running servers (they're not needed)
       await stopAllServerModels();
       logger.info({ modelId }, 'Model uses CLI mode');
+      genLogger.info({ modelId }, 'Model uses CLI mode');
     } else if (modelConfig.exec_mode === ExecMode.API) {
       // For API mode, stop any running servers (external API is used)
       await stopAllServerModels();
       logger.info({ modelId }, 'Model uses external API mode');
+      genLogger.info({ modelId }, 'Model uses external API mode');
     }
 
     // Process the job based on type
     let result;
     switch (job.type) {
       case 'generate':
-        result = await processGenerateJob(job, modelConfig);
+        result = await processGenerateJob(job, modelConfig, genLogger);
         break;
       case 'edit':
-        result = await processEditJob(job, modelConfig);
+        result = await processEditJob(job, modelConfig, genLogger);
         break;
       case 'variation':
-        result = await processVariationJob(job, modelConfig);
+        result = await processVariationJob(job, modelConfig, genLogger);
         break;
       default:
         throw new Error(`Unknown job type: ${job.type}`);
@@ -147,8 +154,10 @@ async function processQueue() {
     });
 
     logger.info({ jobId: job.id }, 'Job completed successfully');
+    genLogger.info({ imageCount: result?.imageCount || 0 }, 'Generation completed successfully');
   } catch (error) {
     logger.error({ error, jobId: job.id }, 'Job failed');
+    genLogger.error({ error: error.message, stack: error.stack }, 'Generation failed');
     updateGenerationStatus(job.id, GenerationStatus.FAILED, {
       error: error.message,
     });
@@ -281,13 +290,15 @@ async function waitForServerReady(apiUrl, timeout = 30000) {
  * Process a text-to-image generation job
  * @param {Object} job - Queue job object
  * @param {Object} modelConfig - Model configuration
+ * @param {Object} genLogger - Generation-specific logger
  * @returns {Promise<Object>} Result with generationId
  */
-async function processGenerateJob(job, modelConfig) {
+async function processGenerateJob(job, modelConfig, genLogger) {
   const modelId = modelConfig.id;
 
   // Update progress
   updateGenerationProgress(job.id, 0.15, 'Preparing generation parameters...');
+  genLogger.debug({ progress: 0.15 }, 'Preparing generation parameters');
 
   // Get model-specific default parameters (if any)
   const modelParams = modelManager.getModelGenerationParams(modelId);
@@ -308,6 +319,7 @@ async function processGenerateJob(job, modelConfig) {
   };
 
   updateGenerationProgress(job.id, 0.25, 'Generating image...');
+  genLogger.info({ params: { ...params, prompt: params.prompt?.substring(0, 50) + '...' } }, 'Starting image generation');
 
   let response;
   // Use job.id as generation_id since queue is now merged into generations
@@ -316,25 +328,30 @@ async function processGenerateJob(job, modelConfig) {
   if (modelConfig.exec_mode === ExecMode.CLI) {
     // Use CLI handler for CLI mode models
     logger.debug({ modelId, execMode: 'CLI' }, 'Using CLI mode for model');
-    response = await processCLIGeneration(job, modelConfig, params);
+    genLogger.debug({ modelId, execMode: 'CLI' }, 'Using CLI mode for model');
+    response = await processCLIGeneration(job, modelConfig, params, genLogger);
   } else if (modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.API) {
     // Use HTTP API for server mode (local) or API mode (external)
     const apiType = modelConfig.exec_mode === ExecMode.API ? 'external' : 'local';
     logger.debug({ modelId, execMode: apiType, api: modelConfig.api }, `Using ${apiType} HTTP API for model`);
-    response = await processHTTPGeneration(job, modelConfig, params);
+    genLogger.debug({ modelId, execMode: apiType, api: modelConfig.api }, `Using ${apiType} HTTP API`);
+    response = await processHTTPGeneration(job, modelConfig, params, genLogger);
   } else {
     throw new Error(`Unknown execution mode: ${modelConfig.exec_mode}`);
   }
 
   updateGenerationProgress(job.id, 0.7, 'Saving generation record...');
+  genLogger.debug({ progress: 0.7 }, 'Saving generation record');
   // Generation record already exists (created when queued), just save images
   updateGenerationProgress(job.id, 0.85, 'Saving images...');
+  genLogger.debug({ progress: 0.85 }, 'Saving images');
 
   let imageCount = 0;
 
   // Save images
   if (response.data && response.data.length > 0) {
     imageCount = response.data.length;
+    genLogger.info({ imageCount }, 'Saving generated images');
     for (let i = 0; i < response.data.length; i++) {
       const imageData = response.data[i];
       const imageId = randomUUID();
@@ -360,9 +377,10 @@ async function processGenerateJob(job, modelConfig) {
  * @param {Object} job - Queue job object
  * @param {Object} modelConfig - Model configuration
  * @param {Object} params - Generation parameters
+ * @param {Object} genLogger - Generation-specific logger
  * @returns {Promise<Object>} API response
  */
-async function processHTTPGeneration(job, modelConfig, params) {
+async function processHTTPGeneration(job, modelConfig, params, genLogger) {
   // Build the request with model-specific API endpoint
   // Replace localhost with 127.0.0.1 to avoid IPv6 issues with Node.js fetch
   const apiUrl = modelConfig.api.replace('localhost', '127.0.0.1');
@@ -378,6 +396,7 @@ async function processHTTPGeneration(job, modelConfig, params) {
       processedPrompt = processedPrompt.replace(/<sd_cpp_extra_args>.*?<\/sd_cpp_extra_args>/s, '').trim();
     } catch (e) {
       logger.error({ error: e }, 'Failed to parse extra args');
+      genLogger.error({ error: e }, 'Failed to parse extra args');
     }
   }
 
@@ -445,6 +464,7 @@ async function processHTTPGeneration(job, modelConfig, params) {
   const endpoint = `${apiUrl}/images/generations`;
 
   logger.debug({ endpoint }, 'Making request to API');
+  genLogger.debug({ endpoint, modelName }, 'Making HTTP API request');
 
   // Build headers - add API key if configured
   const headers = {
@@ -455,6 +475,7 @@ async function processHTTPGeneration(job, modelConfig, params) {
   if (modelConfig.api_key) {
     headers['Authorization'] = `Bearer ${modelConfig.api_key}`;
     logger.debug('Using API key for authentication');
+    genLogger.debug('Using API key for authentication');
   }
 
   const response = await loggedFetch(endpoint, {
@@ -465,9 +486,11 @@ async function processHTTPGeneration(job, modelConfig, params) {
 
   if (!response.ok) {
     const errorText = await response.text();
+    genLogger.error({ status: response.status, error: errorText }, 'API request failed');
     throw new Error(`API request failed: ${response.status} ${errorText}`);
   }
 
+  genLogger.info('HTTP API request completed successfully');
   return await response.json();
 }
 
@@ -476,11 +499,13 @@ async function processHTTPGeneration(job, modelConfig, params) {
  * @param {Object} job - Queue job object
  * @param {Object} modelConfig - Model configuration
  * @param {Object} params - Generation parameters
+ * @param {Object} genLogger - Generation-specific logger
  * @returns {Promise<Object>} Response in same format as HTTP API
  */
-async function processCLIGeneration(job, modelConfig, params) {
+async function processCLIGeneration(job, modelConfig, params, genLogger) {
   try {
     logger.info({ modelId: modelConfig.id }, 'Generating with CLI');
+    genLogger.info({ modelId: modelConfig.id }, 'Starting CLI generation');
 
     // Use CLI handler to generate image
     const imageBuffer = await cliHandler.generateImage(modelConfig.id, params, modelConfig);
@@ -488,6 +513,7 @@ async function processCLIGeneration(job, modelConfig, params) {
     // Convert to same format as HTTP API response
     const b64Json = imageBuffer.toString('base64');
 
+    genLogger.info('CLI generation completed successfully');
     return {
       created: Math.floor(Date.now() / 1000),
       data: [{
@@ -497,6 +523,7 @@ async function processCLIGeneration(job, modelConfig, params) {
     };
   } catch (error) {
     logger.error({ error }, 'CLI generation failed');
+    genLogger.error({ error: error.message, stack: error.stack }, 'CLI generation failed');
     throw new Error(`CLI generation failed: ${error.message}`);
   }
 }
@@ -505,9 +532,10 @@ async function processCLIGeneration(job, modelConfig, params) {
  * Process an image-to-image edit job
  * @param {Object} job - Queue job object
  * @param {Object} modelConfig - Model configuration
+ * @param {Object} genLogger - Generation-specific logger
  * @returns {Promise<Object>} Result with generationId
  */
-async function processEditJob(job, modelConfig) {
+async function processEditJob(job, modelConfig, genLogger) {
   const modelId = modelConfig.id;
 
   // Check if input image path is provided
@@ -517,6 +545,7 @@ async function processEditJob(job, modelConfig) {
 
   // Update progress
   updateGenerationProgress(job.id, 0.15, 'Loading input image...');
+  genLogger.debug({ progress: 0.15 }, 'Loading input image for edit');
 
   // Load the input image from disk
   const imageBuffer = await readFile(job.input_image_path);
@@ -549,9 +578,11 @@ async function processEditJob(job, modelConfig) {
       buffer: await readFile(job.mask_image_path),
       mimetype: job.mask_image_mime_type || 'image/png'
     };
+    genLogger.debug('Loaded mask image for edit');
   }
 
   updateGenerationProgress(job.id, 0.25, 'Generating edit...');
+  genLogger.info({ hasMask: !!job.mask_image_path }, 'Starting image edit');
 
   let response;
   // Use job.id as generation_id since queue is now merged into generations
@@ -563,24 +594,29 @@ async function processEditJob(job, modelConfig) {
     // For CLI mode, fall back to generate for now
     // Full implementation would need CLI-specific edit handling
     logger.warn('Edit mode with CLI not fully supported, using generate');
-    response = await processCLIGeneration(job, modelConfig, params);
+    genLogger.warn('Edit mode with CLI not fully supported, using generate');
+    response = await processCLIGeneration(job, modelConfig, params, genLogger);
   } else if (modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.API) {
     // Use generateImageDirect for edit mode with FormData
     const apiType = modelConfig.exec_mode === ExecMode.API ? 'external' : 'local';
     logger.info({ apiType, api: modelConfig.api }, 'Using HTTP API for edit');
+    genLogger.info({ apiType, api: modelConfig.api }, 'Using HTTP API for edit');
     response = await generateImageDirect(params, 'edit');
   } else {
     throw new Error(`Unknown execution mode: ${modelConfig.exec_mode}`);
   }
 
   updateGenerationProgress(job.id, 0.7, 'Saving generation record...');
+  genLogger.debug({ progress: 0.7 }, 'Saving generation record');
   // Generation record already exists (created when queued), just save images
   updateGenerationProgress(job.id, 0.85, 'Saving images...');
+  genLogger.debug({ progress: 0.85 }, 'Saving images');
 
   let imageCount = 0;
 
   if (response.data && response.data.length > 0) {
     imageCount = response.data.length;
+    genLogger.info({ imageCount }, 'Saving edited images');
     for (let i = 0; i < response.data.length; i++) {
       const imageData = response.data[i];
       const imageId = randomUUID();
@@ -605,9 +641,10 @@ async function processEditJob(job, modelConfig) {
  * Process a variation job
  * @param {Object} job - Queue job object
  * @param {Object} modelConfig - Model configuration
+ * @param {Object} genLogger - Generation-specific logger
  * @returns {Promise<Object>} Result with generationId
  */
-async function processVariationJob(job, modelConfig) {
+async function processVariationJob(job, modelConfig, genLogger) {
   const modelId = modelConfig.id;
 
   // Check if input image path is provided
@@ -617,6 +654,7 @@ async function processVariationJob(job, modelConfig) {
 
   // Update progress
   updateGenerationProgress(job.id, 0.15, 'Loading input image...');
+  genLogger.debug({ progress: 0.15 }, 'Loading input image for variation');
 
   // Load the input image from disk
   const imageBuffer = await readFile(job.input_image_path);
@@ -644,6 +682,7 @@ async function processVariationJob(job, modelConfig) {
   };
 
   updateGenerationProgress(job.id, 0.25, 'Generating variation...');
+  genLogger.info('Starting image variation');
 
   let response;
   // Use job.id as generation_id since queue is now merged into generations
@@ -655,24 +694,29 @@ async function processVariationJob(job, modelConfig) {
     // For CLI mode, fall back to generate for now
     // Full implementation would need CLI-specific variation handling
     logger.warn('Variation mode with CLI not fully supported, using generate');
-    response = await processCLIGeneration(job, modelConfig, params);
+    genLogger.warn('Variation mode with CLI not fully supported, using generate');
+    response = await processCLIGeneration(job, modelConfig, params, genLogger);
   } else if (modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.API) {
     // Use generateImageDirect for variation mode with FormData
     const apiType = modelConfig.exec_mode === ExecMode.API ? 'external' : 'local';
     logger.info({ apiType, api: modelConfig.api }, 'Using HTTP API for variation');
+    genLogger.info({ apiType, api: modelConfig.api }, 'Using HTTP API for variation');
     response = await generateImageDirect(params, 'variation');
   } else {
     throw new Error(`Unknown execution mode: ${modelConfig.exec_mode}`);
   }
 
   updateGenerationProgress(job.id, 0.7, 'Saving generation record...');
+  genLogger.debug({ progress: 0.7 }, 'Saving generation record');
   // Generation record already exists (created when queued), just save images
   updateGenerationProgress(job.id, 0.85, 'Saving images...');
+  genLogger.debug({ progress: 0.85 }, 'Saving images');
 
   let imageCount = 0;
 
   if (response.data && response.data.length > 0) {
     imageCount = response.data.length;
+    genLogger.info({ imageCount }, 'Saving variation images');
     for (let i = 0; i < response.data.length; i++) {
       const imageData = response.data[i];
       const imageId = randomUUID();

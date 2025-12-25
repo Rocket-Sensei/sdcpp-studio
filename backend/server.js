@@ -36,7 +36,7 @@ import { ensurePngFormat } from './utils/imageUtils.js';
 import { initializeWebSocket, broadcastGenerationComplete, broadcastModelStatus } from './services/websocket.js';
 
 // Debug logging utilities
-import { logApiRequest, createLogger } from './utils/logger.js';
+import { logApiRequest, createLogger, getGenerationLogs } from './utils/logger.js';
 
 // Create logger for server module
 const logger = createLogger('server');
@@ -280,6 +280,18 @@ app.delete('/api/generations/:id', authenticateRequest, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     logger.error({ error }, 'Error deleting generation');
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get logs for a specific generation
+app.get('/api/generations/:id/logs', authenticateRequest, async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+    const logs = await getGenerationLogs(req.params.id, limit);
+    res.json(logs);
+  } catch (error) {
+    logger.error({ error, generationId: req.params.id }, 'Error fetching generation logs');
     res.status(500).json({ error: error.message });
   }
 });

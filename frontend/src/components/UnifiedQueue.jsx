@@ -19,11 +19,13 @@ import {
   WifiOff,
   Cpu,
   RefreshCw,
+  Terminal,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { LogViewer } from "./LogViewer";
 import { useGenerations } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
@@ -158,6 +160,7 @@ export function UnifiedQueue({ onCreateMore }) {
   const { fetchGenerations, loadMore, isLoading, isLoadingMore, generations, pagination } = useGenerations({ pageSize: 20 });
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const [models, setModels] = useState({});
 
   // Fetch models on mount to get model names
@@ -595,10 +598,21 @@ export function UnifiedQueue({ onCreateMore }) {
       )}
 
       {/* Image Preview Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl">
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setShowLogs(false); }}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedImage?.prompt}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="truncate pr-4">{selectedImage?.prompt}</DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLogs(!showLogs)}
+                className={showLogs ? "bg-blue-50 border-blue-200" : ""}
+              >
+                <Terminal className="h-4 w-4 mr-2" />
+                {showLogs ? "Hide Logs" : "View Logs"}
+              </Button>
+            </div>
             <DialogDescription>
               {getModelName(selectedImage?.model)} • {selectedImage?.size} • {selectedImage?.width}x{selectedImage?.height} • Seed: {selectedImage?.seed ? Math.floor(Number(selectedImage.seed)) : "Random"}
               {selectedImage?.images && selectedImage.images.length > 1 && (
@@ -606,37 +620,46 @@ export function UnifiedQueue({ onCreateMore }) {
               )}
             </DialogDescription>
           </DialogHeader>
-          {selectedImage?.imageUrl && (
-            <div className="relative">
-              <img
-                src={selectedImage.imageUrl}
-                alt={selectedImage.prompt}
-                className="w-full rounded-lg"
-              />
-              {selectedImage.images && selectedImage.images.length > 1 && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="absolute left-2 top-1/2 -translate-y-1/2"
-                    onClick={handlePreviousImage}
-                    disabled={selectedImage.currentImageIndex === 0}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2"
-                    onClick={handleNextImage}
-                    disabled={selectedImage.currentImageIndex === selectedImage.images.length - 1}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
+          <div className="space-y-4">
+            {/* Image section - hide when logs are shown */}
+            {!showLogs && selectedImage?.imageUrl && (
+              <div className="relative">
+                <img
+                  src={selectedImage.imageUrl}
+                  alt={selectedImage.prompt}
+                  className="w-full rounded-lg"
+                />
+                {selectedImage.images && selectedImage.images.length > 1 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2"
+                      onClick={handlePreviousImage}
+                      disabled={selectedImage.currentImageIndex === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
+                      onClick={handleNextImage}
+                      disabled={selectedImage.currentImageIndex === selectedImage.images.length - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Log viewer - show when logs are enabled */}
+            {showLogs && selectedImage?.id && (
+              <div className="h-[500px]">
+                <LogViewer generationId={selectedImage.id} />
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>

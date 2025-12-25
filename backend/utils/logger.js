@@ -169,6 +169,19 @@ export function createLogger(module, bindings = {}) {
 }
 
 /**
+ * Create a logger with generation context for tracking generation-specific logs
+ * @param {string} generationId - Generation ID to tag logs with
+ * @param {string} module - Module name (optional)
+ * @returns {pino.Logger} Child logger with generation_id
+ */
+export function createGenerationLogger(generationId, module = 'generation') {
+  return baseLogger.child({
+    module,
+    generation_id: generationId
+  });
+}
+
+/**
  * Get the HTTP logger
  * @returns {pino.Logger} HTTP logger
  */
@@ -388,6 +401,75 @@ export async function loggedFetch(url, options = {}) {
   }
 
   return response;
+}
+
+/**
+ * Read logs from a file and optionally filter by generation_id
+ * @param {string} filename - Log file name (e.g., 'app.log', 'sdcpp.log')
+ * @param {string} generationId - Optional generation ID to filter by
+ * @param {number} limit - Maximum number of log entries to return (default: 100)
+ * @returns {Promise<Array>} Array of parsed log entries
+ */
+export async function readLogs(filename, generationId = null, limit = 100) {
+  const filePath = path.join(logsDir, filename);
+
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+
+  const logs = [];
+  const content = await fs.promises.readFile(filePath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim());
+
+  // Process in reverse order to get most recent logs first
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const logEntry = JSON.parse(lines[i]);
+
+      // Filter by generation_id if specified
+      if (generationId) {
+        if (logEntry.generation_id === generationId) {
+          logs.push(logEntry);
+        }
+      } else {
+        logs.push(logEntry);
+      }
+
+      if (logs.length >= limit) break;
+    } catch (e) {
+      // Skip invalid JSON lines
+      continue;
+    }
+  }
+
+  // Reverse to get chronological order
+  return logs.reverse();
+}
+
+/**
+ * Get all logs for a specific generation across all log files
+ * @param {string} generationId - Generation ID to fetch logs for
+ * @param {number} limit - Maximum number of log entries per file (default: 50)
+ * @returns {Promise<Object>} Object with logs from different files
+ */
+export async function getGenerationLogs(generationId, limit = 50) {
+  const [appLogs, sdcppLogs, httpLogs] = await Promise.all([
+    readLogs('app.log', generationId, limit),
+    readLogs('sdcpp.log', generationId, limit),
+    readLogs('http.log', generationId, limit),
+  ]);
+
+  return {
+    app: appLogs,
+    sdcpp: sdcppLogs,
+    http: httpLogs,
+    all: [...appLogs, ...sdcppLogs, ...httpLogs].sort((a, b) => {
+      // Sort by time if available, otherwise by levelNum
+      const timeA = a.time || 0;
+      const timeB = b.time || 0;
+      return timeA.localeCompare(timeB);
+    })
+  };
 }
 
 // Export default logger for general use
