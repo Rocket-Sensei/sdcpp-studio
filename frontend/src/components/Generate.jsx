@@ -183,13 +183,17 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
           setHeight(h);
         }
       }
+      // Set the model from settings
+      if (settings.model && onModelChange) {
+        onModelChange(settings.model);
+      }
       // Note: We do NOT set seed from settings, so "generate more" creates a new random seed
       // This ensures "generate more" creates a new/varied image instead of the same one
       if (settings.type === 'edit' || settings.type === 'variation') {
         setMode(settings.type === 'edit' ? 'imgedit' : 'img2img');
       }
     }
-  }, [settings]);
+  }, [settings, onModelChange]);
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
