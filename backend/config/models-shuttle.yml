@@ -4,32 +4,6 @@
 #   - num_inference_steps: 4
 #   - max_sequence_length: 256
 models:
-  flux1-schnell-fp8:
-    name: "FLUX.1 Schnell FP8"
-    description: "FLUX.1 Schnell FP8 - Fast generation model"
-    capabilities: ["text-to-image"]
-    command: "./bin/sd-server"
-    args:
-      - "--diffusion-model"
-      - "./models/flux1-schnell-fp8.safetensors"
-      - "--vae"
-      - "./models/ae.safetensors"
-      - "--clip_l"
-      - "./models/clip_l.safetensors"
-      - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
-      - "-v"
-      - "--clip-on-cpu"
-    mode: "on_demand"
-    exec_mode: "server"
-    port: 1409
-    model_type: "text-to-image"
-    default_size: "1024x1024"
-    generation_params:
-      cfg_scale: 1.0
-      sample_steps: 4
-      sampling_method: "euler"
-
   shuttle-3-diffusion:
     name: "Shuttle-3-Diffusion"
     description: "Shuttle-3-Diffusion - Flux.1 Schnell compatible model"
@@ -37,7 +11,7 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/shuttle-3-diffusion.safetensors"
+      - "./models/shuttle-3-diffusion-Q8_0.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--clip_l"
@@ -49,32 +23,6 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1410
-    model_type: "text-to-image"
-    default_size: "1024x1024"
-    generation_params:
-      cfg_scale: 3.5
-      sample_steps: 4
-      sampling_method: "euler"
-
-  shuttle-3-diffusion-fp8:
-    name: "Shuttle-3-Diffusion FP8"
-    description: "Shuttle-3-Diffusion FP8 - Quantized Flux.1 Schnell compatible model"
-    capabilities: ["text-to-image"]
-    command: "./bin/sd-server"
-    args:
-      - "--diffusion-model"
-      - "./models/shuttle-3-diffusion-fp8.safetensors"
-      - "--vae"
-      - "./models/ae.safetensors"
-      - "--clip_l"
-      - "./models/clip_l.safetensors"
-      - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
-      - "-v"
-      - "--clip-on-cpu"
-    mode: "on_demand"
-    exec_mode: "server"
-    port: 1411
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:

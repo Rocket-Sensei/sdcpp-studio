@@ -129,26 +129,23 @@ export function useImageGeneration() {
 export function useGenerations(options = {}) {
   const { pageSize = 20 } = options;
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [generations, setGenerations] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     total: 0,
     limit: pageSize,
     offset: 0,
-    hasMore: false
+    hasMore: false,
+    totalPages: 0
   });
 
-  const fetchGenerations = useCallback(async (append = false) => {
-    if (append) {
-      setIsLoadingMore(true);
-    } else {
-      setIsLoading(true);
-    }
+  const fetchGenerations = useCallback(async (page = 1) => {
+    setIsLoading(true);
     setError(null);
 
     try {
-      const offset = append ? pagination.offset + pagination.limit : 0;
+      const offset = (page - 1) * pageSize;
       const url = `/api/generations?limit=${pageSize}&offset=${offset}`;
       const response = await authenticatedFetch(url);
       if (!response.ok) {
@@ -156,28 +153,38 @@ export function useGenerations(options = {}) {
       }
       const data = await response.json();
 
-      if (append) {
-        setGenerations((prev) => [...prev, ...data.generations]);
-      } else {
-        setGenerations(data.generations);
-      }
-
-      setPagination(data.pagination);
+      setGenerations(data.generations);
+      setCurrentPage(page);
+      setPagination({
+        ...data.pagination,
+        totalPages: Math.ceil(data.pagination.total / pageSize)
+      });
       return data;
     } catch (err) {
       setError(err.message);
       throw err;
     } finally {
       setIsLoading(false);
-      setIsLoadingMore(false);
     }
-  }, [pageSize, pagination.offset, pagination.limit]);
+  }, [pageSize]);
 
-  const loadMore = useCallback(() => {
-    if (pagination.hasMore && !isLoadingMore) {
-      fetchGenerations(true);
+  const goToPage = useCallback((page) => {
+    if (page >= 1 && page <= pagination.totalPages) {
+      fetchGenerations(page);
     }
-  }, [pagination.hasMore, isLoadingMore, fetchGenerations]);
+  }, [fetchGenerations, pagination.totalPages]);
+
+  const nextPage = useCallback(() => {
+    if (currentPage < pagination.totalPages) {
+      goToPage(currentPage + 1);
+    }
+  }, [currentPage, pagination.totalPages, goToPage]);
+
+  const prevPage = useCallback(() => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  }, [currentPage, goToPage]);
 
   const deleteGeneration = useCallback(async (id) => {
     try {
@@ -189,21 +196,25 @@ export function useGenerations(options = {}) {
       }
       setGenerations((prev) => prev.filter((g) => g.id !== id));
       setPagination((prev) => ({ ...prev, total: prev.total - 1 }));
+      // Refresh current page after deletion
+      fetchGenerations(currentPage);
       return true;
     } catch (err) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [currentPage, fetchGenerations]);
 
   return {
     fetchGenerations,
-    loadMore,
+    goToPage,
+    nextPage,
+    prevPage,
     deleteGeneration,
     isLoading,
-    isLoadingMore,
     error,
     generations,
-    pagination
+    pagination,
+    currentPage
   };
 }

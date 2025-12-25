@@ -62,12 +62,18 @@ describe('UnifiedQueue - Thumbnail Remount Prevention', () => {
     expect(source).toMatch(/import.*memo.*from.*['"]react['"]/);
   });
 
-  it('should only load images for completed generations', () => {
+  it('should use first_image_url directly from list data', () => {
     const source = getSource();
 
-    // Verify the conditional check in Thumbnail's useEffect
-    expect(source).toContain('if (generation.status === GENERATION_STATUS.COMPLETED)');
-    expect(source).toContain('loadImages()');
+    // Verify Thumbnail uses first_image_url directly (no additional API calls)
+    expect(source).toContain('const src = generation.first_image_url || null');
+  });
+
+  it('should have loading="lazy" on images', () => {
+    const source = getSource();
+
+    // Verify images use lazy loading
+    expect(source).toContain('loading="lazy"');
   });
 
   it('should have helper functions defined outside component', () => {
@@ -139,19 +145,8 @@ describe('UnifiedQueue - Real-time Updates', () => {
     expect(source).toContain('generation_complete');
   });
 
-  it('should show connection status indicator', () => {
-    const source = getSource();
-
-    // Should use Wifi/WifiOff icons for status
-    expect(source).toContain('Wifi');
-    expect(source).toContain('WifiOff');
-    expect(source).toContain('isWsConnected');
-    expect(source).toContain('isConnected');
-
-    // Should show "Live" / "Offline" text
-    expect(source).toContain('Live');
-    expect(source).toContain('Offline');
-  });
+  // Note: WiFi status indicator was removed in favor of WebSocketStatusIndicator component
+  // Connection status is now shown in the header via WebSocketStatusIndicator component
 });
 
 describe('UnifiedQueue - Model Display', () => {

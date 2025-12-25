@@ -114,10 +114,23 @@ export function getAllGenerations(options = {}) {
   const { limit, offset } = options;
   const db = getDatabase();
 
+  // Get generations with first image info
   let query = `
     SELECT
       g.*,
-      COUNT(gi.id) as image_count
+      COUNT(gi.id) as image_count,
+      (
+        SELECT GROUP_CONCAT(id, '|')
+        FROM generated_images
+        WHERE generation_id = g.id
+        ORDER BY index_in_batch
+      ) as image_ids,
+      (
+        SELECT GROUP_CONCAT(file_path, '|')
+        FROM generated_images
+        WHERE generation_id = g.id
+        ORDER BY index_in_batch
+      ) as image_paths
     FROM generations g
     LEFT JOIN generated_images gi ON g.id = gi.generation_id
     GROUP BY g.id
@@ -132,7 +145,26 @@ export function getAllGenerations(options = {}) {
   }
 
   const stmt = db.prepare(query);
-  return stmt.all();
+  const generations = stmt.all();
+
+  // Add first_image_url to each generation
+  return generations.map(gen => {
+    if (gen.image_ids && gen.image_paths) {
+      const ids = gen.image_ids.split('|');
+      const paths = gen.image_paths.split('|');
+      if (ids.length > 0 && paths.length > 0) {
+        const firstImagePath = paths[0];
+        const filename = basename(firstImagePath);
+        const isInputImage = firstImagePath.includes('/input/');
+        const staticPath = isInputImage ? '/static/input' : '/static/images';
+        gen.first_image_id = ids[0];
+        gen.first_image_url = `${staticPath}/${filename}`;
+      }
+    }
+    delete gen.image_ids;
+    delete gen.image_paths;
+    return gen;
+  });
 }
 
 /**
@@ -359,4 +391,34 @@ export function getGenerationsByStatus(status, limit = 50) {
     LIMIT ?
   `);
   return stmt.all(status, limit);
+}
+
+/**
+ * Fail all old queued/processing generations on server startup
+ * This is called when the server starts to clean up any stale jobs
+ */
+export function failOldQueuedGenerations() {
+  const db = getDatabase();
+  const now = Date.now();
+
+  const stmt = db.prepare(`
+    UPDATE generations
+    SET status = ?,
+        completed_at = ?,
+        updated_at = ?,
+        error = 'Server restarted - job cancelled'
+    WHERE status IN (?, ?)
+  `);
+
+  const result = stmt.run(GenerationStatus.FAILED, now, now, GenerationStatus.PENDING, GenerationStatus.PROCESSING);
+
+  if (result.changes > 0) {
+    logger.info({
+      failed: result.changes,
+      pending: GenerationStatus.PENDING,
+      processing: GenerationStatus.PROCESSING
+    }, `Failed old queued/processing generations on startup`);
+  }
+
+  return result;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, memo } from "react";
+import { useEffect, useState, useCallback, memo, useRef, useMemo } from "react";
 import {
   Loader2,
   Trash2,
@@ -79,38 +79,10 @@ const isPendingOrProcessing = (status) => {
 
 // Thumbnail component moved outside parent to prevent remounting on parent re-renders
 // Using memo to prevent unnecessary re-renders when generation props haven't changed
-// This is critical because the parent polls every 3 seconds and would otherwise cause
-// all thumbnails to remount and reload their images
 const Thumbnail = memo(function Thumbnail({ generation }) {
-  const [src, setSrc] = useState(null);
-  const [imageCount, setImageCount] = useState(0);
-
-  useEffect(() => {
-    const loadImages = async () => {
-      try {
-        const response = await authenticatedFetch(`/api/generations/${generation.id}`);
-        if (!response.ok) return;
-
-        const gen = await response.json();
-        if (gen.images && gen.images.length > 0) {
-          setImageCount(gen.images.length);
-          // Use API endpoint for thumbnails (more reliable than static URLs)
-          const imgResponse = await authenticatedFetch(`/api/images/${gen.images[0].id}`);
-          if (imgResponse.ok) {
-            const blob = await imgResponse.blob();
-            setSrc(URL.createObjectURL(blob));
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load thumbnail", e);
-      }
-    };
-
-    // Only load images for completed generations
-    if (generation.status === GENERATION_STATUS.COMPLETED) {
-      loadImages();
-    }
-  }, [generation.id, generation.status]);
+  // Use first_image_url directly from the list data - no additional API calls needed
+  const src = generation.first_image_url || null;
+  const imageCount = generation.image_count || 0;
 
   // Show preloader for pending/processing generations
   if (isPendingOrProcessing(generation.status)) {
@@ -144,7 +116,7 @@ const Thumbnail = memo(function Thumbnail({ generation }) {
 
   return (
     <div className="relative">
-      <img src={src} alt={generation.prompt} className="w-full h-full object-cover" />
+      <img src={src} alt={generation.prompt} className="w-full h-full object-cover" loading="lazy" />
       {imageCount > 1 && (
         <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
           {imageCount}
@@ -152,14 +124,28 @@ const Thumbnail = memo(function Thumbnail({ generation }) {
       )}
     </div>
   );
+}, (prevProps, nextProps) => {
+  // Custom comparison function for memo
+  // Only re-render if these specific props change
+  return (
+    prevProps.generation.id === nextProps.generation.id &&
+    prevProps.generation.status === nextProps.generation.status &&
+    prevProps.generation.first_image_url === nextProps.generation.first_image_url
+  );
 });
 
 export function UnifiedQueue({ onCreateMore }) {
-  const { fetchGenerations, loadMore, isLoading, isLoadingMore, generations, pagination } = useGenerations({ pageSize: 20 });
+  const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [models, setModels] = useState({});
+
+  // Use a ref to track fetchGenerations so the WebSocket onMessage callback doesn't change
+  const fetchGenerationsRef = useRef(() => fetchGenerations(currentPage));
+  useEffect(() => {
+    fetchGenerationsRef.current = () => fetchGenerations(currentPage);
+  }, [fetchGenerations, currentPage]);
 
   // Fetch models on mount to get model names
   useEffect(() => {
@@ -190,26 +176,35 @@ export function UnifiedQueue({ onCreateMore }) {
     return models[modelId] || modelId;
   }, [models]);
 
-  // WebSocket connection for real-time updates
-  useWebSocket({
-    channels: [WS_CHANNELS.QUEUE, WS_CHANNELS.GENERATIONS],
-    onMessage: useCallback((message) => {
-      // Refresh generations when receiving relevant WebSocket messages
-      if (message.channel === WS_CHANNELS.QUEUE) {
-        // Queue updates: job_created, job_updated, job_completed, job_failed
-        if (message.type === 'job_updated' ||
-            message.type === 'job_completed' ||
-            message.type === 'job_failed') {
-          fetchGenerations();
-        }
-      } else if (message.channel === WS_CHANNELS.GENERATIONS) {
-        // Generation completions
-        if (message.type === 'generation_complete') {
-          fetchGenerations();
-        }
+  // WebSocket connection for real-time updates - use ref to keep callback stable
+  // This prevents constant re-subscription
+  const handleWebSocketMessage = useCallback((message) => {
+    // Refresh generations when receiving relevant WebSocket messages
+    if (message.channel === WS_CHANNELS.QUEUE) {
+      // Queue updates: job_created, job_updated, job_completed, job_failed
+      if (message.type === 'job_updated' ||
+          message.type === 'job_completed' ||
+          message.type === 'job_failed') {
+        fetchGenerationsRef.current();
       }
-    }, [fetchGenerations]),
-  });
+    } else if (message.channel === WS_CHANNELS.GENERATIONS) {
+      // Generation completions
+      if (message.type === 'generation_complete') {
+        fetchGenerationsRef.current();
+      }
+    }
+  }, []); // No dependencies - uses ref instead
+
+  // Stable WebSocket options using useMemo to prevent re-subscription on every render
+  const webSocketOptions = useMemo(
+    () => ({
+      channels: [WS_CHANNELS.QUEUE, WS_CHANNELS.GENERATIONS],
+      onMessage: handleWebSocketMessage,
+    }),
+    [] // Empty deps - options never change
+  );
+
+  useWebSocket(webSocketOptions);
 
   // Initial fetch on mount
   useEffect(() => {
@@ -542,27 +537,61 @@ export function UnifiedQueue({ onCreateMore }) {
         })}
       </div>
 
-      {/* Load More Button */}
-      {pagination.hasMore && (
-        <div className="flex justify-center mt-6">
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6">
           <Button
             variant="outline"
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="min-w-[150px]"
+            size="sm"
+            onClick={prevPage}
+            disabled={currentPage === 1 || isLoading}
           >
-            {isLoadingMore ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4 mr-2" />
-                Load More ({pagination.total - generations.length} remaining)
-              </>
-            )}
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
           </Button>
+
+          {/* Page numbers */}
+          <div className="flex gap-1">
+            {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+              let pageNum;
+              if (pagination.totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= pagination.totalPages - 2) {
+                pageNum = pagination.totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => goToPage(pageNum)}
+                  disabled={isLoading}
+                  className="min-w-[40px]"
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={nextPage}
+            disabled={currentPage === pagination.totalPages || isLoading}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+
+          <span className="text-sm text-muted-foreground ml-2">
+            Page {currentPage} of {pagination.totalPages} ({pagination.total} total)
+          </span>
         </div>
       )}
 

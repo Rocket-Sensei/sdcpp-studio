@@ -15,6 +15,7 @@
  */
 
 import pino from 'pino';
+import { build } from 'pino-pretty';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -77,10 +78,21 @@ function createBaseLogger() {
   ];
 
   // Also output to console if LOG_TO_STDOUT is enabled (default: true)
+  // Use pino-pretty for nice formatting
   if (isStdoutEnabled()) {
+    const prettyStream = build({
+      destination: process.stdout,
+      colorize: true,
+      translateTime: 'HH:MM:ss.l',
+      ignore: 'pid,hostname,levelNum',
+      singleLine: false,
+      levelFirst: true,
+      messageFormat: '{if module}[{module}] {end}{msg}',
+      customColors: 'trace:gray,debug:blue,info:green,warn:yellow,error:red,fatal:bgRed',
+    });
     streams.push({
       level: LOG_LEVEL,
-      stream: process.stdout,
+      stream: prettyStream,
     });
   }
 

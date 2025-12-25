@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { Terminal, X, RefreshCw, Filter, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { authenticatedFetch } from "../lib/api";
+import { authenticatedFetch } from "../utils/api";
 
 const LOG_LEVEL_COLORS = {
   trace: "text-gray-400",

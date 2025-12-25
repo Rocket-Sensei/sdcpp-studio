@@ -7,8 +7,10 @@ import { getDatabase } from './database.js';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createLogger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const logger = createLogger('migrations');
 
 // Migrations directory
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
@@ -66,7 +68,7 @@ async function applyMigration(migrationFile) {
   // Import and run the migration
   const migration = await import(migrationPath);
 
-  console.log(`[Migrations] Applying migration ${version}: ${migration.description || migrationFile}`);
+  logger.info({ version, description: migration.description || migrationFile }, 'Applying migration');
 
   // Start transaction
   const transaction = db.transaction(() => {
@@ -81,7 +83,7 @@ async function applyMigration(migrationFile) {
   });
 
   transaction();
-  console.log(`[Migrations] Applied migration ${version}`);
+  logger.info({ version }, 'Applied migration');
 }
 
 /**
@@ -97,11 +99,11 @@ export async function runMigrations() {
   });
 
   if (pendingMigrations.length === 0) {
-    console.log('[Migrations] No pending migrations');
+    logger.info('No pending migrations');
     return { applied: 0, total: migrationFiles.length };
   }
 
-  console.log(`[Migrations] Found ${pendingMigrations.length} pending migration(s)`);
+  logger.info({ count: pendingMigrations.length }, 'Found pending migrations');
 
   for (const migrationFile of pendingMigrations) {
     await applyMigration(migrationFile);
@@ -164,7 +166,7 @@ export function down(db) {
   const { writeFile } = await import('fs/promises');
   await writeFile(filepath, template);
 
-  console.log(`[Migrations] Created migration: ${filename}`);
+  logger.info({ filename }, 'Created migration');
   return filename;
 }
 
@@ -194,7 +196,7 @@ export async function migrateCLI() {
 
     case 'create':
       if (!args[1]) {
-        console.error('Usage: node migrations.js create <migration-name>');
+        logger.error('Usage: node migrations.js create <migration-name>');
         process.exit(1);
       }
       await createMigration(args[1]);

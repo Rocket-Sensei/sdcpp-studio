@@ -23,6 +23,10 @@ export default defineConfig({
         target: backendUrl,
         changeOrigin: true,
         ws: true
+      },
+      '/static': {
+        target: backendUrl,
+        changeOrigin: true
       }
     }
   },

@@ -129,34 +129,11 @@ export function History({ onCreateMore }) {
     return null;
   };
 
-  // Thumbnail component that loads image on mount
+  // Thumbnail component that uses first_image_url directly from list data
   const Thumbnail = ({ generation, index = 0 }) => {
-    const [src, setSrc] = useState(null);
-    const [imageCount, setImageCount] = useState(0);
-
-    useEffect(() => {
-      const loadImages = async () => {
-        try {
-          const response = await fetch(`/api/generations/${generation.id}`);
-          if (!response.ok) return;
-
-          const gen = await response.json();
-          if (gen.images && gen.images.length > 0) {
-            setImageCount(gen.images.length);
-            // Use API endpoint for thumbnails (more reliable than static URLs)
-            const imgResponse = await fetch(`/api/images/${gen.images[0].id}`);
-            if (imgResponse.ok) {
-              const blob = await imgResponse.blob();
-              setSrc(URL.createObjectURL(blob));
-            }
-          }
-        } catch (e) {
-          console.error("Failed to load thumbnail", e);
-        }
-      };
-
-      loadImages();
-    }, [generation.id]);
+    // Use first_image_url directly from the list data - no additional API calls needed
+    const src = generation.first_image_url || null;
+    const imageCount = generation.image_count || 0;
 
     if (!src) {
       return (

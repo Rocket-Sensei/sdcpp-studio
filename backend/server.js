@@ -22,7 +22,8 @@ import {
   getGenerationStats,
   GenerationStatus,
   deleteGeneration,
-  getGenerationsCount
+  getGenerationsCount,
+  failOldQueuedGenerations
 } from './db/queries.js';
 import { startQueueProcessor } from './services/queueProcessor.js';
 
@@ -238,6 +239,8 @@ app.get('/api/images/:imageId', async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
     res.set('Content-Type', image.mime_type);
+    // Cache images for 1 hour
+    res.set('Cache-Control', 'public, max-age=3600, immutable');
     res.sendFile(image.file_path);
   } catch (error) {
     logger.error({ error }, 'Error fetching image');
@@ -254,6 +257,8 @@ app.get('/api/generations/:id/image', async (req, res) => {
     }
     const firstImage = generation.images[0];
     res.set('Content-Type', firstImage.mime_type);
+    // Cache images for 1 hour
+    res.set('Cache-Control', 'public, max-age=3600, immutable');
     res.sendFile(firstImage.file_path);
   } catch (error) {
     logger.error({ error }, 'Error fetching image');
@@ -1598,6 +1603,13 @@ server.listen(PORT, HOST, async () => {
   logger.info(`Server running on http://${HOST}:${PORT}`);
   logger.info(`SD API endpoint: ${process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1231/v1'}`);
   logger.info(`WebSocket server initialized at ws://${HOST}:${PORT}/ws`);
+
+  // Fail old queued/processing generations from previous server run
+  try {
+    failOldQueuedGenerations();
+  } catch (error) {
+    logger.error(`Failed to fail old queued generations: ${error.message}`);
+  }
 
   // Initialize model manager
   try {
