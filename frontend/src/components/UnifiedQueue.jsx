@@ -79,7 +79,7 @@ const isPendingOrProcessing = (status) => {
 
 // Thumbnail component moved outside parent to prevent remounting on parent re-renders
 // Using memo to prevent unnecessary re-renders when generation props haven't changed
-const Thumbnail = memo(function Thumbnail({ generation }) {
+const Thumbnail = memo(function Thumbnail({ generation, onViewLogs }) {
   // Use first_image_url directly from the list data - no additional API calls needed
   const src = generation.first_image_url || null;
   const imageCount = generation.image_count || 0;
@@ -94,14 +94,28 @@ const Thumbnail = memo(function Thumbnail({ generation }) {
     );
   }
 
-  // Show failed state
+  // Show failed state with View Logs button
   if (generation.status === GENERATION_STATUS.FAILED || generation.status === GENERATION_STATUS.CANCELLED) {
     return (
-      <div className="aspect-square bg-destructive/10 rounded-lg flex flex-col items-center justify-center">
-        <XCircle className="h-8 w-8 text-destructive mb-2" />
-        <span className="text-xs text-destructive">
+      <div className="aspect-square bg-destructive/10 rounded-lg flex flex-col items-center justify-center p-4">
+        <XCircle className="h-8 w-8 text-destructive mb-3" />
+        <span className="text-xs text-destructive mb-3">
           {generation.status === GENERATION_STATUS.FAILED ? "Failed" : "Cancelled"}
         </span>
+        {generation.error && (
+          <span className="text-xs text-destructive/70 mb-3 text-center line-clamp-2">
+            {generation.error}
+          </span>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onViewLogs && onViewLogs(generation)}
+          className="text-xs"
+        >
+          <Terminal className="h-3 w-3 mr-1" />
+          View Logs
+        </Button>
       </div>
     );
   }
@@ -139,6 +153,8 @@ export function UnifiedQueue({ onCreateMore }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [failedLogsGeneration, setFailedLogsGeneration] = useState(null);
+  const [isFailedLogsOpen, setIsFailedLogsOpen] = useState(false);
   const [models, setModels] = useState({});
 
   // Use a ref to track fetchGenerations so the WebSocket onMessage callback doesn't change
@@ -404,6 +420,11 @@ export function UnifiedQueue({ onCreateMore }) {
     }
   };
 
+  const handleViewFailedLogs = (generation) => {
+    setFailedLogsGeneration(generation);
+    setIsFailedLogsOpen(true);
+  };
+
   if (generations.length === 0 && !isLoading) {
     return (
       <Card>
@@ -438,7 +459,7 @@ export function UnifiedQueue({ onCreateMore }) {
                   }
                 }}
               >
-                <Thumbnail generation={generation} />
+                <Thumbnail generation={generation} onViewLogs={handleViewFailedLogs} />
                 {generation.status === GENERATION_STATUS.COMPLETED && (
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <Button
@@ -657,6 +678,39 @@ export function UnifiedQueue({ onCreateMore }) {
                 <LogViewer generationId={selectedImage.id} />
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Failed Generation Logs Dialog */}
+      <Dialog open={isFailedLogsOpen} onOpenChange={(open) => { setIsFailedLogsOpen(open); if (!open) setFailedLogsGeneration(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Generation Logs - {failedLogsGeneration?.status === GENERATION_STATUS.FAILED ? "Failed" : "Cancelled"}</DialogTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFailedLogsOpen(false)}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Close
+              </Button>
+            </div>
+            <DialogDescription>
+              {failedLogsGeneration?.prompt || "No prompt"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {failedLogsGeneration?.error && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <p className="text-sm font-medium text-destructive">Error:</p>
+                <p className="text-sm text-destructive/80">{failedLogsGeneration.error}</p>
+              </div>
+            )}
+            <div className="h-[500px]">
+              <LogViewer generationId={failedLogsGeneration?.id} />
+            </div>
           </div>
         </DialogContent>
       </Dialog>
