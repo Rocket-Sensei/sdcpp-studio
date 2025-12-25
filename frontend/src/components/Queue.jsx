@@ -292,7 +292,7 @@ export function Queue() {
                     {/* Size and seed info */}
                     <span className="text-xs text-muted-foreground">
                       {job.size || "512x512"}
-                      {job.seed && ` • Seed: ${job.seed}`}
+                      {job.seed && ` • Seed: ${Math.floor(Number(job.seed))}`}
                     </span>
                   </div>
                 </div>

@@ -183,7 +183,8 @@ export function Generate({ onGenerated, settings, selectedModel, onModelChange }
           setHeight(h);
         }
       }
-      if (settings.seed) setSeed(settings.seed.toString());
+      // Note: We do NOT set seed from settings, so "generate more" creates a new random seed
+      // This ensures "generate more" creates a new/varied image instead of the same one
       if (settings.type === 'edit' || settings.type === 'variation') {
         setMode(settings.type === 'edit' ? 'imgedit' : 'img2img');
       }

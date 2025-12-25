@@ -210,7 +210,7 @@ export function History({ onCreateMore }) {
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                 <Box className="h-3 w-3" />
                 <span>{generation.size || "512x512"}</span>
-                {generation.seed && <span>• Seed: {generation.seed}</span>}
+                {generation.seed && <span>• Seed: {Math.floor(Number(generation.seed))}</span>}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -252,7 +252,7 @@ export function History({ onCreateMore }) {
           <DialogHeader>
             <DialogTitle>{selectedImage?.prompt}</DialogTitle>
             <DialogDescription>
-              {selectedImage?.size} • {selectedImage?.width}x{selectedImage?.height} • Seed: {selectedImage?.seed || "Random"}
+              {selectedImage?.size} • {selectedImage?.width}x{selectedImage?.height} • Seed: {selectedImage?.seed ? Math.floor(Number(selectedImage.seed)) : "Random"}
               {selectedImage?.images && selectedImage.images.length > 1 && (
                 <span className="ml-2">• Image {selectedImage.currentImageIndex + 1} of {selectedImage.images.length}</span>
               )}

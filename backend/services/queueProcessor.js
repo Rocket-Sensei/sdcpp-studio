@@ -433,6 +433,13 @@ async function processHTTPGeneration(job, modelConfig, params) {
   if (params.quality) requestBody.quality = params.quality;
   if (params.style) requestBody.style = params.style;
 
+  // Add SD.cpp advanced settings to request body
+  // These are passed as separate JSON fields for the sd-server API
+  if (params.cfg_scale !== undefined) requestBody.cfg_scale = params.cfg_scale;
+  if (params.sampling_method !== undefined) requestBody.sampling_method = params.sampling_method;
+  if (params.sample_steps !== undefined) requestBody.steps = params.sample_steps; // Note: sd-server uses 'steps' not 'sample_steps'
+  if (params.clip_skip !== undefined && params.clip_skip !== -1) requestBody.clip_skip = params.clip_skip;
+
   const endpoint = `${apiUrl}/images/generations`;
 
   console.log(`[QueueProcessor] Making request to: ${endpoint}`);
