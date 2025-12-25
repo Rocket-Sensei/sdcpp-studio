@@ -94,10 +94,11 @@ const Thumbnail = memo(function Thumbnail({ generation }) {
         const gen = await response.json();
         if (gen.images && gen.images.length > 0) {
           setImageCount(gen.images.length);
-          // Use static_url directly instead of fetching via API
-          const firstImage = gen.images[0];
-          if (firstImage.static_url) {
-            setSrc(firstImage.static_url);
+          // Use API endpoint for thumbnails (more reliable than static URLs)
+          const imgResponse = await authenticatedFetch(`/api/images/${gen.images[0].id}`);
+          if (imgResponse.ok) {
+            const blob = await imgResponse.blob();
+            setSrc(URL.createObjectURL(blob));
           }
         }
       } catch (e) {

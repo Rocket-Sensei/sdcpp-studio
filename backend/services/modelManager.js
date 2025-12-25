@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import { spawn } from 'child_process';
 import { broadcastModelStatus } from './websocket.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger } from '../utils/logger.js';
 
 const logger = createLogger('modelManager');
 
@@ -498,6 +498,11 @@ export class ModelManager {
 
       const childProcess = spawn(command, processedArgs, processOptions);
 
+      // Log the command to sdcpp.log for server mode
+      if (model.exec_mode === ExecMode.SERVER) {
+        logCliCommand(command, processedArgs, { cwd: processOptions.cwd });
+      }
+
       // Create process entry
       const processEntry = new ProcessEntry(modelId, childProcess, port, model.exec_mode, {
         command,
@@ -507,12 +512,19 @@ export class ModelManager {
 
       // Set up output handlers
       childProcess.stdout.on('data', (data) => {
+        const output = data.toString();
         processEntry.appendOutput(data);
-        logger.debug({ modelId, output: data.toString().trim() }, 'Process stdout');
+        logger.debug({ modelId, output: output.trim() }, 'Process stdout');
+
+        // Log to sdcpp.log for server mode processes
+        if (model.exec_mode === ExecMode.SERVER) {
+          const sdcppLogger = getSdCppLogger();
+          sdcppLogger.info({ modelId, stdout: output.trim() }, 'Server output');
+          sdcppLogger.flush();
+        }
 
         // Detect when server is ready (looks for common patterns)
         if (processEntry.status === ModelStatus.STARTING) {
-          const output = data.toString();
           if (this._isServerReady(output)) {
             processEntry.status = ModelStatus.RUNNING;
             logger.info({ modelId, port }, 'Model is now running');
@@ -527,8 +539,16 @@ export class ModelManager {
       });
 
       childProcess.stderr.on('data', (data) => {
-        processEntry.appendError(data);
-        logger.debug({ modelId, output: data.toString().trim() }, 'Process stderr');
+        const error = data.toString();
+        processEntry.appendError(error);
+        logger.debug({ modelId, output: error.trim() }, 'Process stderr');
+
+        // Log to sdcpp.log for server mode processes
+        if (model.exec_mode === ExecMode.SERVER) {
+          const sdcppLogger = getSdCppLogger();
+          sdcppLogger.warn({ modelId, stderr: error.trim() }, 'Server error');
+          sdcppLogger.flush();
+        }
       });
 
       // Set up exit handler
