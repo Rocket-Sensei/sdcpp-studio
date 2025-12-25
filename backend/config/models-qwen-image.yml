@@ -25,6 +25,10 @@ models:
     port: 1400
     model_type: "text-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 24
+      sampling_method: "euler"
     huggingface:
       repo: "QuantStack/Qwen-Image-GGUF"
       files:

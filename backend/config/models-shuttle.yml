@@ -27,5 +27,5 @@ models:
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 3.5
-      sample_steps: 4
+      sample_steps: 28
       sampling_method: "euler"

@@ -3,6 +3,7 @@ import { writeFile, unlink } from 'fs/promises';
 import { join, basename } from 'path';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../utils/logger.js';
+import { modelManager } from '../services/modelManager.js';
 
 const logger = createLogger('queries');
 
@@ -40,9 +41,16 @@ function addStaticUrlToImage(image) {
 export async function createGeneration(data) {
   const db = getDatabase();
 
-  // Model is required - use default from modelManager if not provided
+  // Use default model if not provided
   if (!data.model) {
-    throw new Error('Model is required for generation. Please specify a model ID.');
+    const jobType = data.type || 'generate';
+    const defaultModel = modelManager.getDefaultModelForType(jobType);
+    if (defaultModel) {
+      data.model = defaultModel.id;
+      logger.debug({ jobType, defaultModel: data.model }, 'Using default model for generation');
+    } else {
+      throw new Error('No model specified and no default model configured. Please specify a model ID or configure a default model.');
+    }
   }
 
   // Generate a random seed if not provided (ensures every generation has a seed)

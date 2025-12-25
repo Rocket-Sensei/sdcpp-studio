@@ -23,3 +23,7 @@ models:
     exec_mode: "cli"
     model_type: "text-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 24
+      sampling_method: "euler"

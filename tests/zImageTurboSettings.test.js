@@ -21,6 +21,12 @@ const getModelsYmlSource = () => {
   return readFileSync(modelsPath, 'utf-8');
 };
 
+// Read the models-z-turbo.yml source file for z-image-turbo specific tests
+const getModelsZTurboYmlSource = () => {
+  const modelsPath = join(__dirname, '../backend/config/models-z-turbo.yml');
+  return readFileSync(modelsPath, 'utf-8');
+};
+
 // Read the modelManager source file for static analysis
 const getModelManagerSource = () => {
   const sourcePath = join(__dirname, '../backend/services/modelManager.js');
@@ -34,8 +40,8 @@ const getQueueProcessorSource = () => {
 };
 
 describe('Z-Image-Turbo Model Configuration', () => {
-  it('should have generation_params defined in models.yml', () => {
-    const source = getModelsYmlSource();
+  it('should have generation_params defined in models-z-turbo.yml', () => {
+    const source = getModelsZTurboYmlSource();
 
     // Verify z-image-turbo has generation_params section
     expect(source).toContain('z-image-turbo:');
@@ -46,7 +52,7 @@ describe('Z-Image-Turbo Model Configuration', () => {
   });
 
   it('should document the correct settings for Z-Image-Turbo', () => {
-    const source = getModelsYmlSource();
+    const source = getModelsZTurboYmlSource();
 
     // Verify the comment explains the recommended settings
     expect(source).toContain('Z-Image-Turbo is a distilled model');
@@ -56,18 +62,15 @@ describe('Z-Image-Turbo Model Configuration', () => {
   });
 
   it('should remove hardcoded --cfg-scale from args', () => {
-    const source = getModelsYmlSource();
+    const source = getModelsZTurboYmlSource();
 
     // Extract z-image-turbo section only
     const turboSection = source.substring(
-      source.indexOf('z-image-turbo:'),
-      source.indexOf('fluxed-up-flux:')
+      source.indexOf('z-image-turbo:')
     );
 
-    // Verify that the old hardcoded --cfg-scale 1.0 is removed from z-image-turbo section
-    expect(turboSection).not.toMatch(/--cfg-scale.*1\.0/);
-    // Should have comment about dynamic setting
-    expect(turboSection).toContain('set dynamically');
+    // Verify that the old hardcoded --cfg-scale is not in args
+    expect(turboSection).not.toMatch(/--cfg-scale/);
     // Should not have --cfg-scale in the args at all for z-image-turbo
     expect(turboSection).not.toMatch(/^\s*-\s*"--cfg-scale"/m);
   });
@@ -155,12 +158,11 @@ describe('QueueProcessor - Model-specific defaults', () => {
 
 describe('Z-Image-Turbo Settings Values', () => {
   it('should set cfg_scale to 0.0 for z-image-turbo', () => {
-    const source = getModelsYmlSource();
+    const source = getModelsZTurboYmlSource();
 
     // Extract z-image-turbo section
     const turboSection = source.substring(
-      source.indexOf('z-image-turbo:'),
-      source.indexOf('fluxed-up-flux:')
+      source.indexOf('z-image-turbo:')
     );
 
     // Verify cfg_scale is set to 0.0
@@ -171,12 +173,11 @@ describe('Z-Image-Turbo Settings Values', () => {
   });
 
   it('should set sample_steps to 9 for z-image-turbo', () => {
-    const source = getModelsYmlSource();
+    const source = getModelsZTurboYmlSource();
 
     // Extract z-image-turbo section
     const turboSection = source.substring(
-      source.indexOf('z-image-turbo:'),
-      source.indexOf('fluxed-up-flux:')
+      source.indexOf('z-image-turbo:')
     );
 
     // Verify sample_steps is set to 9
@@ -187,12 +188,11 @@ describe('Z-Image-Turbo Settings Values', () => {
   });
 
   it('should set sampling_method to euler for z-image-turbo', () => {
-    const source = getModelsYmlSource();
+    const source = getModelsZTurboYmlSource();
 
     // Extract z-image-turbo section
     const turboSection = source.substring(
-      source.indexOf('z-image-turbo:'),
-      source.indexOf('fluxed-up-flux:')
+      source.indexOf('z-image-turbo:')
     );
 
     // Verify sampling_method is set to euler

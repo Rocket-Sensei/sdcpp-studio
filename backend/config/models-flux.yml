@@ -49,6 +49,9 @@ models:
     port: 1234
     model_type: "text-to-image"
     default_size: "1024x1024"
+    generation_params:
+      sample_steps: 24
+      sampling_method: "euler"
 
   fluxed-up-flux:
     name: "FluxedUp Flux"
@@ -72,6 +75,9 @@ models:
     port: 1412
     model_type: "text-to-image"
     default_size: "1024x1024"
+    generation_params:
+      sample_steps: 24
+      sampling_method: "euler"
 
   fux-capacity:
     name: "fuxCapacityNSFW"
@@ -95,3 +101,5 @@ models:
     port: 1235
     model_type: "text-to-image"
     default_size: "1024x1024"
+    generation_params:
+      sample_steps: 24

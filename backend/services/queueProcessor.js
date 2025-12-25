@@ -540,8 +540,8 @@ async function processCLIGeneration(job, modelConfig, params, genLogger) {
     logger.info({ modelId: modelConfig.id }, 'Generating with CLI');
     genLogger.info({ modelId: modelConfig.id }, 'Starting CLI generation');
 
-    // Use CLI handler to generate image
-    const imageBuffer = await cliHandler.generateImage(modelConfig.id, params, modelConfig);
+    // Use CLI handler to generate image, passing generation ID for logging
+    const imageBuffer = await cliHandler.generateImage(modelConfig.id, params, modelConfig, job.id);
 
     // Convert to same format as HTTP API response
     const b64Json = imageBuffer.toString('base64');

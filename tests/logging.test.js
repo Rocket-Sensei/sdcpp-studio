@@ -81,6 +81,7 @@ describe('Logger Utility', () => {
   beforeEach(async () => {
     clearLogFiles();
     // Clear module cache to get fresh instances
+    vi.clearAllMocks();
     vi.resetModules();
     // Set environment for testing
     process.env.LOG_LEVEL = 'debug';
@@ -328,6 +329,108 @@ describe('Logger Utility', () => {
       expect(logEntry).toBeDefined();
       expect(logEntry.command).toBe('./bin/sd-cli');
       expect(logEntry.args).toEqual(['--model', 'test.gguf', '--prompt', 'a cat']);
+    });
+
+    it('should include generation_id in CLI logs when provided', async () => {
+      const { logCliCommand, logCliOutput, logCliError, createSdCppChildLogger } = await import('../backend/utils/logger.js');
+
+      const testGenerationId = 'test-gen-123';
+
+      // Log CLI command with generation ID
+      logCliCommand('./bin/sd-cli', ['--model', 'test.gguf'], { cwd: '/tmp' }, testGenerationId);
+
+      // Log CLI output with generation ID
+      logCliOutput('success output', null, 0, testGenerationId);
+
+      // Also test the direct logger creation
+      const genLogger = createSdCppChildLogger(testGenerationId);
+      genLogger.info({ test: 'data' }, 'Generation log message');
+
+      await flushAllLoggers();
+
+      const content = readLogFile(sdcppLogPath);
+      const logLines = parseLogLines(content);
+
+      // All logs with generation_id should have it in their log entry
+      const logsWithGenId = logLines.filter(l => l.generation_id === testGenerationId);
+
+      // Should have at least 3 entries with generation_id (command, output, direct log)
+      expect(logsWithGenId.length).toBeGreaterThanOrEqual(3);
+
+      // Verify specific entries
+      const commandEntry = logLines.find(l => l.eventType === 'cliCommand' && l.generation_id === testGenerationId);
+      expect(commandEntry).toBeDefined();
+      expect(commandEntry.generation_id).toBe(testGenerationId);
+
+      const outputEntry = logLines.find(l => l.eventType === 'cliOutput' && l.generation_id === testGenerationId);
+      expect(outputEntry).toBeDefined();
+      expect(outputEntry.generation_id).toBe(testGenerationId);
+      expect(outputEntry.exitCode).toBe(0);
+
+      const directLogEntry = logLines.find(l => l.msg === 'Generation log message' && l.generation_id === testGenerationId);
+      expect(directLogEntry).toBeDefined();
+      expect(directLogEntry.generation_id).toBe(testGenerationId);
+    });
+
+    it('should include generation_id in CLI error logs when provided', async () => {
+      const { logCliError, logCliOutput } = await import('../backend/utils/logger.js');
+
+      const testGenerationId = 'test-gen-error-456';
+
+      // Log CLI error with generation ID
+      const testError = new Error('Model loading failed');
+      testError.stack = 'Error: Model loading failed\n    at test.js:10:15';
+      logCliError(testError, testGenerationId);
+
+      // Log CLI output with non-zero exit code and generation ID
+      logCliOutput(null, 'Failed to load model', 1, testGenerationId);
+
+      await flushAllLoggers();
+
+      const content = readLogFile(sdcppLogPath);
+      const logLines = parseLogLines(content);
+
+      // Check error log entry
+      const errorEntry = logLines.find(l => l.eventType === 'cliError' && l.generation_id === testGenerationId);
+      expect(errorEntry).toBeDefined();
+      expect(errorEntry.generation_id).toBe(testGenerationId);
+      expect(errorEntry.error?.message).toBe('Model loading failed');
+
+      // Check output entry with error exit code
+      const outputEntry = logLines.find(l => l.eventType === 'cliOutput' && l.generation_id === testGenerationId);
+      expect(outputEntry).toBeDefined();
+      expect(outputEntry.generation_id).toBe(testGenerationId);
+      expect(outputEntry.exitCode).toBe(1);
+      expect(outputEntry.levelNum).toBe(50); // error level
+    });
+
+    it('should support getSdCppLogger with optional generation ID', async () => {
+      const { getSdCppLogger } = await import('../backend/utils/logger.js');
+
+      const testGenerationId = 'test-gen-getLogger-789';
+
+      // Get logger with generation ID
+      const genLogger = getSdCppLogger(testGenerationId);
+      genLogger.info('Test with generation ID');
+
+      // Get logger without generation ID
+      const plainLogger = getSdCppLogger();
+      plainLogger.info('Test without generation ID');
+
+      await flushAllLoggers();
+
+      const content = readLogFile(sdcppLogPath);
+      const logLines = parseLogLines(content);
+
+      // Check entry with generation ID
+      const withGenId = logLines.find(l => l.msg === 'Test with generation ID');
+      expect(withGenId).toBeDefined();
+      expect(withGenId.generation_id).toBe(testGenerationId);
+
+      // Check entry without generation ID (should not have generation_id field)
+      const withoutGenId = logLines.find(l => l.msg === 'Test without generation ID');
+      expect(withoutGenId).toBeDefined();
+      expect(withoutGenId.generation_id).toBeUndefined();
     });
 
     it('should log CLI output to sdcpp.log', async () => {
@@ -614,7 +717,6 @@ describe('Logger Utility', () => {
 
     it('should NOT log to stdout when LOG_TO_STDOUT is false', async () => {
       process.env.LOG_TO_STDOUT = 'false';
-      vi.resetModules();
 
       // Mock console.log to capture stdout output
       const stdoutWrite = process.stdout.write;
@@ -644,7 +746,6 @@ describe('Logger Utility', () => {
 
     it('should log to stdout when LOG_TO_STDOUT is 1', async () => {
       process.env.LOG_TO_STDOUT = '1';
-      vi.resetModules();
 
       const stdoutWrite = process.stdout.write;
       const writtenData = [];

@@ -210,11 +210,24 @@ export function getHttpLogger() {
 }
 
 /**
- * Get the SD.cpp logger
- * @returns {pino.Logger} SD.cpp logger
+ * Get the SD.cpp logger with optional generation context
+ * @param {string} generationId - Optional generation ID to tag logs with
+ * @returns {pino.Logger} SD.cpp logger with or without generation context
  */
-export function getSdCppLogger() {
+export function getSdCppLogger(generationId = null) {
+  if (generationId) {
+    return sdCppLogger.child({ generation_id: generationId });
+  }
   return sdCppLogger;
+}
+
+/**
+ * Create an SD.cpp child logger with generation context
+ * @param {string} generationId - Generation ID to tag logs with
+ * @returns {pino.Logger} Child logger with generation_id for sdcpp.log
+ */
+export function createSdCppChildLogger(generationId) {
+  return sdCppLogger.child({ generation_id: generationId });
 }
 
 /**
@@ -333,13 +346,15 @@ export async function logApiResponse(response, data = null) {
  * @param {string} command - Command to execute
  * @param {string[]} args - Command arguments
  * @param {Object} options - Spawn options
+ * @param {string} generationId - Optional generation ID to tag logs with
  */
-export function logCliCommand(command, args = [], options = {}) {
+export function logCliCommand(command, args = [], options = {}, generationId = null) {
   if (!isCliLoggingEnabled()) return;
 
   const shellCmd = [command, ...args.map(arg => arg.includes(' ') ? `'${arg}'` : arg)].join(' ');
+  const logger = getSdCppLogger(generationId);
 
-  sdCppLogger.info({
+  logger.info({
     command,
     args,
     options,
@@ -348,7 +363,7 @@ export function logCliCommand(command, args = [], options = {}) {
   }, `CLI: ${command}`);
 
   // Flush immediately to ensure logs are written
-  sdCppLogger.flush();
+  logger.flush();
 }
 
 /**
@@ -356,13 +371,15 @@ export function logCliCommand(command, args = [], options = {}) {
  * @param {string} stdout - Standard output
  * @param {string} stderr - Standard error
  * @param {number} exitCode - Process exit code
+ * @param {string} generationId - Optional generation ID to tag logs with
  */
-export function logCliOutput(stdout, stderr, exitCode) {
+export function logCliOutput(stdout, stderr, exitCode, generationId = null) {
   if (!isCliLoggingEnabled()) return;
 
   const level = exitCode !== 0 ? 'error' : 'info';
+  const logger = getSdCppLogger(generationId);
 
-  sdCppLogger[level]({
+  logger[level]({
     exitCode,
     stdout: stdout || undefined,
     stderr: stderr || undefined,
@@ -370,23 +387,26 @@ export function logCliOutput(stdout, stderr, exitCode) {
   }, `CLI exit code: ${exitCode}`);
 
   // Flush immediately to ensure logs are written
-  sdCppLogger.flush();
+  logger.flush();
 }
 
 /**
  * Log CLI command error
  * @param {Error} error - Error object
+ * @param {string} generationId - Optional generation ID to tag logs with
  */
-export function logCliError(error) {
+export function logCliError(error, generationId = null) {
   if (!isCliLoggingEnabled()) return;
 
-  sdCppLogger.error({
+  const logger = getSdCppLogger(generationId);
+
+  logger.error({
     error: pino.stdSerializers.err(error),
     eventType: 'cliError'
   }, `CLI Error: ${error.message}`);
 
   // Flush immediately to ensure logs are written
-  sdCppLogger.flush();
+  logger.flush();
 }
 
 /**

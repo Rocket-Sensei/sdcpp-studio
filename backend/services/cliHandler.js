@@ -120,9 +120,10 @@ class CLIHandler {
    * @param {string} [params.quality='medium'] - Quality level
    * @param {string} [params.style] - Style preset
    * @param {Object} modelConfig - Model configuration from models.yml
+   * @param {string} [generationId] - Optional generation ID for logging
    * @returns {Promise<Buffer>} Generated image as a Buffer
    */
-  async generateImage(modelId, params, modelConfig) {
+  async generateImage(modelId, params, modelConfig, generationId = null) {
     // Build the CLI command
     const command = this.buildCommand(modelConfig, params);
 
@@ -135,13 +136,13 @@ class CLIHandler {
 
     logger.debug({ command: command.join(' ') }, 'Executing command');
 
-    // Log the CLI command
+    // Log the CLI command with generation ID
     const [cmd, ...args] = command;
-    logCliCommand(cmd, args, { cwd: PROJECT_ROOT });
+    logCliCommand(cmd, args, { cwd: PROJECT_ROOT }, generationId);
 
     try {
       // Execute the CLI command
-      const result = await this.executeCommand(command);
+      const result = await this.executeCommand(command, generationId);
 
       // Parse output to get the actual image path
       const imagePath = this.parseOutput(result, outputPath);
@@ -156,7 +157,7 @@ class CLIHandler {
 
       return imageBuffer;
     } catch (error) {
-      logCliError(error);
+      logCliError(error, generationId);
       logger.error({ error }, 'Image generation failed');
       throw new Error(`CLI generation failed: ${error.message}`);
     }
@@ -249,10 +250,11 @@ class CLIHandler {
   /**
    * Execute a CLI command and capture output
    * @param {string[]} command - Command array
+   * @param {string} [generationId] - Optional generation ID for logging
    * @returns {Promise<string>} Combined stdout and stderr output
    * @private
    */
-  executeCommand(command) {
+  executeCommand(command, generationId = null) {
     return new Promise((resolve, reject) => {
       const [cmd, ...args] = command;
 
@@ -274,8 +276,8 @@ class CLIHandler {
       });
 
       child.on('close', (code) => {
-        // Log CLI output
-        logCliOutput(stdout, stderr, code);
+        // Log CLI output with generation ID
+        logCliOutput(stdout, stderr, code, generationId);
 
         if (code === 0) {
           resolve(stdout + stderr);
@@ -289,7 +291,7 @@ class CLIHandler {
       });
 
       child.on('error', (error) => {
-        logCliError(error);
+        logCliError(error, generationId);
         reject(new Error(
           `Failed to spawn command: ${error.message}\n` +
           `Command: ${command.join(' ')}`
