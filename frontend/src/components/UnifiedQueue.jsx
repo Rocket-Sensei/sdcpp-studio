@@ -294,13 +294,16 @@ export function UnifiedQueue({ onCreateMore }) {
 
       if ((generation.type === 'edit' || generation.type === 'variation') && generation.input_image_path) {
         // For edit/variation, we need to send the image file
-        // Since we only have the path, we'll need to fetch the image first
-        const imageResponse = await fetch(generation.input_image_path);
+        // Convert disk path to static URL
+        const filename = generation.input_image_path.split('/').pop();
+        const staticUrl = `/static/input/${filename}`;
+
+        const imageResponse = await fetch(staticUrl);
         if (!imageResponse.ok) {
           throw new Error("Failed to fetch input image");
         }
         const blob = await imageResponse.blob();
-        const file = new File([blob], 'input.png', { type: 'image/png' });
+        const file = new File([blob], filename, { type: blob.type || 'image/png' });
 
         const formData = new FormData();
         formData.append('image', file);
@@ -313,6 +316,7 @@ export function UnifiedQueue({ onCreateMore }) {
         if (generation.sampling_method) formData.append('sampling_method', generation.sampling_method);
         if (generation.sample_steps) formData.append('sample_steps', generation.sample_steps);
         if (generation.clip_skip) formData.append('clip_skip', generation.clip_skip);
+        if (generation.strength !== undefined) formData.append('strength', generation.strength);
 
         body = formData;
       } else {

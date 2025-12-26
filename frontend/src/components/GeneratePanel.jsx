@@ -186,6 +186,36 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, o
       if (settings.type === 'edit' || settings.type === 'variation') {
         setMode(settings.type === 'edit' ? 'imgedit' : 'img2img');
       }
+
+      // Load source image for edit/variation modes
+      if (settings.input_image_path && (settings.type === 'edit' || settings.type === 'variation')) {
+        const loadImage = async () => {
+          try {
+            // Extract filename from the disk path and convert to static URL
+            const filename = settings.input_image_path.split('/').pop();
+            const staticUrl = `/static/input/${filename}`;
+
+            // Fetch the image
+            const response = await fetch(staticUrl);
+            if (!response.ok) {
+              console.error('Failed to fetch input image:', response.statusText);
+              return;
+            }
+
+            const blob = await response.blob();
+            const file = new File([blob], filename, { type: blob.type || 'image/png' });
+
+            // Set both the file and preview
+            setSourceImage(file);
+            setSourceImagePreview(staticUrl);
+            setUpscaleResult(null);
+          } catch (err) {
+            console.error('Error loading source image:', err);
+          }
+        };
+
+        loadImage();
+      }
     }
   }, [settings]);
 
