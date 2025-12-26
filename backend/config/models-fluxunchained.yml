@@ -1,0 +1,35 @@
+# Flux Models
+models:
+  # ==================== FluxUnchained Models ====================
+  # FluxUnchained with NF4 quantization
+
+  fluxunchained-nf4:
+    name: "FluxUnchained NF4"
+    description: "FluxUnchained V11 - NF4 quantization"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/fluxunchainedNF4_fluxunchainedV11NF4.safetensors"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "20"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1537
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 20
+      sampling_method: "euler"

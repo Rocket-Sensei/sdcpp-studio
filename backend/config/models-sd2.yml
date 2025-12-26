@@ -1,0 +1,25 @@
+# Stable Diffusion 2.x Models
+models:
+  # ==================== SD 2.1 Models ====================
+  sd-2-1-768:
+    name: "SD 2.1 768"
+    description: "Stable Diffusion 2.1 - 768px resolution variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: true
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/v2-1_768-ema-pruned.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--steps"
+      - "30"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1533
+    model_type: "text-to-image"
+    default_size: "768x768"
+    generation_params:
+      cfg_scale: 7.0
+      sample_steps: 30
+      sampling_method: "euler_a"

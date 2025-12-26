@@ -61,3 +61,5 @@ coverage/
 /bin
 /models
 /sdcpp
+/tests/backend/data/test-input/*
+/backend/data/test-images/
