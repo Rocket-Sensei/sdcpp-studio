@@ -266,6 +266,28 @@ export function getNextPendingGeneration() {
 }
 
 /**
+ * Atomically get and mark the next pending generation as PROCESSING.
+ * This prevents race conditions where multiple queue processors might try to process the same job.
+ * Uses UPDATE with RETURNING to atomically find and claim a job in one operation.
+ * @returns {Object|null} The claimed generation, or null if no pending jobs exist
+ */
+export function claimNextPendingGeneration() {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    UPDATE generations
+    SET status = ?
+    WHERE id = (
+      SELECT id FROM generations
+      WHERE status = ?
+      ORDER BY created_at ASC
+      LIMIT 1
+    )
+    RETURNING *
+  `);
+  return stmt.get(GenerationStatus.PROCESSING, GenerationStatus.PENDING);
+}
+
+/**
  * Update generation status and related fields
  */
 export function updateGenerationStatus(id, status, additionalData = {}) {

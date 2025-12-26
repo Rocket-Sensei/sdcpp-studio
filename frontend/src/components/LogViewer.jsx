@@ -114,7 +114,7 @@ export function LogViewer({ generationId, onClose }) {
   };
 
   return (
-    <div className={`${isFullscreen ? "fixed inset-4 z-50" : "relative"} bg-gray-950 rounded-lg overflow-hidden flex flex-col`}>
+    <div className={`${isFullscreen ? "fixed inset-4 z-50" : "relative w-full"} bg-gray-950 rounded-lg overflow-hidden flex flex-col`}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center gap-2">

@@ -48,7 +48,7 @@ export function WebSocketStatusIndicator() {
       <Dialog open={isLogModalOpen} onOpenChange={setIsLogModalOpen}>
         <DialogPortal>
           <DialogOverlay />
-          <div className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-4xl h-[80vh]">
+          <div className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-4xl h-[80vh] px-2 sm:px-4">
             <LogViewer onClose={() => setIsLogModalOpen(false)} />
           </div>
         </DialogPortal>

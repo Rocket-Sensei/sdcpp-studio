@@ -10,6 +10,8 @@ models:
     args:
       - "--diffusion-model"
       - "./models/v2-1_768-ema-pruned.safetensors"
+      - "--clip_g"
+      - "./models/clip_g.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"

@@ -8,12 +8,21 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
+      - "--diffusion-model"
       - "./models/v1-5-pruned-emaonly-fp16.safetensors"
-    mode: "preload"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--steps"
+      - "30"
+    mode: "on_demand"
     exec_mode: "server"
     port: 1235
     model_type: "text-to-image"
     default_size: "512x512"
+    generation_params:
+      cfg_scale: 7.0
+      sample_steps: 30
+      sampling_method: "euler_a"
     huggingface:
       repo: "runwayml/stable-diffusion-v1-5"
       files:

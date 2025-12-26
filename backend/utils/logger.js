@@ -201,7 +201,7 @@ function createSdCppLogger() {
       level: (label, number) => ({ level: label, levelNum: number }),
     },
     mixin() {
-      return { time: new Date().toISOString() };
+      return { module: 'sdcpp', time: new Date().toISOString() };
     },
     base: { type: 'sdcpp' }
   }, pino.multistream(streams));

@@ -1,4 +1,4 @@
-import { getNextPendingGeneration, updateGenerationStatus, updateGenerationProgress, deleteGeneration, GenerationStatus, createGeneratedImage } from '../db/queries.js';
+import { claimNextPendingGeneration, updateGenerationStatus, updateGenerationProgress, deleteGeneration, GenerationStatus, createGeneratedImage } from '../db/queries.js';
 import { generateImageDirect } from './imageService.js';
 import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
@@ -130,7 +130,8 @@ async function processQueue() {
     return;
   }
 
-  const job = getNextPendingGeneration();
+  // Atomically claim the next pending job (marks it as PROCESSING immediately)
+  const job = claimNextPendingGeneration();
   if (!job) {
     return;
   }
@@ -149,8 +150,7 @@ async function processQueue() {
   genLogger.info({ prompt: job.prompt?.substring(0, 50) }, 'Starting generation');
 
   try {
-    // Update status to processing
-    updateGenerationStatus(job.id, GenerationStatus.PROCESSING);
+    // Job is already marked as PROCESSING by claimNextPendingGeneration()
     broadcastQueueEvent({ ...job, status: GenerationStatus.PROCESSING }, 'job_updated');
 
     // Get model configuration

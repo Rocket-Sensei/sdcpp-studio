@@ -12,7 +12,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
-import { logCliCommand, logCliOutput, logCliError, createLogger } from '../utils/logger.js';
+import { logCliCommand, logCliOutput, logCliError, createLogger, getSdCppLogger } from '../utils/logger.js';
 
 const logger = createLogger('cliHandler');
 
@@ -281,6 +281,9 @@ class CLIHandler {
     return new Promise((resolve, reject) => {
       const [cmd, ...args] = command;
 
+      // Get SD.cpp logger with generation context
+      const sdCppLogger = getSdCppLogger(generationId);
+
       const child = spawn(cmd, args, {
         cwd: PROJECT_ROOT,  // Set working directory to project root so relative paths resolve correctly
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -290,16 +293,32 @@ class CLIHandler {
       let stdout = '';
       let stderr = '';
 
+      // Log each line of stdout with generation_id
       child.stdout.on('data', (data) => {
-        stdout += data.toString();
+        const text = data.toString();
+        stdout += text;
+
+        // Log each line with generation_id
+        const lines = text.split('\n').filter(line => line.trim());
+        for (const line of lines) {
+          sdCppLogger.info({ stdout: line }, line);
+        }
       });
 
+      // Log each line of stderr with generation_id
       child.stderr.on('data', (data) => {
-        stderr += data.toString();
+        const text = data.toString();
+        stderr += text;
+
+        // Log each line with generation_id
+        const lines = text.split('\n').filter(line => line.trim());
+        for (const line of lines) {
+          sdCppLogger.warn({ stderr: line }, line);
+        }
       });
 
       child.on('close', (code) => {
-        // Log CLI output with generation ID
+        // Log CLI output with generation ID (summary)
         logCliOutput(stdout, stderr, code, generationId);
 
         if (code === 0) {

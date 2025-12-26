@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Edit3,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -184,6 +185,8 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [isCancelAllOpen, setIsCancelAllOpen] = useState(false);
   const [deleteFiles, setDeleteFiles] = useState(false);
+  const [mobileInfoGeneration, setMobileInfoGeneration] = useState(null);
+  const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
 
   // Use a ref to track fetchGenerations so the WebSocket onMessage callback doesn't change
   const fetchGenerationsRef = useRef(() => fetchGenerations(currentPage));
@@ -438,6 +441,11 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   const handleViewFailedLogs = (generation) => {
     setFailedLogsGeneration(generation);
     setIsFailedLogsOpen(true);
+  };
+
+  const handleViewMobileInfo = (generation) => {
+    setMobileInfoGeneration(generation);
+    setIsMobileInfoOpen(true);
   };
 
   const handleDeleteAll = async () => {
@@ -696,6 +704,18 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
+                        {/* Mobile info button - only shows on small screens */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="sm:hidden"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewMobileInfo(generation);
+                          }}
+                        >
+                          <Info className="h-3 w-3" />
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -876,6 +896,74 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
               <LogViewer generationId={failedLogsGeneration?.id} />
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Generation Info Dialog */}
+      <Dialog open={isMobileInfoOpen} onOpenChange={(open) => { setIsMobileInfoOpen(open); if (!open) setMobileInfoGeneration(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generation Details</DialogTitle>
+            <DialogDescription className="line-clamp-2">
+              {mobileInfoGeneration?.prompt || "No prompt"}
+            </DialogDescription>
+          </DialogHeader>
+          {mobileInfoGeneration && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Box className="h-4 w-4" />
+                <span className="text-sm">Size: {mobileInfoGeneration.size || "512x512"}</span>
+              </div>
+              {mobileInfoGeneration.seed && (
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-sm">Seed: {Math.floor(Number(mobileInfoGeneration.seed))}</span>
+                </div>
+              )}
+              {mobileInfoGeneration.sample_steps && (
+                <div className="flex items-center gap-2">
+                  <Box className="h-4 w-4" />
+                  <span className="text-sm">Steps: {mobileInfoGeneration.sample_steps}</span>
+                </div>
+              )}
+              {mobileInfoGeneration.cfg_scale && (
+                <div className="flex items-center gap-2">
+                  <Cpu className="h-4 w-4" />
+                  <span className="text-sm">CFG: {mobileInfoGeneration.cfg_scale}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Cpu className="h-4 w-4" />
+                <span className="text-sm">Model: {getModelName(mobileInfoGeneration.model)}</span>
+              </div>
+              {(mobileInfoGeneration.model_loading_time_ms !== undefined || mobileInfoGeneration.generation_time_ms !== undefined) && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span className="text-sm">
+                    {mobileInfoGeneration.model_loading_time_ms !== undefined && `Model: ${(mobileInfoGeneration.model_loading_time_ms / 1000).toFixed(1)}s`}
+                    {mobileInfoGeneration.model_loading_time_ms !== undefined && mobileInfoGeneration.generation_time_ms !== undefined && ' • '}
+                    {mobileInfoGeneration.generation_time_ms !== undefined && `Gen: ${(mobileInfoGeneration.generation_time_ms / 1000).toFixed(1)}s`}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm">{formatDate(mobileInfoGeneration.created_at)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const config = getStatusConfig(mobileInfoGeneration.status);
+                  const StatusIcon = config.icon;
+                  return (
+                    <>
+                      <StatusIcon className={`h-4 w-4 ${config.animate ? 'animate-spin' : ''}`} />
+                      <span className="text-sm capitalize">{config.label}</span>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
