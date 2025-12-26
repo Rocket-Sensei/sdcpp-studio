@@ -41,6 +41,8 @@ The model configuration is split across multiple YAML files in `/backend/config/
 - **models-qwen-image.yml** - Server mode qwen-image (port 1400)
 - **models-qwen-edit.yml** - Qwen Image Edit variants (ports 1401-1405)
 - **models-z-turbo.yml** - Z-Image Turbo (port 1238)
+- **models-shuttle.yml** - Shuttle-3-Diffusion (port 1410)
+- **models-flux.yml** - FLUX models (ports 1234, 1409, 1412)
 - **models-copax.yml** - Copax Timeless XL+Z1 (port 1406)
 
 Config files are loaded in order; later configs override earlier ones. The modelManager auto-adds `--listen-port` from the `port` field and auto-fills the `api` field for server mode models.
@@ -81,6 +83,14 @@ For SillyTavern integration, the backend provides SD.next-compatible endpoints:
 
 **Important:** Model loading progress is reported via the progress endpoint by checking for models with `status === 'starting'` and returning non-zero progress during load.
 
+### Logging
+
+- SD.cpp logs are now written to console with `[SD.cpp]` prefix for visibility
+- `GET /api/logs` - Fetch all logs (not filtered by generation_id)
+- `GET /api/logs/:generationId` - Fetch logs for a specific generation
+- WebSocket status indicator (top-right) is clickable to open LogViewer modal
+- LogViewer provides terminal-style log display with WebSocket auto-refresh
+
 ### Database Schema
 
 **Generations Table** (unified queue + generations):
@@ -108,10 +118,13 @@ models:
       - "./models/model.gguf"
       - "--vae"
       - "./models/vae.safetensors"
+      - "--steps"         # Server-mode models require --steps in args
+      - "9"              # SD.cpp server doesn't support steps via HTTP API
     exec_mode: "server"  # server/cli/api
     mode: "on_demand"     # on_demand/preload
     model_type: "text-to-image"
-    generation_params:    # Optional defaults
+    startup_timeout: 90000  # Optional: per-model startup timeout (ms)
+    generation_params:    # Optional defaults (for queue processing)
       cfg_scale: 0.0
       sample_steps: 9
 ```
@@ -120,6 +133,7 @@ models:
 - Server mode: `port` field required, `api` field auto-generated as `http://127.0.0.1:{port}/v1`
 - CLI mode: No port/api needed, spawns process per generation
 - Only one server model can run at a time; queueProcessor auto-stops conflicts
+- Server-mode models MUST include `--steps` in args (SD.cpp doesn't support steps via HTTP API)
 
 ### WebSocket Protocol
 
@@ -154,6 +168,6 @@ Connect to `ws://host:3000/ws`
 
 4. **Model Loading**: Models are loaded on-demand (unless `mode: preload`). The modelManager tracks process status (stopped/starting/running/error) and broadcasts via WebSocket.
 
-5. **Testing**: Uses Vitest with jsdom. Test setup in `/tests/setup.js`. Run individual test files with `npm test -- filename.test.js`.
+5. **Testing**: Uses Vitest with jsdom. Test setup in `/tests/setup.js`. Run individual test files with `npm test -- filename.test.js`. Each test file uses a separate database (`DB_PATH` environment variable) to prevent clearing production data.
 
 6. **LLM Compatibility Issues**: Some newer models (qwen-image-edit-2511, z-image-turbo) require specific LLM files in safetensors format. GGUF LLM files may have incompatible tensor structures.
