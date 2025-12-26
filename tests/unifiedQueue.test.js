@@ -69,11 +69,13 @@ describe('UnifiedQueue - Thumbnail Remount Prevention', () => {
     expect(source).toContain('const src = generation.first_image_url || null');
   });
 
-  it('should have loading="lazy" on images', () => {
+  it('should use LightboxWithImage component for images', () => {
     const source = getSource();
 
-    // Verify images use lazy loading
-    expect(source).toContain('loading="lazy"');
+    // Verify LightboxWithImage component is used for modal image viewing
+    expect(source).toContain('LightboxWithImage');
+    expect(source).toContain('LightboxGalleryWithImages');
+    expect(source).toContain('@didik-mulyadi/react-modal-images');
   });
 
   it('should have helper functions defined outside component', () => {
