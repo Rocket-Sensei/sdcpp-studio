@@ -69,6 +69,19 @@ function createFileDestination(filename, options = {}) {
 }
 
 /**
+ * Create a pino destination with synchronous file writes
+ * Used for critical logs that must be written immediately (e.g., SD.cpp logs)
+ */
+function createFileSyncDestination(filename, options = {}) {
+  const filePath = path.join(logsDir, filename);
+  return pino.destination({
+    dest: filePath,
+    sync: true, // Synchronous for immediate writes
+    ...options
+  });
+}
+
+/**
  * Create multi-stream logger for different log types
  */
 function createBaseLogger() {
@@ -133,7 +146,7 @@ function createHttpLogger() {
       level: (label, number) => ({ level: label, levelNum: number }),
     },
     mixin() {
-      return { time: new Date().toISOString() };
+      return { module: 'http', time: new Date().toISOString() };
     },
     serializers: {
       req: pino.stdSerializers.req,
@@ -159,8 +172,8 @@ function createHttpLogger() {
  */
 function createSdCppLogger() {
   const streams = [
-    // All SD.cpp logs go to sdcpp.log
-    { level: 'trace', stream: createFileDestination('sdcpp.log') },
+    // All SD.cpp logs go to sdcpp.log (sync writes to ensure logs are captured)
+    { level: 'trace', stream: createFileSyncDestination('sdcpp.log') },
   ];
 
   // Also output to console if LOG_TO_STDOUT is enabled (default: true)
