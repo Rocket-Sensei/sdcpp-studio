@@ -337,31 +337,14 @@ async function prepareModelForJob(modelId, jobId) {
   currentModelLoadingStartTime = Date.now();
 
   try {
-    // Start the model
+    // Start the model - this waits for the model to be ready via _waitForServerReady
+    updateGenerationProgress(jobId, 0.1, `Starting model server: ${modelId}...`);
     const processEntry = await modelManager.startModel(modelId);
 
-    // Wait for server to be ready
-    updateGenerationProgress(jobId, 0.1, `Waiting for model server to be ready...`);
-
-    // The startModel already waits for ready, but we'll verify
-    const maxWait = 60000; // 60 seconds max
-    const startTime = Date.now();
-    let checkInterval = 500;
-
-    while (Date.now() - startTime < maxWait) {
-      const status = modelManager.getModelStatus(modelId);
-      if (status.status === ModelStatus.RUNNING) {
-        const loadingTimeMs = Date.now() - currentModelLoadingStartTime;
-        logger.info({ modelId, port: status.port, loadingTimeMs }, 'Model is now running');
-        return { wasAlreadyRunning: false, loadingTimeMs };
-      }
-      if (status.status === ModelStatus.ERROR) {
-        throw new Error(`Model ${modelId} failed to start: ${status.error || 'Unknown error'}`);
-      }
-      await new Promise(resolve => setTimeout(resolve, checkInterval));
-    }
-
-    throw new Error(`Model ${modelId} failed to start within timeout period`);
+    // If we get here, the model is running (startModel would have thrown otherwise)
+    const loadingTimeMs = Date.now() - currentModelLoadingStartTime;
+    logger.info({ modelId, port: processEntry.port, loadingTimeMs }, 'Model is now running');
+    return { wasAlreadyRunning: false, loadingTimeMs };
 
   } catch (error) {
     logger.error({ error, modelId }, 'Failed to start model');

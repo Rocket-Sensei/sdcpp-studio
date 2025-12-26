@@ -903,6 +903,18 @@ export class ModelManager {
           return;
         }
 
+        // Check for ERROR status (set by _handleProcessExit when process crashes)
+        if (processEntry.status === ModelStatus.ERROR) {
+          // Get the error details from the process entry
+          const reason = processEntry.signal
+            ? `Process crashed (${processEntry.signal})`
+            : processEntry.exitCode !== null
+              ? `Process exited with code ${processEntry.exitCode}`
+              : 'Process failed before becoming ready';
+          reject(new Error(reason));
+          return;
+        }
+
         if (processEntry.process.killed || processEntry.process.exitCode !== null) {
           reject(new Error('Process exited before becoming ready'));
           return;
