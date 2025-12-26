@@ -45,13 +45,13 @@ const mockModels = [
     id: 'qwen-image-edit',
     name: 'Qwen Image Edit',
     description: 'Image editing with instructions',
-    capabilities: ['image-to-image'],
+    capabilities: ['text-to-image', 'imgedit'],
     command: './bin/sd-server',
     port: 1401,
     args: ['--diffusion-model', './models/qwen-edit.gguf', '--llm', './models/llm.gguf'],
     exec_mode: 'server',
     mode: 'on_demand',
-    model_type: 'image-to-image',
+    model_type: 'imgedit',
     status: 'stopped',
   },
   {
@@ -127,12 +127,12 @@ describe('MultiModelSelector', () => {
       });
     });
 
-    it('should filter models by capability (image-to-image)', async () => {
+    it('should filter models by capability (imgedit)', async () => {
       render(
         <MultiModelSelector
           selectedModels={[]}
           onModelsChange={mockOnModelsChange}
-          filterCapabilities={['image-to-image']}
+          filterCapabilities={['imgedit']}
         />
       );
 
@@ -167,7 +167,10 @@ describe('MultiModelSelector', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Qwen Image Edit')).toBeInTheDocument();
+        // All models support img2img via --init-img
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+        expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
+        expect(screen.getByText('CLI Model')).toBeInTheDocument();
       });
     });
 

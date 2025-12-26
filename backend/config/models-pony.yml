@@ -3,7 +3,7 @@ models:
   cyberrealistic-pony:
     name: "CyberRealistic Pony"
     description: "Pony architecture with realistic style - supports negative prompts"
-    capabilities: ["text-to-image", "image-to-image"]
+    capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:

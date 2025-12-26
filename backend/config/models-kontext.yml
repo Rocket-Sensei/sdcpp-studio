@@ -1,0 +1,38 @@
+models:
+  # ==================== Kontext Models ====================
+  # FLUX.1-Kontext-dev - Drop-in replacement for FLUX.1-dev
+  # https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev
+  # Docs: sdcpp/docs/kontext.md
+  #
+  # Recommended: --cfg-scale 1.0
+  # Supports imgedit mode (--ref-image) for actual image editing
+  flux1-kontext-dev:
+    name: "FLUX.1 Kontext Dev"
+    description: "FLUX.1 Kontext Dev - Enhanced FLUX.1 dev model (6GB+ VRAM) - Supports imgedit"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux1-kontext-dev-Q8_0.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "20"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1411
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 20
+      sampling_method: "euler"

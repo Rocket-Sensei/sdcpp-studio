@@ -3,7 +3,7 @@ models:
   v1-5-pruned:
     name: "SD 1.5 Pruned"
     description: "Stable Diffusion 1.5 - Classic model with full negative prompt support"
-    capabilities: ["text-to-image", "image-to-image"]
+    capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:

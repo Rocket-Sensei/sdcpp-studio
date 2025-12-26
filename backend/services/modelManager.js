@@ -240,6 +240,12 @@ export class ModelManager {
       this.models.clear();
 
       for (const [modelId, modelConfig] of Object.entries(modelsConfig)) {
+        // Skip disabled models
+        if (modelConfig.enabled === false || modelConfig.enabled === 'false') {
+          logger.debug({ modelId }, 'Model is disabled, skipping');
+          continue;
+        }
+
         // Validate required fields
         if (!modelConfig.name) {
           logger.warn({ modelId }, 'Model missing name, skipping');
@@ -312,8 +318,8 @@ export class ModelManager {
         // Ensure capabilities is an array, default to text-to-image if not specified
         if (!modelConfig.capabilities) {
           // Infer capabilities from model_type if available
-          if (modelConfig.model_type === 'image-to-image') {
-            modelConfig.capabilities = ['image-to-image', 'text-to-image'];
+          if (modelConfig.model_type === 'imgedit') {
+            modelConfig.capabilities = ['text-to-image', 'imgedit'];
           } else {
             modelConfig.capabilities = ['text-to-image'];
           }

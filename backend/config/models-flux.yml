@@ -117,3 +117,34 @@ models:
     startup_timeout: 240000
     generation_params:
       sample_steps: 24
+
+  flux1-krea-dev:
+    name: "FLUX.1 Krea Dev"
+    description: "FLUX.1 Krea Dev - Drop-in replacement for FLUX.1 dev"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux1-krea-dev-Q8_0.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "20"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1413
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 20
+      sampling_method: "euler"

@@ -48,13 +48,11 @@ const filterModels = (allModels, mode) => {
     case "txt2img":
       return allModels.filter((m) => m.capabilities?.includes("text-to-image"));
     case "img2img":
-      return allModels.filter((m) => m.capabilities?.includes("image-to-image"));
+      // All models support img2img via --init-img
+      return allModels.filter((m) => m.capabilities?.includes("text-to-image"));
     case "imgedit":
-      return allModels.filter(
-        (m) =>
-          m.capabilities?.includes("image-to-image") &&
-          (m.args?.includes("--llm") || m.id.includes("edit") || m.id.includes("qwen"))
-      );
+      // Only models with imgedit capability support --ref-image
+      return allModels.filter((m) => m.capabilities?.includes("imgedit"));
     case "upscale":
       return []; // Upscale doesn't use models directly
     default:

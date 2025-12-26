@@ -3,6 +3,7 @@
 # No local server is started - requests go directly to the external API
 models:
   flux2:
+    enabled: false
     name: "black-forest-labs/FLUX.2-pro"
     description: "External API"
     capabilities: ["text-to-image"]

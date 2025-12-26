@@ -3,7 +3,7 @@ models:
   epicrealism-xl:
     name: "EpicRealism XL"
     description: "SDXL architecture with pure fix - supports negative prompts"
-    capabilities: ["text-to-image", "image-to-image"]
+    capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:

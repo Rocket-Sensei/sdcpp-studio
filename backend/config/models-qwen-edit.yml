@@ -3,8 +3,9 @@ models:
   # ==================== Qwen Image Edit Models (Server Mode) ====================
   # NOTE: 2511 models require --qwen-image-zero-cond-t flag for proper quality
   qwen-image-edit-2511-q4-0:
+    enabled: false
     name: "Qwen Image Edit 2511 Q4_0"
-    capabilities: ["image-to-image", "text-to-image"]
+    capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
@@ -28,7 +29,7 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1401
-    model_type: "image-to-image"
+    model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 2.5
@@ -36,8 +37,9 @@ models:
       sampling_method: "euler"
 
   qwen-image-edit-2511-q5-0:
+    enabled: false
     name: "Qwen Image Edit 2511 Q5_0"
-    capabilities: ["image-to-image", "text-to-image"]
+    capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
@@ -61,7 +63,7 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1402
-    model_type: "image-to-image"
+    model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 2.5
@@ -70,7 +72,7 @@ models:
 
   qwen-image-edit-2511-q5-1:
     name: "Qwen Image Edit 2511 Q5_1"
-    capabilities: ["image-to-image", "text-to-image"]
+    capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
@@ -94,7 +96,7 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1403
-    model_type: "image-to-image"
+    model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 2.5
@@ -102,8 +104,9 @@ models:
       sampling_method: "euler"
 
   qwen-image-edit-2511-q2-k:
+    enabled: false
     name: "Qwen Image Edit 2511 Q2_K"
-    capabilities: ["image-to-image", "text-to-image"]
+    capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
@@ -127,7 +130,7 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1404
-    model_type: "image-to-image"
+    model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 2.5
@@ -135,9 +138,9 @@ models:
       sampling_method: "euler"
 
   qwen-image-edit:
-    name: "Qwen Image Edit"
+    name: "Qwen Image Edit 2509-Q4_K_M"
     description: "Qwen Image Edit - image-to-image editing model with object manipulation and style transformation"
-    capabilities: ["image-to-image", "text-to-image"]
+    capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
@@ -160,7 +163,7 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1405
-    model_type: "image-to-image"
+    model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 2.5
