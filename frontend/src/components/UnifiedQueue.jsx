@@ -23,6 +23,7 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
 import { LogViewer } from "./LogViewer";
 import { LightboxWithImage, LightboxGalleryWithImages } from "@didik-mulyadi/react-modal-images";
 import { useGenerations } from "../hooks/useImageGeneration";
@@ -579,129 +580,179 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {generations.map((generation) => {
-          const config = getStatusConfig(generation.status);
-          const StatusIcon = config.icon;
-          const canCancel = isPendingOrProcessing(generation.status);
+      <TooltipProvider>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {generations.map((generation) => {
+            const config = getStatusConfig(generation.status);
+            const StatusIcon = config.icon;
+            const canCancel = isPendingOrProcessing(generation.status);
 
-          return (
-            <Card key={generation.id} className="overflow-hidden group">
-              <div className="relative aspect-square">
-                <Thumbnail generation={generation} onViewLogs={handleViewFailedLogs} />
-                {generation.status === GENERATION_STATUS.COMPLETED && generation.image_count > 1 && (
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleViewImage(generation)}
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </Button>
+            return (
+              <Tooltip key={generation.id}>
+                <TooltipTrigger asChild>
+                  <Card className="overflow-hidden group">
+                    <div className="relative aspect-square">
+                      <Thumbnail generation={generation} onViewLogs={handleViewFailedLogs} />
+                      {generation.status === GENERATION_STATUS.COMPLETED && generation.image_count > 1 && (
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewImage(generation);
+                            }}
+                          >
+                            <ImageIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-sm line-clamp-2 flex-1 pr-1">{generation.prompt || "No prompt"}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {canCancel ? (
+                          // Cancel button for pending/processing
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancel(generation.id);
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Cancel
+                          </Button>
+                        ) : generation.status === GENERATION_STATUS.COMPLETED ? (
+                          // Download button for completed (icon only for compact view)
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(generation.id);
+                            }}
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          // Retry button for failed/cancelled
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRetry(generation);
+                            }}
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Retry
+                          </Button>
+                        )}
+                        {generation.status === GENERATION_STATUS.COMPLETED && onCreateMore && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCreateMore(generation);
+                            }}
+                          >
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            More
+                          </Button>
+                        )}
+                        {generation.status === GENERATION_STATUS.COMPLETED && onEditImage && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditImage(generation);
+                            }}
+                          >
+                            <Edit3 className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                        {generation.status !== GENERATION_STATUS.PENDING && generation.status !== GENERATION_STATUS.PROCESSING && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(generation.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Box className="h-3 w-3" />
+                      <span className="font-medium">Size: {generation.size || "512x512"}</span>
+                    </div>
+                    {generation.seed && (
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3 w-3" />
+                        <span>Seed: {Math.floor(Number(generation.seed))}</span>
+                      </div>
+                    )}
+                    {generation.sample_steps && (
+                      <div className="flex items-center gap-2">
+                        <Box className="h-3 w-3" />
+                        <span>Steps: {generation.sample_steps}</span>
+                      </div>
+                    )}
+                    {generation.cfg_scale && (
+                      <div className="flex items-center gap-2">
+                        <Cpu className="h-3 w-3" />
+                        <span>CFG: {generation.cfg_scale}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-3 w-3" />
+                      <span>Model: {getModelName(generation.model)}</span>
+                    </div>
+                    {(generation.model_loading_time_ms !== undefined || generation.generation_time_ms !== undefined) && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {generation.model_loading_time_ms !== undefined && `Model: ${(generation.model_loading_time_ms / 1000).toFixed(1)}s`}
+                          {generation.model_loading_time_ms !== undefined && generation.generation_time_ms !== undefined && ' • '}
+                          {generation.generation_time_ms !== undefined && `Gen: ${(generation.generation_time_ms / 1000).toFixed(1)}s`}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3 w-3" />
+                      <span>{formatDate(generation.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusIcon className={`h-3 w-3 ${config.animate ? 'animate-spin' : ''}`} />
+                      <span className="capitalize">{config.label}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-sm line-clamp-2 flex-1 pr-1">{generation.prompt || "No prompt"}</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                  <Calendar className="h-3 w-3" />
-                  <span>{formatDate(generation.created_at)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                  <Cpu className="h-3 w-3" />
-                  <span>{getModelName(generation.model)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                  <Box className="h-3 w-3" />
-                  <span>{generation.size || "512x512"}</span>
-                  {generation.seed && <span>• Seed: {Math.floor(Number(generation.seed))}</span>}
-                  {generation.sample_steps && <span>• Steps: {generation.sample_steps}</span>}
-                  {generation.cfg_scale && <span>• CFG: {generation.cfg_scale}</span>}
-                </div>
-                {(generation.model_loading_time_ms !== undefined || generation.generation_time_ms !== undefined) && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                    <Clock className="h-3 w-3" />
-                    <span>
-                      {generation.model_loading_time_ms !== undefined && `Model: ${(generation.model_loading_time_ms / 1000).toFixed(1)}s`}
-                      {generation.model_loading_time_ms !== undefined && generation.generation_time_ms !== undefined && ' • '}
-                      {generation.generation_time_ms !== undefined && `Gen: ${(generation.generation_time_ms / 1000).toFixed(1)}s`}
-                    </span>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  {canCancel ? (
-                    // Cancel button for pending/processing
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleCancel(generation.id)}
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Cancel
-                    </Button>
-                  ) : generation.status === GENERATION_STATUS.COMPLETED ? (
-                    // Download button for completed (icon only for compact view)
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="flex-shrink-0"
-                      onClick={() => handleDownload(generation.id)}
-                    >
-                      <Download className="h-3 w-3" />
-                    </Button>
-                  ) : (
-                    // Retry button for failed/cancelled
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleRetry(generation)}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Retry
-                    </Button>
-                  )}
-                  {generation.status === GENERATION_STATUS.COMPLETED && onCreateMore && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => onCreateMore(generation)}
-                    >
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      More
-                    </Button>
-                  )}
-                  {generation.status === GENERATION_STATUS.COMPLETED && onEditImage && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleEditImage(generation)}
-                    >
-                      <Edit3 className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                  )}
-                  {generation.status !== GENERATION_STATUS.PENDING && generation.status !== GENERATION_STATUS.PROCESSING && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(generation.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+      </TooltipProvider>
 
       {/* Pagination Controls */}
       {pagination.totalPages > 1 && (

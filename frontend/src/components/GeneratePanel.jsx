@@ -17,6 +17,9 @@ import { cn } from "../lib/utils";
 import { authenticatedFetch } from "../utils/api";
 import { MultiModelSelector } from "./MultiModelSelector";
 
+// localStorage key for form state persistence
+const FORM_STATE_KEY = "sd-webui-generate-form-state";
+
 const MODES = [
   { value: "txt2img", label: "Text to Image", icon: Wand2, needsImage: false },
   { value: "img2img", label: "Image to Image", icon: ImageIcon, needsImage: true },
@@ -267,6 +270,84 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
       };
     }
   }, [editImageSettings]);
+
+  // Save form state to localStorage whenever fields change
+  // Skip saving when settings or editImageSettings are being applied (they override localStorage)
+  useEffect(() => {
+    if (settings || editImageSettings) {
+      return; // Don't save when settings are being applied from "Create More" or "Edit Image"
+    }
+
+    const formState = {
+      mode,
+      prompt,
+      negativePrompt,
+      width,
+      height,
+      seed,
+      n,
+      useQueue,
+      strength,
+      upscaleFactor,
+      upscalerName,
+      upscaleResizeMode,
+      upscaleAfterGeneration,
+      cfgScale,
+      samplingMethod,
+      sampleSteps,
+      clipSkip,
+    };
+
+    try {
+      localStorage.setItem(FORM_STATE_KEY, JSON.stringify(formState));
+    } catch (err) {
+      // Ignore localStorage errors (e.g., quota exceeded, private browsing)
+      console.warn('Failed to save form state to localStorage:', err);
+    }
+  }, [
+    mode, prompt, negativePrompt, width, height, seed, n, useQueue,
+    strength, upscaleFactor, upscalerName, upscaleResizeMode, upscaleAfterGeneration,
+    cfgScale, samplingMethod, sampleSteps, clipSkip,
+    settings, editImageSettings,
+  ]);
+
+  // Load form state from localStorage on mount (only if not overridden by settings/editImageSettings)
+  useEffect(() => {
+    if (settings || editImageSettings) {
+      return; // Don't load from localStorage when settings are being applied
+    }
+
+    try {
+      const savedState = localStorage.getItem(FORM_STATE_KEY);
+      if (savedState) {
+        const formState = JSON.parse(savedState);
+
+        // Only restore fields that exist in saved state
+        if (formState.mode !== undefined) setMode(formState.mode);
+        if (formState.prompt !== undefined) setPrompt(formState.prompt);
+        if (formState.negativePrompt !== undefined) setNegativePrompt(formState.negativePrompt);
+        if (formState.width !== undefined) setWidth(formState.width);
+        if (formState.height !== undefined) setHeight(formState.height);
+        if (formState.seed !== undefined) setSeed(formState.seed);
+        if (formState.n !== undefined) setN(formState.n);
+        if (formState.useQueue !== undefined) setUseQueue(formState.useQueue);
+        if (formState.strength !== undefined) setStrength(formState.strength);
+        if (formState.upscaleFactor !== undefined) setUpscaleFactor(formState.upscaleFactor);
+        if (formState.upscalerName !== undefined) setUpscalerName(formState.upscalerName);
+        if (formState.upscaleResizeMode !== undefined) setUpscaleResizeMode(formState.upscaleResizeMode);
+        if (formState.upscaleAfterGeneration !== undefined) setUpscaleAfterGeneration(formState.upscaleAfterGeneration);
+        if (formState.cfgScale !== undefined) setCfgScale(formState.cfgScale);
+        if (formState.samplingMethod !== undefined) setSamplingMethod(formState.samplingMethod);
+        if (formState.sampleSteps !== undefined) setSampleSteps(formState.sampleSteps);
+        if (formState.clipSkip !== undefined) setClipSkip(formState.clipSkip);
+      }
+    } catch (err) {
+      // Ignore localStorage errors (e.g., invalid JSON)
+      console.warn('Failed to load form state from localStorage:', err);
+    }
+    // Only run on mount - empty deps array is intentional
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getApiMode = useCallback((modeValue) => {
     if (modeValue === "imgedit") return "edit";
