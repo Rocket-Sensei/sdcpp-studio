@@ -5,6 +5,7 @@ models:
     name: "Qwen Image - CLI mode"
     description: "Qwen Image used via sd-cli"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     # CLI mode command
     command: "./bin/sd-cli"
     args:

@@ -1,0 +1,24 @@
+# Stable Diffusion 1.5 Models
+models:
+  v1-5-pruned:
+    name: "SD 1.5 Pruned"
+    description: "Stable Diffusion 1.5 - Classic model with full negative prompt support"
+    capabilities: ["text-to-image", "image-to-image"]
+    supports_negative_prompt: true
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/v1-5-pruned-emaonly-fp16.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--steps"
+      - "30"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1510
+    model_type: "text-to-image"
+    default_size: "512x512"
+    generation_params:
+      cfg_scale: 7.0
+      sample_steps: 30
+      sampling_method: "euler_a"

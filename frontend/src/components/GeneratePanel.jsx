@@ -15,6 +15,7 @@ import { useImageGeneration } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
 import { authenticatedFetch } from "../utils/api";
+import { MultiModelSelector } from "./MultiModelSelector";
 
 const MODES = [
   { value: "txt2img", label: "Text to Image", icon: Wand2, needsImage: false },
@@ -106,6 +107,9 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, o
   // Store full models data
   const [modelsData, setModelsData] = useState([]);
 
+  // Track if selected models support negative prompts
+  const [supportsNegativePrompt, setSupportsNegativePrompt] = useState(false);
+
   // Image-related settings (for img2img, imgedit, upscale)
   const [sourceImage, setSourceImage] = useState(null);
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
@@ -155,6 +159,16 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, o
         console.error("Failed to fetch models:", err);
       });
   }, []);
+
+  // Update negative prompt support when selectedModels change
+  useEffect(() => {
+    // Check if ANY selected model supports negative prompts
+    const hasSupport = selectedModels.some(modelId => {
+      const model = modelsData?.find(m => m.id === modelId);
+      return model?.supports_negative_prompt === true;
+    });
+    setSupportsNegativePrompt(hasSupport);
+  }, [selectedModels, modelsData]);
 
   // Apply settings when provided (from "Create More" button)
   useEffect(() => {
@@ -415,13 +429,13 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, o
             </div>
           </div>
 
-          {/* Multi-model selector placeholder - this will be a separate component */}
-          <div className="space-y-2">
-            <Label>Models ({selectedModels.length} selected)</Label>
-            <div className="text-sm text-muted-foreground">
-              Multi-model selector component will be rendered here
-            </div>
-          </div>
+          {/* Model Selection - Multi-select */}
+          <MultiModelSelector
+            selectedModels={selectedModels}
+            onModelsChange={onModelsChange}
+            mode={mode}
+            className="space-y-2"
+          />
 
           {/* Image Upload for modes that need it */}
           {currentModeConfig.needsImage && (
@@ -501,17 +515,20 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, o
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="negative-prompt">Negative Prompt</Label>
-                <Textarea
-                  id="negative-prompt"
-                  placeholder="blurry, low quality, distorted, watermark..."
-                  value={negativePrompt}
-                  onChange={(e) => setNegativePrompt(e.target.value)}
-                  rows={2}
-                  disabled={isLoading || isUpscaling}
-                />
-              </div>
+              {/* Negative Prompt - Only show if supported models are selected */}
+              {supportsNegativePrompt && (
+                <div className="space-y-2">
+                  <Label htmlFor="negative-prompt">Negative Prompt</Label>
+                  <Textarea
+                    id="negative-prompt"
+                    placeholder="blurry, low quality, distorted, watermark..."
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                    rows={2}
+                    disabled={isLoading || isUpscaling}
+                  />
+                </div>
+              )}
             </>
           )}
 

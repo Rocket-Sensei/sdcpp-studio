@@ -2,6 +2,10 @@
 # Default model configuration
 # Supports separate defaults for different generation types
 
+# Default negative prompt support (defaults to false for most models)
+# Models that benefit from negative prompts: SD1.5, SDXL, Pony
+supports_negative_prompt: false
+
 default_model: qwen-image
 
 default_models:

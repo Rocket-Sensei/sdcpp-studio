@@ -9,6 +9,7 @@ models:
     name: "Shuttle-3-Diffusion"
     description: "Shuttle-3-Diffusion - Apache 2.0 licensed aesthetic model (Flux Schnell based)"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"

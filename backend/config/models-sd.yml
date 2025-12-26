@@ -5,6 +5,7 @@ models:
     name: "SD 1.5 Base"
     description: "Stable Diffusion 1.5 base model"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
       - "./models/v1-5-pruned-emaonly-fp16.safetensors"
@@ -23,6 +24,7 @@ models:
     name: "SDXL Turbo"
     description: "Fast SDXL Turbo for quick generations"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: true
     command: "./bin/sd-cli"
     args:
       - "-m"

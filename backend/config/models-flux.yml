@@ -4,6 +4,7 @@ models:
     name: "FLUX.1 Schnell FP8"
     description: "FLUX.1 Schnell FP8 - Fast generation model"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -34,6 +35,7 @@ models:
     name: "FluxedUp Flux 61 Q8"
     description: "FluxedUp Flux 61 - Q8 quantized (12GB)"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -62,6 +64,7 @@ models:
     name: "FluxedUp Flux"
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -90,6 +93,7 @@ models:
     name: "fuxCapacityNSFW"
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"

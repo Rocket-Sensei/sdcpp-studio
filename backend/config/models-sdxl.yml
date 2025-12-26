@@ -1,0 +1,24 @@
+# SDXL Models
+models:
+  epicrealism-xl:
+    name: "EpicRealism XL"
+    description: "SDXL architecture with pure fix - supports negative prompts"
+    capabilities: ["text-to-image", "image-to-image"]
+    supports_negative_prompt: true
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/epicrealismXL_pureFix.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--steps"
+      - "30"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1521
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 7.0
+      sample_steps: 30
+      sampling_method: "euler_a"

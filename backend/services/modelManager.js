@@ -168,7 +168,7 @@ export class ModelManager {
       logger.info({ configFiles: this.configPaths.length }, 'Loading configuration');
 
       // Merge all configs
-      let mergedConfig = { models: {}, upscalers: {} };
+      let mergedConfig = { models: {}, upscalers: {}, supports_negative_prompt: false };
       const loadedFiles = [];
 
       for (const configPath of this.configPaths) {
@@ -208,6 +208,11 @@ export class ModelManager {
           mergedConfig.default_models = { ...mergedConfig.default_models, ...config.default_models };
         }
 
+        // Capture global supports_negative_prompt setting
+        if (config.supports_negative_prompt !== undefined) {
+          mergedConfig.supports_negative_prompt = config.supports_negative_prompt;
+        }
+
         loadedFiles.push(configPath);
         logger.debug({ configPath }, 'Loaded configuration from file');
       }
@@ -222,11 +227,13 @@ export class ModelManager {
       // Support both legacy 'default' and new 'default_model' and 'default_models'
       this.defaultModelId = mergedConfig.default_model || null;
       this.defaultModels = mergedConfig.default_models || null;
+      this.defaultSupportsNegativePrompt = mergedConfig.supports_negative_prompt || false;
 
       logger.info({ defaultModel: this.defaultModelId || 'none' }, 'Default model');
       if (this.defaultModels) {
         logger.info({ defaultModels: this.defaultModels }, 'Type-specific defaults');
       }
+      logger.info({ supportsNegativePrompt: this.defaultSupportsNegativePrompt }, 'Default negative prompt support');
 
       // Parse models
       const modelsConfig = mergedConfig.models || {};
@@ -314,13 +321,18 @@ export class ModelManager {
           modelConfig.capabilities = [modelConfig.capabilities];
         }
 
+        // Apply supports_negative_prompt - use model-specific value or fall back to global default
+        if (modelConfig.supports_negative_prompt === undefined) {
+          modelConfig.supports_negative_prompt = this.defaultSupportsNegativePrompt;
+        }
+
         // Store model config
         this.models.set(modelId, {
           id: modelId,
           ...modelConfig
         });
 
-        logger.debug({ modelId, name: modelConfig.name }, 'Loaded model');
+        logger.debug({ modelId, name: modelConfig.name, supportsNegativePrompt: modelConfig.supports_negative_prompt }, 'Loaded model');
       }
 
       this.configLoaded = true;

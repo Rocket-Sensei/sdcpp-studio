@@ -5,6 +5,7 @@ models:
   qwen-image-edit-2511-q4-0:
     name: "Qwen Image Edit 2511 Q4_0"
     capabilities: ["image-to-image", "text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -37,6 +38,7 @@ models:
   qwen-image-edit-2511-q5-0:
     name: "Qwen Image Edit 2511 Q5_0"
     capabilities: ["image-to-image", "text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -69,6 +71,7 @@ models:
   qwen-image-edit-2511-q5-1:
     name: "Qwen Image Edit 2511 Q5_1"
     capabilities: ["image-to-image", "text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -101,6 +104,7 @@ models:
   qwen-image-edit-2511-q2-k:
     name: "Qwen Image Edit 2511 Q2_K"
     capabilities: ["image-to-image", "text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
@@ -134,6 +138,7 @@ models:
     name: "Qwen Image Edit"
     description: "Qwen Image Edit - image-to-image editing model with object manipulation and style transformation"
     capabilities: ["image-to-image", "text-to-image"]
+    supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"

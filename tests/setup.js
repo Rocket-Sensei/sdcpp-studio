@@ -24,5 +24,12 @@ afterEach(() => {
   cleanup();
 });
 
+// Mock ResizeObserver for Radix UI components
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));
+
 // Don't mock fetch globally - let individual test files decide
 // Integration tests need real fetch, unit tests can mock it locally

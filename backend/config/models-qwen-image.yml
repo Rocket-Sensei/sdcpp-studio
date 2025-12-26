@@ -6,6 +6,7 @@ models:
     description: "Qwen Image - advanced text-to-image model with complex text rendering and precise image editing capabilities"
     default: true
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     # Server mode command
     command: "./bin/sd-server"
     args:

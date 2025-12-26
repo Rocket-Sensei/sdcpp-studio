@@ -6,6 +6,7 @@ models:
     name: "black-forest-labs/FLUX.2-pro"
     description: "External API"
     capabilities: ["text-to-image"]
+    supports_negative_prompt: false
     command: null  # No command needed for API mode
     args: []
     api: "http://example.com"  # External API endpoint
