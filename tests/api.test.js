@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, unlinkSync } from 'fs';
 import { startServer, stopServer } from './helpers/testServer.js';
+import { FormData, File } from 'formdata-node';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -200,13 +201,16 @@ describe('API Endpoints (No Model Required)', () => {
       expect(response.status).toBeGreaterThanOrEqual(400);
     });
 
-    it.skip('POST /api/queue/edit should accept image upload', async () => {
+    it('POST /api/queue/edit should accept image upload', async () => {
+      // Use formdata-node's FormData with File created from buffer
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'edit test');
       formData.append('size', '512x512');
-      const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
-      formData.append('image', imageBlob, 'test.png');
+
+      const imageBuffer = createTestImageBuffer();
+      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
+      formData.append('image', imageFile);
 
       const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
@@ -232,13 +236,16 @@ describe('API Endpoints (No Model Required)', () => {
       expect(response.status).toBeGreaterThanOrEqual(400);
     });
 
-    it.skip('POST /api/queue/variation should accept image upload', async () => {
+    it('POST /api/queue/variation should accept image upload', async () => {
+      // Use formdata-node's FormData with File created from buffer
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'variation test');
       formData.append('size', '512x512');
-      const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
-      formData.append('image', imageBlob, 'test.png');
+
+      const imageBuffer = createTestImageBuffer();
+      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
+      formData.append('image', imageFile);
 
       const response = await fetch(`${API_URL}/api/queue/variation`, {
         method: 'POST',

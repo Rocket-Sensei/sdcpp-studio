@@ -6,10 +6,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
-import { existsSync, unlinkSync } from 'fs';
+import { existsSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { startServer, stopServer } from './helpers/testServer.js';
+import { FormData, File } from 'formdata-node';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,14 +96,22 @@ describe('Edit/Variation Queue Endpoints', () => {
       expect(response.status).toBeGreaterThanOrEqual(400);
     });
 
-    it.skip('should create queue job with input_image_path when image is uploaded', async () => {
+    it('should create queue job with input_image_path when image is uploaded', async () => {
+      // Create a temporary test image file
+      const testImagePath = path.join(TEST_INPUT_DIR, `test-${randomUUID()}.png`);
+      await writeFile(testImagePath, createTestImageBuffer());
+
+      // Use formdata-node's FormData with File created from buffer
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'add a cat');
       formData.append('size', '512x512');
       formData.append('n', '1');
-      const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
-      formData.append('image', imageBlob, 'test.png');
+
+      // Create a File object from the test image buffer
+      const imageBuffer = createTestImageBuffer();
+      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
+      formData.append('image', imageFile);
 
       const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
@@ -116,15 +125,19 @@ describe('Edit/Variation Queue Endpoints', () => {
       expect(data.status).toBe('pending');
     });
 
-    it.skip('should handle mask image upload', async () => {
+    it('should handle mask image upload', async () => {
+      // Use formdata-node's FormData with File objects created from buffers
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'add a cat');
       formData.append('size', '512x512');
-      const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
-      formData.append('image', imageBlob, 'test.png');
-      const maskBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
-      formData.append('mask', maskBlob, 'mask.png');
+
+      const imageBuffer = createTestImageBuffer();
+      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
+      const maskBuffer = createTestImageBuffer();
+      const maskFile = new File([maskBuffer], 'mask.png', { type: 'image/png' });
+      formData.append('image', imageFile);
+      formData.append('mask', maskFile);
 
       const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
@@ -136,14 +149,16 @@ describe('Edit/Variation Queue Endpoints', () => {
       expect(data.job_id).toBeTruthy();
     });
 
-    it.skip('should save uploaded image to disk', async () => {
-      const testBuffer = createTestImageBuffer();
+    it('should save uploaded image to disk', async () => {
+      // Use formdata-node's FormData with File created from buffer
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'test edit');
       formData.append('size', '512x512');
-      const imageBlob = new Blob([testBuffer], { type: 'image/png' });
-      formData.append('image', imageBlob, 'test.png');
+
+      const testBuffer = createTestImageBuffer();
+      const imageFile = new File([testBuffer], 'test.png', { type: 'image/png' });
+      formData.append('image', imageFile);
 
       const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
@@ -171,13 +186,16 @@ describe('Edit/Variation Queue Endpoints', () => {
       expect(response.status).toBeGreaterThanOrEqual(400);
     });
 
-    it.skip('should create queue job with type=variation', async () => {
+    it('should create queue job with type=variation', async () => {
+      // Use formdata-node's FormData with File created from buffer
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'create variation');
       formData.append('size', '512x512');
-      const imageBlob = new Blob([createTestImageBuffer()], { type: 'image/png' });
-      formData.append('image', imageBlob, 'test.png');
+
+      const imageBuffer = createTestImageBuffer();
+      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
+      formData.append('image', imageFile);
 
       const response = await fetch(`${API_URL}/api/queue/variation`, {
         method: 'POST',
