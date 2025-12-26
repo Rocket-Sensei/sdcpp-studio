@@ -12,20 +12,27 @@ models:
       - "--vae"
       - "./models/qwen_image_vae.safetensors"
       - "--llm"
-      - "./models/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
       - "--llm_vision"
       - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"
+      - "--steps"
+      - "24"
       - "--qwen-image-zero-cond-t"
     mode: "on_demand"
     exec_mode: "server"
     port: 1401
     model_type: "image-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
 
   qwen-image-edit-2511-q5-0:
     name: "Qwen Image Edit 2511 Q5_0"
@@ -37,20 +44,27 @@ models:
       - "--vae"
       - "./models/qwen_image_vae.safetensors"
       - "--llm"
-      - "./models/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
       - "--llm_vision"
       - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"
+      - "--steps"
+      - "24"
       - "--qwen-image-zero-cond-t"
     mode: "on_demand"
     exec_mode: "server"
     port: 1402
     model_type: "image-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
 
   qwen-image-edit-2511-q5-1:
     name: "Qwen Image Edit 2511 Q5_1"
@@ -62,20 +76,27 @@ models:
       - "--vae"
       - "./models/qwen_image_vae.safetensors"
       - "--llm"
-      - "./models/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
       - "--llm_vision"
       - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"
+      - "--steps"
+      - "24"
       - "--qwen-image-zero-cond-t"
     mode: "on_demand"
     exec_mode: "server"
     port: 1403
     model_type: "image-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
 
   qwen-image-edit-2511-q2-k:
     name: "Qwen Image Edit 2511 Q2_K"
@@ -87,20 +108,27 @@ models:
       - "--vae"
       - "./models/qwen_image_vae.safetensors"
       - "--llm"
-      - "./models/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
       - "--llm_vision"
       - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
       - "-v"
       - "--offload-to-cpu"
+      #- "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"
+      - "--steps"
+      - "24"
       - "--qwen-image-zero-cond-t"
     mode: "on_demand"
     exec_mode: "server"
     port: 1404
     model_type: "image-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
 
   qwen-image-edit:
     name: "Qwen Image Edit"
@@ -113,16 +141,23 @@ models:
       - "--vae"
       - "./models/qwen_image_vae.safetensors"
       - "--llm"
-      - "./models/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
       - "--llm_vision"
       - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"
+      - "--steps"
+      - "24"
     mode: "on_demand"
     exec_mode: "server"
     port: 1405
     model_type: "image-to-image"
     default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
