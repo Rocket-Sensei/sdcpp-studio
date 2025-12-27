@@ -179,6 +179,9 @@ async function processQueue() {
     if (modelConfig.exec_mode === ExecMode.SERVER) {
       // For server mode, stop conflicting servers and start the required one
       const prepareResult = await prepareModelForJob(modelId, job.id);
+      if (!prepareResult) {
+        throw new Error(`Failed to prepare model ${modelId}: prepareModelForJob returned undefined`);
+      }
       modelLoadingTimeMs = prepareResult.loadingTimeMs;
     } else if (modelConfig.exec_mode === ExecMode.CLI) {
       // For CLI mode, stop any running servers (they're not needed)
@@ -194,6 +197,8 @@ async function processQueue() {
       modelLoadingTimeMs = 0;
       logger.info({ modelId }, 'Model uses external API mode');
       genLogger.info({ modelId }, 'Model uses external API mode');
+    } else {
+      throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
     }
 
     // Process the job based on type
@@ -330,6 +335,12 @@ async function prepareModelForJob(modelId, jobId) {
   // Stop any other running server models (only one server at a time)
   await stopAllServerModels();
 
+  // Double-check after stopping other models - it might have been started by another process
+  if (modelManager.isModelRunning(modelId)) {
+    logger.info({ modelId }, 'Model became running while stopping others');
+    return { wasAlreadyRunning: true, loadingTimeMs: 0 };
+  }
+
   logger.info({ modelId }, 'Model not running, starting...');
   updateGenerationProgress(jobId, 0.05, `Starting model: ${modelId}...`);
 
@@ -340,6 +351,11 @@ async function prepareModelForJob(modelId, jobId) {
     // Start the model - this waits for the model to be ready via _waitForServerReady
     updateGenerationProgress(jobId, 0.1, `Starting model server: ${modelId}...`);
     const processEntry = await modelManager.startModel(modelId);
+
+    // Verify the model is actually running (defensive check)
+    if (!processEntry) {
+      throw new Error('startModel returned undefined processEntry');
+    }
 
     // If we get here, the model is running (startModel would have thrown otherwise)
     const loadingTimeMs = Date.now() - currentModelLoadingStartTime;
