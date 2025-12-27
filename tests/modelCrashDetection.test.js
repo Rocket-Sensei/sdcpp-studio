@@ -141,15 +141,44 @@ describe('Model Crash Detection - Startup Timeout Fix', () => {
 
     it('should reset isProcessing state when model crashes', () => {
       // When model crashes, the queue should be able to continue processing
+      // The isProcessing flag is now reset in the finally block, NOT in the callback
+      // This prevents race conditions where a new job starts before cleanup completes
+
+      // Check that handleModelProcessExit sets currentJob to null to signal cleanup done
       const handleExitMatch = queueProcessorSource.match(/function handleModelProcessExit\([^)]*\) \{[\s\S]*?\n\}/);
       expect(handleExitMatch).toBeTruthy();
 
       const functionBody = handleExitMatch[0];
 
-      // Should reset isProcessing to false so queue can continue
-      expect(functionBody).toContain('isProcessing = false');
+      // Should set currentJob to null to signal that cleanup has been handled
       expect(functionBody).toContain('currentJob = null');
-      expect(functionBody).toContain('currentModelId = null');
+
+      // Check that the queueProcessor has a finally block that resets isProcessing
+      // The finally block ensures cleanup happens even on errors
+      expect(queueProcessorSource).toContain('} finally {');
+      expect(queueProcessorSource).toContain('isProcessing = false');
+
+      // Verify isProcessing = false comes after the finally block
+      const lines = queueProcessorSource.split('\n');
+      let foundFinally = false;
+      let foundIsProcessingReset = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('} finally {')) {
+          foundFinally = true;
+          // Look for isProcessing = false in the next 10 lines
+          for (let j = i + 1; j < i + 11 && j < lines.length; j++) {
+            if (lines[j].includes('isProcessing = false')) {
+              foundIsProcessingReset = true;
+              break;
+            }
+          }
+          break;
+        }
+      }
+
+      expect(foundFinally).toBe(true);
+      expect(foundIsProcessingReset).toBe(true);
     });
 
     it('should fail the current generation when model crashes', () => {

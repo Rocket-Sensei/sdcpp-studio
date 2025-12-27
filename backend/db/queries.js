@@ -10,7 +10,8 @@ const logger = createLogger('queries');
 // Generation status constants (merged from queue)
 export const GenerationStatus = {
   PENDING: 'pending',
-  PROCESSING: 'processing',
+  MODEL_LOADING: 'model_loading',  // Model is being loaded/prepared
+  PROCESSING: 'processing',  // Actively generating image
   COMPLETED: 'completed',
   FAILED: 'failed',
   CANCELLED: 'cancelled',

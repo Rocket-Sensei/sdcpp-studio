@@ -35,7 +35,8 @@ import { authenticatedFetch } from "../utils/api";
 
 const GENERATION_STATUS = {
   PENDING: "pending",
-  PROCESSING: "processing",
+  MODEL_LOADING: "model_loading",  // Model is being loaded/prepared
+  PROCESSING: "processing",  // Actively generating image
   COMPLETED: "completed",
   FAILED: "failed",
   CANCELLED: "cancelled",
@@ -47,9 +48,15 @@ const STATUS_CONFIG = {
     label: "Queued",
     color: "secondary",
   },
+  [GENERATION_STATUS.MODEL_LOADING]: {
+    icon: Cpu,
+    label: "Loading Model",
+    color: "default",
+    animate: true,
+  },
   [GENERATION_STATUS.PROCESSING]: {
     icon: Loader2,
-    label: "Processing",
+    label: "Generating",
     color: "default",
     animate: true,
   },
@@ -77,7 +84,9 @@ const getStatusConfig = (status) => {
 };
 
 const isPendingOrProcessing = (status) => {
-  return status === GENERATION_STATUS.PENDING || status === GENERATION_STATUS.PROCESSING;
+  return status === GENERATION_STATUS.PENDING ||
+         status === GENERATION_STATUS.MODEL_LOADING ||
+         status === GENERATION_STATUS.PROCESSING;
 };
 
 // Thumbnail component moved outside parent to prevent remounting on parent re-renders

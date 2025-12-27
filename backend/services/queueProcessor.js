@@ -21,6 +21,8 @@ const modelManager = getModelManager();
 /**
  * Handle model process exit/crash during generation
  * Fails the current job if the model crashes while processing
+ * NOTE: This should NOT reset isProcessing - let the finally block in processQueue handle that
+ * to prevent race conditions where a new job starts before the current one is fully cleaned up.
  */
 function handleModelProcessExit(modelId, code, signal) {
   logger.warn({ modelId, code, signal }, 'Model process exited');
@@ -37,18 +39,19 @@ function handleModelProcessExit(modelId, code, signal) {
 
   logger.error({ jobId: currentJob.id, modelId, error: errorMsg }, 'Failing generation due to model crash');
 
-  // Update job status to failed
+  // Update job status to failed - this is synchronous, so it will complete before we return
   updateGenerationStatus(currentJob.id, GenerationStatus.FAILED, { error: errorMsg });
   broadcastQueueEvent({ ...currentJob, status: GenerationStatus.FAILED, error: errorMsg }, 'job_failed');
 
-  // Reset processing state so queue can continue
-  isProcessing = false;
+  // Mark that this job should be skipped in the finally block
+  // We set currentJob to null to signal that cleanup has already been handled
   currentJob = null;
-  currentModelId = null;
 }
 
 /**
  * Handle model process error
+ * NOTE: This should NOT reset isProcessing - let the finally block in processQueue handle that
+ * to prevent race conditions where a new job starts before the current one is fully cleaned up.
  */
 function handleModelProcessError(modelId, error) {
   logger.error({ modelId, error: error.message }, 'Model process error');
@@ -63,14 +66,13 @@ function handleModelProcessError(modelId, error) {
 
   logger.error({ jobId: currentJob.id, modelId, error: errorMsg }, 'Failing generation due to model error');
 
-  // Update job status to failed
+  // Update job status to failed - this is synchronous, so it will complete before we return
   updateGenerationStatus(currentJob.id, GenerationStatus.FAILED, { error: errorMsg });
   broadcastQueueEvent({ ...currentJob, status: GenerationStatus.FAILED, error: errorMsg }, 'job_failed');
 
-  // Reset processing state so queue can continue
-  isProcessing = false;
+  // Mark that this job should be skipped in the finally block
+  // We set currentJob to null to signal that cleanup has already been handled
   currentJob = null;
-  currentModelId = null;
 }
 
 // Register callbacks with model manager
@@ -150,9 +152,6 @@ async function processQueue() {
   genLogger.info({ prompt: job.prompt?.substring(0, 50) }, 'Starting generation');
 
   try {
-    // Job is already marked as PROCESSING by claimNextPendingGeneration()
-    broadcastQueueEvent({ ...job, status: GenerationStatus.PROCESSING }, 'job_updated');
-
     // Get model configuration
     // Use type-specific default if no model specified
     let modelId = job.model;
@@ -174,6 +173,17 @@ async function processQueue() {
 
     logger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
     genLogger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
+
+    // Update to MODEL_LOADING state when starting to load the model
+    updateGenerationStatus(job.id, GenerationStatus.MODEL_LOADING, {
+      progress: 0,
+    });
+    broadcastQueueEvent({
+      ...job,
+      status: GenerationStatus.MODEL_LOADING,
+      modelId,
+      modelName: modelConfig.name
+    }, 'job_updated');
 
     // Prepare model based on execution mode
     if (modelConfig.exec_mode === ExecMode.SERVER) {
@@ -200,6 +210,17 @@ async function processQueue() {
     } else {
       throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
     }
+
+    // Update to PROCESSING state when model is ready and we're about to generate
+    updateGenerationStatus(job.id, GenerationStatus.PROCESSING, {
+      progress: 0,
+    });
+    broadcastQueueEvent({
+      ...job,
+      status: GenerationStatus.PROCESSING,
+      modelId,
+      modelName: modelConfig.name
+    }, 'job_updated');
 
     // Process the job based on type
     let result;
@@ -256,37 +277,43 @@ async function processQueue() {
       result: 'completed',
     }, 'Generation completed successfully');
   } catch (error) {
-    // Calculate timing even for failures
-    const endTime = Date.now();
-    const totalTimeMs = endTime - startTime;
-    const generationTimeMs = totalTimeMs - modelLoadingTimeMs;
-    const generationTimeSec = (generationTimeMs / 1000).toFixed(2);
+    // Check if the callback already handled the failure (by setting currentJob to null)
+    // This prevents double-updating the status
+    if (currentJob !== null) {
+      // Calculate timing even for failures
+      const endTime = Date.now();
+      const totalTimeMs = endTime - startTime;
+      const generationTimeMs = totalTimeMs - modelLoadingTimeMs;
+      const generationTimeSec = (generationTimeMs / 1000).toFixed(2);
 
-    logger.error({
-      error: error.message,
-      jobId: job.id,
-      modelLoadingTimeMs,
-      generationTimeSec,
-      generationTimeMs,
-      totalTimeMs,
-    }, 'Job failed');
-    genLogger.error({
-      error: error.message,
-      stack: error.stack,
-      modelLoadingTimeMs,
-      generationTimeSec,
-      generationTimeMs,
-      totalTimeMs,
-      result: 'failed',
-    }, 'Generation failed');
+      logger.error({
+        error: error.message,
+        jobId: job.id,
+        modelLoadingTimeMs,
+        generationTimeSec,
+        generationTimeMs,
+        totalTimeMs,
+      }, 'Job failed');
+      genLogger.error({
+        error: error.message,
+        stack: error.stack,
+        modelLoadingTimeMs,
+        generationTimeSec,
+        generationTimeMs,
+        totalTimeMs,
+        result: 'failed',
+      }, 'Generation failed');
 
-    updateGenerationStatus(job.id, GenerationStatus.FAILED, {
-      error: error.message,
-      model_loading_time_ms: modelLoadingTimeMs,
-      generation_time_ms: generationTimeMs,
-    });
-    broadcastQueueEvent({ ...job, status: GenerationStatus.FAILED, error: error.message }, 'job_failed');
+      updateGenerationStatus(job.id, GenerationStatus.FAILED, {
+        error: error.message,
+        model_loading_time_ms: modelLoadingTimeMs,
+        generation_time_ms: generationTimeMs,
+      });
+      broadcastQueueEvent({ ...job, status: GenerationStatus.FAILED, error: error.message }, 'job_failed');
+    }
   } finally {
+    // Always reset isProcessing at the end, even if callback handled the failure
+    // This ensures the queue can continue processing
     isProcessing = false;
     currentJob = null;
     currentModelId = null;
