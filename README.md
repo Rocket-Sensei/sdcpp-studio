@@ -4,6 +4,8 @@ A modern web interface for Stable Diffusion image generation via stable-diffusio
 
 While this application supports any OpenAI-compatible Images API, it is primarily designed as a GUI for [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
+See [PR #1037](https://github.com/leejet/stable-diffusion.cpp/pull/1037) for SD-CPP server documentation.
+
 ## Features
 
 ### Image Generation
