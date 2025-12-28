@@ -824,6 +824,51 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
             <div className="space-y-4 bg-muted/50 rounded-lg p-4">
               <h3 className="font-semibold">Video Settings</h3>
 
+              {/* Start Frame Image (Optional - for I2V) */}
+              <div className="space-y-2">
+                <Label>Start Frame Image (Optional - for Image to Video)</Label>
+                <div className="flex items-center gap-4">
+                  {sourceImagePreview ? (
+                    <div className="relative group">
+                      <img
+                        src={sourceImagePreview}
+                        alt="Start frame"
+                        className="w-32 h-32 object-cover rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={handleClearImage}
+                        disabled={isLoading || isUpscaling}
+                      >
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className="w-32 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">Upload</span>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={isLoading || isUpscaling}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload a start frame for Image to Video (I2V) generation. Leave empty for Text to Video (T2V).
+                </p>
+              </div>
+
               {/* Video Frames */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

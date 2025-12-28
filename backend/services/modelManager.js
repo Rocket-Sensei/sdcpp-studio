@@ -320,6 +320,8 @@ export class ModelManager {
           // Infer capabilities from model_type if available
           if (modelConfig.model_type === 'imgedit') {
             modelConfig.capabilities = ['text-to-image', 'imgedit'];
+          } else if (modelConfig.model_type === 'video') {
+            modelConfig.capabilities = ['video'];
           } else {
             modelConfig.capabilities = ['text-to-image'];
           }

@@ -40,19 +40,29 @@ const DOWNLOAD_STATUS = {
 /**
  * Filter models based on mode
  * @param {Array} allModels - All models from API
- * @param {string} mode - Mode to filter by ('txt2img', 'img2img', 'imgedit', 'upscale')
+ * @param {string} mode - Mode to filter by ('txt2img', 'img2img', 'imgedit', 'video', 'upscale')
  * @returns {Array} Filtered models
  */
 const filterModels = (allModels, mode) => {
   switch (mode) {
     case "txt2img":
-      return allModels.filter((m) => m.capabilities?.includes("text-to-image"));
+      // Only models with text-to-image capability (exclude video models)
+      return allModels.filter((m) =>
+        m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video")
+      );
     case "img2img":
-      // All models support img2img via --init-img
-      return allModels.filter((m) => m.capabilities?.includes("text-to-image"));
+      // All models support img2img via --init-img (exclude video models)
+      return allModels.filter((m) =>
+        m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video")
+      );
     case "imgedit":
-      // Only models with imgedit capability support --ref-image
-      return allModels.filter((m) => m.capabilities?.includes("imgedit"));
+      // Only models with imgedit capability support --ref-image (exclude video models)
+      return allModels.filter((m) =>
+        m.capabilities?.includes("imgedit") && !m.capabilities?.includes("video")
+      );
+    case "video":
+      // Only models with video capability
+      return allModels.filter((m) => m.capabilities?.includes("video"));
     case "upscale":
       return []; // Upscale doesn't use models directly
     default:
