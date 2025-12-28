@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Wand2, Upload, Image as ImageIcon, Sparkles, List,
-  ChevronDown, ChevronUp, Download, Loader2, MinusCircle, ChevronLeft, ChevronRight, Video
+  ChevronDown, ChevronUp, Download, Loader2, MinusCircle, Video
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -10,7 +10,7 @@ import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Slider } from "./ui/slider";
 import { Switch } from "./ui/switch";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
@@ -94,9 +94,6 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
 
   // Mode selection
   const [mode, setMode] = useState("txt2img");
-
-  // Panel collapse state
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Common settings
   const [prompt, setPrompt] = useState("");
@@ -632,32 +629,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
 
   return (
     <Card>
-      {/* Header with collapse toggle */}
-      <CardHeader className="cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <currentModeConfig.icon className="h-5 w-5" />
-            {currentModeConfig.label}
-          </CardTitle>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            {isCollapsed ? (
-              <ChevronLeft className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        <CardDescription>
-          {mode === "txt2img" && "Generate images from text descriptions"}
-          {mode === "img2img" && "Create variations of images"}
-          {mode === "imgedit" && "Edit and transform images"}
-          {mode === "video" && "Generate videos from text or images"}
-          {mode === "upscale" && "Enhance and upscale images"}
-        </CardDescription>
-      </CardHeader>
-
-      {!isCollapsed && (
-        <CardContent className="space-y-6">
+      <CardContent className="space-y-6">
           {/* Sticky Generate Bar */}
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border rounded-lg p-3 shadow-sm">
             <div className="flex items-center justify-between">
@@ -1298,7 +1270,6 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
             </div>
           </div>
         </CardContent>
-      )}
     </Card>
   );
 }
