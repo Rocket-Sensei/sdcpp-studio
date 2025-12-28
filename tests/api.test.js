@@ -15,7 +15,7 @@ import { FormData, File } from 'formdata-node';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Test-specific database path - MUST be set before importing database modules
-const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-api-sd-webui.db');
+const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-api-sd-cpp-studio.db');
 process.env.DB_PATH = TEST_DB_PATH;
 
 const API_URL = 'http://127.0.0.1:3000';

@@ -97,11 +97,14 @@ const Thumbnail = memo(function Thumbnail({ generation, onViewLogs }) {
   const imageCount = generation.image_count || 0;
 
   // Show preloader for pending/processing generations
+  // Use the status config to show the correct icon and label (Queued, Loading Model, or Generating)
   if (isPendingOrProcessing(generation.status)) {
+    const config = getStatusConfig(generation.status);
+    const StatusIcon = config.icon;
     return (
       <div className="aspect-square bg-muted rounded-lg flex flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-2" />
-        <span className="text-xs text-muted-foreground">Generating...</span>
+        <StatusIcon className={`h-8 w-8 text-muted-foreground mb-2 ${config.animate ? 'animate-spin' : ''}`} />
+        <span className="text-xs text-muted-foreground">{config.label}</span>
       </div>
     );
   }
@@ -785,57 +788,59 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
       {/* Pagination Controls */}
       {pagination.totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={prevPage}
-            disabled={currentPage === 1 || isLoading}
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
-          </Button>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 mt-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={prevPage}
+              disabled={currentPage === 1 || isLoading}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Previous</span>
+            </Button>
 
-          {/* Page numbers */}
-          <div className="flex gap-1">
-            {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
-              let pageNum;
-              if (pagination.totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= pagination.totalPages - 2) {
-                pageNum = pagination.totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
+            {/* Page numbers */}
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+                let pageNum;
+                if (pagination.totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= pagination.totalPages - 2) {
+                  pageNum = pagination.totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
 
-              return (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => goToPage(pageNum)}
-                  disabled={isLoading}
-                  className="min-w-[40px]"
-                >
-                  {pageNum}
-                </Button>
-              );
-            })}
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => goToPage(pageNum)}
+                    disabled={isLoading}
+                    className="min-w-[40px]"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={nextPage}
+              disabled={currentPage === pagination.totalPages || isLoading}
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight className="h-4 w-4 sm:ml-1" />
+            </Button>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={nextPage}
-            disabled={currentPage === pagination.totalPages || isLoading}
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-
-          <span className="text-sm text-muted-foreground ml-2">
+          <span className="text-sm text-muted-foreground">
             Page {currentPage} of {pagination.totalPages} ({pagination.total} total)
           </span>
         </div>

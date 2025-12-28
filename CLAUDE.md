@@ -25,7 +25,7 @@ npm run models:running     # Show running models
 
 ## Architecture Overview
 
-SD WebUI is a web interface for Stable Diffusion via stable-diffusion.cpp. The architecture has three main layers:
+sd.cpp Studio is a web interface for Stable Diffusion via stable-diffusion.cpp with OpenAI-compatible API. The architecture has three main layers:
 
 1. **Backend (`/backend`)** - Express.js API server with SQLite database
 2. **Frontend (`/frontend`)** - React + Vite application with shadcn/ui
@@ -156,7 +156,7 @@ Connect to `ws://host:3000/ws`
 
 - **stable-diffusion.cpp**: Binaries at `/bin/sd-server` and `/bin/sd-cli`
 - **Model files**: Stored in `/models/` (gitignored)
-- **Database**: SQLite at `/backend/data/sd-webui.db` (WAL mode enabled)
+- **Database**: SQLite at `/backend/data/sd-cpp-studio.db` (WAL mode enabled)
 
 ### Important Notes
 

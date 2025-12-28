@@ -247,6 +247,8 @@ async function processQueue() {
     updateGenerationStatus(job.id, GenerationStatus.COMPLETED, {
       model_loading_time_ms: modelLoadingTimeMs,
       generation_time_ms: generationTimeMs,
+      // Update sample_steps with the actual value used (from model args for server mode, from request for CLI mode)
+      sample_steps: result?.actualSteps,
     });
 
     // Broadcast completion events
@@ -454,6 +456,17 @@ async function processGenerateJob(job, modelConfig, genLogger) {
   // Get model-specific default parameters (if any)
   const modelParams = modelManager.getModelGenerationParams(modelId);
 
+  // For server mode models, parse steps from command line args since they cannot be set via API
+  // Server mode SD.cpp requires --steps to be specified at startup, not in HTTP requests
+  let actualSteps = job.sample_steps ?? modelParams?.sample_steps ?? undefined;
+  if (modelConfig.exec_mode === ExecMode.SERVER) {
+    const stepsFromArgs = modelManager.getModelStepsFromArgs(modelId);
+    if (stepsFromArgs !== null) {
+      actualSteps = stepsFromArgs;
+      genLogger.debug({ steps: actualSteps, source: 'command_line_args' }, 'Using steps from model config args for server mode');
+    }
+  }
+
   const params = {
     prompt: job.prompt,
     negative_prompt: job.negative_prompt,
@@ -465,7 +478,7 @@ async function processGenerateJob(job, modelConfig, genLogger) {
     // SD.cpp Advanced Settings - use job values, fallback to model defaults, then undefined
     cfg_scale: job.cfg_scale ?? modelParams?.cfg_scale ?? undefined,
     sampling_method: job.sampling_method ?? modelParams?.sampling_method ?? undefined,
-    sample_steps: job.sample_steps ?? modelParams?.sample_steps ?? undefined,
+    sample_steps: actualSteps,
     clip_skip: job.clip_skip ?? modelParams?.clip_skip ?? undefined,
   };
 
@@ -520,7 +533,7 @@ async function processGenerateJob(job, modelConfig, genLogger) {
     }
   }
 
-  return { generationId, imageCount };
+  return { generationId, imageCount, actualSteps };
 }
 
 /**
@@ -704,6 +717,16 @@ async function processEditJob(job, modelConfig, genLogger) {
   // Get model-specific default parameters (if any)
   const modelParams = modelManager.getModelGenerationParams(modelId);
 
+  // For server mode models, parse steps from command line args since they cannot be set via API
+  let actualSteps = job.sample_steps ?? modelParams?.sample_steps ?? undefined;
+  if (modelConfig.exec_mode === ExecMode.SERVER) {
+    const stepsFromArgs = modelManager.getModelStepsFromArgs(modelId);
+    if (stepsFromArgs !== null) {
+      actualSteps = stepsFromArgs;
+      genLogger.debug({ steps: actualSteps, source: 'command_line_args' }, 'Using steps from model config args for server mode');
+    }
+  }
+
   // Prepare params for generateImageDirect
   const params = {
     model: modelId,
@@ -719,7 +742,7 @@ async function processEditJob(job, modelConfig, genLogger) {
     // SD.cpp Advanced Settings - use job values, fallback to model defaults, then undefined
     cfg_scale: job.cfg_scale ?? modelParams?.cfg_scale ?? undefined,
     sampling_method: job.sampling_method ?? modelParams?.sampling_method ?? undefined,
-    sample_steps: job.sample_steps ?? modelParams?.sample_steps ?? undefined,
+    sample_steps: actualSteps,
     clip_skip: job.clip_skip ?? modelParams?.clip_skip ?? undefined,
   };
 
@@ -788,7 +811,7 @@ async function processEditJob(job, modelConfig, genLogger) {
     }
   }
 
-  return { generationId, imageCount };
+  return { generationId, imageCount, actualSteps };
 }
 
 /**
@@ -816,6 +839,16 @@ async function processVariationJob(job, modelConfig, genLogger) {
   // Get model-specific default parameters (if any)
   const modelParams = modelManager.getModelGenerationParams(modelId);
 
+  // For server mode models, parse steps from command line args since they cannot be set via API
+  let actualSteps = job.sample_steps ?? modelParams?.sample_steps ?? undefined;
+  if (modelConfig.exec_mode === ExecMode.SERVER) {
+    const stepsFromArgs = modelManager.getModelStepsFromArgs(modelId);
+    if (stepsFromArgs !== null) {
+      actualSteps = stepsFromArgs;
+      genLogger.debug({ steps: actualSteps, source: 'command_line_args' }, 'Using steps from model config args for server mode');
+    }
+  }
+
   // Prepare params for generateImageDirect
   const params = {
     model: modelId,
@@ -834,7 +867,7 @@ async function processVariationJob(job, modelConfig, genLogger) {
     // SD.cpp Advanced Settings - use job values, fallback to model defaults, then undefined
     cfg_scale: job.cfg_scale ?? modelParams?.cfg_scale ?? undefined,
     sampling_method: job.sampling_method ?? modelParams?.sampling_method ?? undefined,
-    sample_steps: job.sample_steps ?? modelParams?.sample_steps ?? undefined,
+    sample_steps: actualSteps,
     clip_skip: job.clip_skip ?? modelParams?.clip_skip ?? undefined,
   };
 
@@ -894,5 +927,5 @@ async function processVariationJob(job, modelConfig, genLogger) {
     }
   }
 
-  return { generationId, imageCount };
+  return { generationId, imageCount, actualSteps };
 }

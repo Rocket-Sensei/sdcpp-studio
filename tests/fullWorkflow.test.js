@@ -1,7 +1,7 @@
 /**
  * Vitest Full Workflow Integration Tests
  *
- * End-to-end testing for the SD WebUI image generation pipeline.
+ * End-to-end testing for the sd.cpp Studio image generation pipeline.
  * Tests the complete flow from API call to image saved on disk.
  */
 
@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.join(__dirname, '../..');
 
 // Test-specific database path - MUST be set before importing database modules
-const TEST_DB_PATH = path.join(PROJECT_ROOT, 'backend/data/test-fullworkflow-sd-webui.db');
+const TEST_DB_PATH = path.join(PROJECT_ROOT, 'backend/data/test-fullworkflow-sd-cpp-studio.db');
 process.env.DB_PATH = TEST_DB_PATH;
 
 // Test-specific images directories - MUST be set before importing backend modules

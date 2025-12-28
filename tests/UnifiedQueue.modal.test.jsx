@@ -230,8 +230,45 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify loading state rendering
-      expect(componentContent).toContain('Generating...');
+      // Verify the component uses getStatusConfig for dynamic status labels
+      expect(componentContent).toContain('const config = getStatusConfig(generation.status)');
+      expect(componentContent).toContain('const StatusIcon = config.icon');
+      expect(componentContent).toContain('{config.label}');
+
+      // Verify STATUS_CONFIG has correct labels for different states
+      expect(componentContent).toContain('label: "Queued"');
+      expect(componentContent).toContain('label: "Loading Model"');
+      expect(componentContent).toContain('label: "Generating"');
+    });
+
+    it('should show correct status for PENDING state', () => {
+      const fs = require('fs');
+      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentContent = fs.readFileSync(componentPath, 'utf-8');
+
+      // Verify PENDING shows "Queued"
+      expect(componentContent).toContain('[GENERATION_STATUS.PENDING]: {');
+      expect(componentContent).toContain('label: "Queued"');
+    });
+
+    it('should show correct status for MODEL_LOADING state', () => {
+      const fs = require('fs');
+      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentContent = fs.readFileSync(componentPath, 'utf-8');
+
+      // Verify MODEL_LOADING shows "Loading Model"
+      expect(componentContent).toContain('[GENERATION_STATUS.MODEL_LOADING]: {');
+      expect(componentContent).toContain('label: "Loading Model"');
+    });
+
+    it('should show correct status for PROCESSING state', () => {
+      const fs = require('fs');
+      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentContent = fs.readFileSync(componentPath, 'utf-8');
+
+      // Verify PROCESSING shows "Generating"
+      expect(componentContent).toContain('[GENERATION_STATUS.PROCESSING]: {');
+      expect(componentContent).toContain('label: "Generating"');
     });
   });
 

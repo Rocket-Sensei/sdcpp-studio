@@ -18,7 +18,7 @@ import { authenticatedFetch } from "../utils/api";
 import { MultiModelSelector } from "./MultiModelSelector";
 
 // localStorage key for form state persistence
-const FORM_STATE_KEY = "sd-webui-generate-form-state";
+const FORM_STATE_KEY = "sd-cpp-studio-generate-form-state";
 
 const MODES = [
   { value: "txt2img", label: "Text to Image", icon: Wand2, needsImage: false },
@@ -116,6 +116,10 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
   // Track if selected models support negative prompts
   const [supportsNegativePrompt, setSupportsNegativePrompt] = useState(false);
 
+  // Track if selected models are server mode (steps cannot be changed dynamically)
+  const [hasServerModeModel, setHasServerModeModel] = useState(false);
+  const [serverModeSteps, setServerModeSteps] = useState(null);
+
   // Image-related settings (for img2img, imgedit, upscale)
   const [sourceImage, setSourceImage] = useState(null);
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
@@ -174,6 +178,46 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
       return model?.supports_negative_prompt === true;
     });
     setSupportsNegativePrompt(hasSupport);
+  }, [selectedModels, modelsData]);
+
+  // Update server mode steps info when selectedModels change
+  useEffect(() => {
+    // Check if ANY selected model is server mode
+    const serverModels = selectedModels
+      .map(modelId => modelsData?.find(m => m.id === modelId))
+      .filter(m => m && m.exec_mode === 'server');
+
+    setHasServerModeModel(serverModels.length > 0);
+
+    // For server mode models, parse steps from command line args
+    // Server mode SD.cpp requires --steps to be specified at startup, not in HTTP requests
+    if (serverModels.length > 0) {
+      const stepsList = serverModels
+        .map(model => {
+          // Parse --steps from args array
+          if (model.args && Array.isArray(model.args)) {
+            const stepsIndex = model.args.indexOf('--steps');
+            if (stepsIndex !== -1 && stepsIndex + 1 < model.args.length) {
+              const stepsValue = model.args[stepsIndex + 1];
+              const parsed = parseInt(stepsValue, 10);
+              if (!isNaN(parsed) && parsed > 0) {
+                return parsed;
+              }
+            }
+          }
+          return null;
+        })
+        .filter(s => s !== null);
+
+      // If all server models have the same steps value, show it
+      if (stepsList.length > 0 && stepsList.every(s => s === stepsList[0])) {
+        setServerModeSteps(stepsList[0]);
+      } else {
+        setServerModeSteps(null);
+      }
+    } else {
+      setServerModeSteps(null);
+    }
   }, [selectedModels, modelsData]);
 
   // Apply settings when provided (from "Create More" button)
@@ -922,36 +966,44 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
                       step={0.5}
                       value={[cfgScale]}
                       onValueChange={(v) => setCfgScale(v[0])}
-                      disabled={isLoading || isUpscaling}
+                      disabled={isLoading || isUpscaling || selectedModels.length > 1}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Classifier-free guidance scale. Higher = more prompt adherence.
+                      {selectedModels.length > 1
+                        ? 'Using default settings for each selected model.'
+                        : 'Classifier-free guidance scale. Higher = more prompt adherence.'}
                     </p>
                   </div>
 
                   {/* Sample Steps */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="sample-steps">Sample Steps: {sampleSteps}</Label>
+                      <Label htmlFor="sample-steps">
+                        Sample Steps: {hasServerModeModel && serverModeSteps !== null ? serverModeSteps : sampleSteps}
+                      </Label>
                     </div>
                     <Slider
                       id="sample-steps"
                       min={1}
                       max={100}
                       step={1}
-                      value={[sampleSteps]}
+                      value={[hasServerModeModel && serverModeSteps !== null ? serverModeSteps : sampleSteps]}
                       onValueChange={(v) => setSampleSteps(v[0])}
-                      disabled={isLoading || isUpscaling}
+                      disabled={isLoading || isUpscaling || hasServerModeModel || selectedModels.length > 1}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Number of denoising steps. More steps = higher quality but slower.
+                      {selectedModels.length > 1
+                        ? 'Using default settings for each selected model.'
+                        : hasServerModeModel && serverModeSteps !== null
+                          ? `Steps are fixed at ${serverModeSteps} for server mode models (set via command line args).`
+                          : 'Number of denoising steps. More steps = higher quality but slower.'}
                     </p>
                   </div>
 
                   {/* Sampling Method */}
                   <div className="space-y-2">
                     <Label htmlFor="sampling-method">Sampling Method</Label>
-                    <Select value={samplingMethod} onValueChange={setSamplingMethod} disabled={isLoading || isUpscaling}>
+                    <Select value={samplingMethod} onValueChange={setSamplingMethod} disabled={isLoading || isUpscaling || selectedModels.length > 1}>
                       <SelectTrigger id="sampling-method">
                         <SelectValue />
                       </SelectTrigger>
@@ -963,12 +1015,17 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
                         ))}
                       </SelectContent>
                     </Select>
+                    {selectedModels.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        Using default settings for each selected model.
+                      </p>
+                    )}
                   </div>
 
                   {/* CLIP Skip */}
                   <div className="space-y-2">
                     <Label htmlFor="clip-skip">CLIP Skip</Label>
-                    <Select value={clipSkip} onValueChange={setClipSkip} disabled={isLoading || isUpscaling}>
+                    <Select value={clipSkip} onValueChange={setClipSkip} disabled={isLoading || isUpscaling || selectedModels.length > 1}>
                       <SelectTrigger id="clip-skip">
                         <SelectValue />
                       </SelectTrigger>
@@ -980,6 +1037,11 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
                         ))}
                       </SelectContent>
                     </Select>
+                    {selectedModels.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        Using default settings for each selected model.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

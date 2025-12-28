@@ -9,7 +9,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/sd_xl_base_1.0.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -36,7 +36,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/epicrealismXL_pureFix.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -61,7 +61,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/forrealxlV10_v10.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -86,7 +86,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/illustriousXL_v01.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -111,7 +111,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/hassakuXLIllustrious_v21.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -136,7 +136,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/ThinkDiffusionXL.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -161,7 +161,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/pornmasterPro_noobV15VAE.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
@@ -186,8 +186,8 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
-      - "./models/perfectionAmateurILXL_33.safetensors.safetensors"
+      - "-m"
+      - "./models/perfectionAmateurILXL_33.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"
       - "-v"
@@ -196,7 +196,7 @@ models:
       - "30"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1526
+    port: 1528
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -211,7 +211,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/DreamShaperXL_Turbo_dpmppSdeKarras_half_pruned_6.safetensors"
       - "--vae"
       - "./models/sdxl_vae.safetensors"

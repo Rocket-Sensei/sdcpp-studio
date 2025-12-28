@@ -1,4 +1,4 @@
-const API_KEY_STORAGE_KEY = 'sd-webui-api-key';
+const API_KEY_STORAGE_KEY = 'sd-cpp-studio-api-key';
 
 /**
  * Get the stored API key from localStorage

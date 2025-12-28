@@ -164,7 +164,7 @@ describe('Frontend API Utilities', () => {
       saveApiKey(testKey);
 
       expect(global.localStorage.setItem).toHaveBeenCalledWith(
-        'sd-webui-api-key',
+        'sd-cpp-studio-api-key',
         testKey
       );
     });
@@ -174,7 +174,7 @@ describe('Frontend API Utilities', () => {
 
       saveApiKey('');
 
-      expect(global.localStorage.removeItem).toHaveBeenCalledWith('sd-webui-api-key');
+      expect(global.localStorage.removeItem).toHaveBeenCalledWith('sd-cpp-studio-api-key');
     });
 
     it('should get stored API key from localStorage', async () => {
@@ -184,7 +184,7 @@ describe('Frontend API Utilities', () => {
       const { getStoredApiKey } = await import('../frontend/src/utils/api.js');
       const result = getStoredApiKey();
 
-      expect(global.localStorage.getItem).toHaveBeenCalledWith('sd-webui-api-key');
+      expect(global.localStorage.getItem).toHaveBeenCalledWith('sd-cpp-studio-api-key');
       expect(result).toBe(testKey);
     });
 

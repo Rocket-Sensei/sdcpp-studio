@@ -1375,7 +1375,7 @@ app.post('/sdapi/v1/txt2img', authenticateRequest, async (req, res) => {
       sampler_name,
       seed,
       n = 1,
-      // SD WebUI API compatibility fields
+      // SD.next API compatibility fields (for SillyTavern integration)
       override_settings,
       sd_model_checkpoint
     } = req.body;
@@ -1403,7 +1403,7 @@ app.post('/sdapi/v1/txt2img', authenticateRequest, async (req, res) => {
     // Priority: override_settings.sd_model_checkpoint > sd_model_checkpoint > running model > default
     let modelId = null;
 
-    // Check override_settings first (SD WebUI API standard for per-request override)
+    // Check override_settings first (SD.next API standard for per-request override)
     if (override_settings && override_settings.sd_model_checkpoint) {
       modelId = findModelIdByName(override_settings.sd_model_checkpoint);
     }

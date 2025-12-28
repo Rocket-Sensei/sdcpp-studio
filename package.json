@@ -1,7 +1,7 @@
 {
-  "name": "sd-webui",
+  "name": "sd.cpp-studio",
   "version": "1.0.0",
-  "description": "Web interface for Stable Diffusion via OpenAI-compatible API",
+  "description": "Web interface for Stable Diffusion via stable-diffusion.cpp with OpenAI-compatible API",
   "private": true,
   "type": "module",
   "scripts": {

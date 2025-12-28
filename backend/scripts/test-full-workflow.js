@@ -2,7 +2,7 @@
 /**
  * Full Workflow Test Suite
  *
- * Comprehensive end-to-end testing for the SD WebUI image generation pipeline.
+ * Comprehensive end-to-end testing for the sd.cpp Studio image generation pipeline.
  * Tests the complete flow from API call to image saved on disk.
  *
  * Usage:
@@ -47,7 +47,7 @@ const CONFIG = {
   apiQueueStatus: '/api/queue/stats',
   apiModels: '/api/models',
   apiModelStatus: '/api/models',
-  dbPath: resolve(dirname(fileURLToPath(import.meta.url)), '../data/sd-webui.db'),
+  dbPath: resolve(dirname(fileURLToPath(import.meta.url)), '../data/sd-cpp-studio.db'),
   imagesDir: resolve(dirname(fileURLToPath(import.meta.url)), '../data/images'),
   projectRoot: resolve(dirname(fileURLToPath(import.meta.url)), '../..'),
   pollInterval: 2000, // ms
@@ -668,7 +668,7 @@ function printTestReport() {
  * Main test execution
  */
 async function main() {
-  printHeader('SD WebUI Full Workflow Test Suite');
+  printHeader('sd.cpp Studio Full Workflow Test Suite');
 
   log('Configuration:', 'blue');
   log(`  Backend URL: ${CONFIG.backendUrl}`, 'gray');

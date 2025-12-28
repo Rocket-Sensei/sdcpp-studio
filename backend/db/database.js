@@ -11,7 +11,7 @@ const __dirname = dirname(__filename);
 
 // Helper function to get dbPath (reads env var dynamically to support test mode)
 function getDbPath() {
-  return process.env.DB_PATH || `${__dirname}/../data/sd-webui.db`;
+  return process.env.DB_PATH || `${__dirname}/../data/sd-cpp-studio.db`;
 }
 
 // Helper function to get imagesDir (reads env var dynamically)
@@ -289,7 +289,7 @@ export function deleteGeneration(id) {
  *
  * SAFETY: This function will NOT clear the database if it appears to be
  * a production database. The database is considered safe to clear if:
- * 1. DB_PATH contains 'test' (e.g., 'test-sd-webui.db')
+ * 1. DB_PATH contains 'test' (e.g., 'test-sd-cpp-studio.db')
  * 2. OR DB_PATH is not the default production database path
  *
  * This prevents accidental data loss in production.
@@ -299,11 +299,11 @@ export function clearDatabase() {
   const currentDbPath = getDbPath();
 
   // Get the default (production) database path
-  const defaultDbPath = `${__dirname}/../data/sd-webui.db`;
+  const defaultDbPath = `${__dirname}/../data/sd-cpp-studio.db`;
 
   // Safety check: Don't clear production database
   // The database is considered "safe to clear" if:
-  // 1. The path contains 'test' anywhere (e.g., test-sd-webui.db, /data/test/, etc.)
+  // 1. The path contains 'test' anywhere (e.g., test-sd-cpp-studio.db, /data/test/, etc.)
   // 2. OR the path is NOT the default production database path
   const isProductionDb = currentDbPath === defaultDbPath;
   const isTestDb = currentDbPath.includes('test');
@@ -314,7 +314,7 @@ export function clearDatabase() {
       'Cannot clear database: This appears to be the production database at ' +
       `"${currentDbPath}". To prevent accidental data loss, ` +
       'clearDatabase() will only work if:\n' +
-      '  1. DB_PATH contains "test" (e.g., "test-sd-webui.db"), or\n' +
+      '  1. DB_PATH contains "test" (e.g., "test-sd-cpp-studio.db"), or\n' +
       '  2. You use a custom database path (not the default production path).\n' +
       'Set process.env.DB_PATH to a test database path before running tests.'
     );

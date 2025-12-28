@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Test-specific database path - MUST be set before importing database modules
-const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-sd-webui.db');
+const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-sd-cpp-studio.db');
 process.env.DB_PATH = TEST_DB_PATH;
 
 // Test-specific images directories - MUST be set before importing database modules

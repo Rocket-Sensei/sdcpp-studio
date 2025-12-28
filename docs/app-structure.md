@@ -1,11 +1,11 @@
 # Application Code Structure
 
-SD WebUI is a full-stack Node.js application with an Express backend and React frontend.
+sd.cpp Studio is a full-stack Node.js application with an Express backend and React frontend.
 
 ## Directory Structure
 
 ```
-sd-webui/
+sd.cpp-studio/
 ├── backend/                 # Express API server
 │   ├── db/                 # Database layer
 │   │   ├── database.js     # Database initialization and schema
@@ -239,5 +239,5 @@ User submits form
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
-| `DB_PATH` | SQLite database path | `backend/data/sd-webui.db` |
+| `DB_PATH` | SQLite database path | `backend/data/sd-cpp-studio.db` |
 | `IMAGES_DIR` | Images storage directory | `backend/data/images` |

@@ -158,7 +158,7 @@ export function ApiKeyProvider({ children }) {
 
         // If auth is required and no key is stored, show modal
         if (required) {
-          const storedKey = localStorage.getItem('sd-webui-api-key');
+          const storedKey = localStorage.getItem('sd-cpp-studio-api-key');
           if (!storedKey) {
             setShowModal(true);
           }

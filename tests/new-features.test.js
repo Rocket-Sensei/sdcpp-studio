@@ -19,7 +19,7 @@ import { FormData, File } from 'formdata-node';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Test-specific paths - MUST be set before importing database modules
-const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-new-features-sd-webui.db');
+const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-new-features-sd-cpp-studio.db');
 const TEST_IMAGES_DIR = path.join(__dirname, '..', 'backend', 'data', 'test-images');
 const TEST_INPUT_DIR = path.join(__dirname, '..', 'backend', 'data', 'test-input');
 

@@ -1,5 +1,5 @@
 /**
- * WebSocket Server for SD-WebUI
+ * WebSocket Server for sd.cpp Studio
  *
  * Provides real-time pub-sub communication for:
  * - Queue updates (job status changes)

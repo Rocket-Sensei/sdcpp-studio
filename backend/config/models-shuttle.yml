@@ -24,7 +24,7 @@ models:
       - "--offload-to-cpu"
       - "--clip-on-cpu"
       - "--steps"
-      - "4"
+      - "28"
     mode: "on_demand"
     exec_mode: "server"
     port: 1410
@@ -32,5 +32,5 @@ models:
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 1.0
-      sample_steps: 4
+      sample_steps: 28
       sampling_method: "euler"

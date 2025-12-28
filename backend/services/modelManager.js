@@ -1057,6 +1057,35 @@ export class ModelManager {
 
     return model.generation_params;
   }
+
+  /**
+   * Parse steps value from model's command line arguments
+   * For server mode models, steps must be specified via --steps in args
+   * @param {string} modelId - Model identifier
+   * @returns {number|null} Steps value from args, or null if not found
+   */
+  getModelStepsFromArgs(modelId) {
+    if (!this.configLoaded) {
+      this.loadConfig();
+    }
+
+    const model = this.getModel(modelId);
+    if (!model || !model.args || !Array.isArray(model.args)) {
+      return null;
+    }
+
+    // Look for --steps flag in args and return the next value
+    const stepsIndex = model.args.indexOf('--steps');
+    if (stepsIndex !== -1 && stepsIndex + 1 < model.args.length) {
+      const stepsValue = model.args[stepsIndex + 1];
+      const parsed = parseInt(stepsValue, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }
 }
 
 /**

@@ -99,7 +99,7 @@ describe('App Routing', () => {
     it('should render header with logo', () => {
       renderAppWithRoute(['/studio']);
 
-      expect(screen.getByText('SD WebUI')).toBeInTheDocument();
+      expect(screen.getByText('sd.cpp Studio')).toBeInTheDocument();
     });
 
     it('should render Generate toggle button in header', () => {
@@ -117,7 +117,7 @@ describe('App Routing', () => {
     it('should render footer', () => {
       renderAppWithRoute(['/studio']);
 
-      expect(screen.getByText('SD WebUI - OpenAI-Compatible Image Generation Interface')).toBeInTheDocument();
+      expect(screen.getByText('sd.cpp Studio - OpenAI-Compatible Image Generation Interface')).toBeInTheDocument();
     });
 
     it('should render Toaster', () => {

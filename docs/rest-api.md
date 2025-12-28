@@ -1,6 +1,6 @@
 # REST API Documentation
 
-SD WebUI provides a REST API for image generation and queue management.
+sd.cpp Studio provides a REST API for image generation and queue management.
 
 ## Base URL
 

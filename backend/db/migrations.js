@@ -1,6 +1,6 @@
 /**
  * Database Migrations System
- * Handles schema migrations for the sd-webui database
+ * Handles schema migrations for the sd.cpp Studio database
  */
 
 import { getDatabase } from './database.js';

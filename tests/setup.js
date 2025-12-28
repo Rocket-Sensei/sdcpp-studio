@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 
 // Set test database path BEFORE importing any backend modules
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEST_DB_PATH = path.join(__dirname, 'backend', 'data', 'test-sd-webui.db');
+const TEST_DB_PATH = path.join(__dirname, 'backend', 'data', 'test-sd-cpp-studio.db');
 process.env.DB_PATH = TEST_DB_PATH;
 
 // Set test images directories BEFORE importing any backend modules

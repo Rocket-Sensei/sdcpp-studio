@@ -1,5 +1,5 @@
 /**
- * WebSocket Hook for SD-WebUI
+ * WebSocket Hook for sd.cpp Studio
  *
  * Provides real-time updates from the backend via WebSocket.
  *

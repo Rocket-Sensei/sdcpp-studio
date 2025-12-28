@@ -1,6 +1,6 @@
-# SD WebUI
+# sd.cpp Studio
 
-A modern web interface for Stable Diffusion image generation via OpenAI-compatible API.
+A modern web interface for Stable Diffusion image generation via stable-diffusion.cpp.
 
 While this application supports any OpenAI-compatible Images API, it is primarily designed as a GUI for [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
 
@@ -115,7 +115,7 @@ Each model specifies:
 ## Project Structure
 
 ```
-sd-webui/
+sd.cpp-studio/
 ├── backend/           # Express API server
 │   ├── config/        # YAML model configurations
 │   ├── db/           # Database setup and queries

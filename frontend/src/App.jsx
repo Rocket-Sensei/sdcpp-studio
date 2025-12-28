@@ -65,7 +65,7 @@ function App() {
                 {/* Logo */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  <h1 className="text-lg font-bold hidden sm:block">SD WebUI</h1>
+                  <h1 className="text-lg font-bold hidden sm:block">sd.cpp Studio</h1>
                 </div>
 
                 {/* Spacer for balance */}
@@ -102,7 +102,7 @@ function App() {
           {/* Footer */}
           <footer className="border-t border-border py-4 mt-8">
             <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-              SD WebUI - OpenAI-Compatible Image Generation Interface
+              sd.cpp Studio - OpenAI-Compatible Image Generation Interface
             </div>
           </footer>
 
