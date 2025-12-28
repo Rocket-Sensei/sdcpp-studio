@@ -16,7 +16,8 @@
     "models:list": "node backend/scripts/models-cli.js list",
     "models:info": "node backend/scripts/models-cli.js info",
     "models:files": "node backend/scripts/models-cli.js files",
-    "models:running": "node backend/scripts/models-cli.js running"
+    "models:running": "node backend/scripts/models-cli.js running",
+    "test:logging": "node scripts/test-sdcpp-logging.js"
   },
   "keywords": [
     "stable-diffusion",
