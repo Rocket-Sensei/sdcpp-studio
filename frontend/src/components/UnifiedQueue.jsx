@@ -650,19 +650,19 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
                     {canCancel ? (
                       // Cancel button for pending/processing
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="flex-1 min-w-[60px]"
+                        className="flex-shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCancel(generation.id);
                         }}
                       >
-                        <X className="h-3 w-3 mr-1" />
+                        <X className="h-3 w-3 sm:mr-1" />
                         <span className="hidden sm:inline">Cancel</span>
                       </Button>
                     ) : generation.status === GENERATION_STATUS.COMPLETED ? (
@@ -690,13 +690,13 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                       <Button
                         variant="default"
                         size="sm"
-                        className="flex-1 min-w-[60px]"
+                        className="flex-shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRetry(generation);
                         }}
                       >
-                        <RefreshCw className="h-3 w-3 mr-1" />
+                        <RefreshCw className="h-3 w-3 sm:mr-1" />
                         <span className="hidden sm:inline">Retry</span>
                       </Button>
                     )}
@@ -904,72 +904,122 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       </Dialog>
 
       {/* Generation Info Dialog */}
-      <Dialog open={isMobileInfoOpen} onOpenChange={(open) => { setIsMobileInfoOpen(open); if (!open) setMobileInfoGeneration(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Generation Details</DialogTitle>
-            <DialogDescription className="line-clamp-2">
-              {mobileInfoGeneration?.prompt || "No prompt"}
-            </DialogDescription>
-          </DialogHeader>
-          {mobileInfoGeneration && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Box className="h-4 w-4" />
-                <span className="text-sm">Size: {mobileInfoGeneration.size || "512x512"}</span>
-              </div>
-              {mobileInfoGeneration.seed && (
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-sm">Seed: {Math.floor(Number(mobileInfoGeneration.seed))}</span>
+      <TooltipProvider>
+        <Dialog open={isMobileInfoOpen} onOpenChange={(open) => { setIsMobileInfoOpen(open); if (!open) setMobileInfoGeneration(null); }}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Generation Details</DialogTitle>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DialogDescription className="line-clamp-2 cursor-help">
+                    {mobileInfoGeneration?.prompt || "No prompt"}
+                  </DialogDescription>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="whitespace-pre-wrap break-words">{mobileInfoGeneration?.prompt || "No prompt"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </DialogHeader>
+            {mobileInfoGeneration && (
+              <div className="space-y-3">
+                {mobileInfoGeneration.prompt && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Prompt</span>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-sm line-clamp-2 cursor-help pl-6">{mobileInfoGeneration.prompt}</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="whitespace-pre-wrap break-words">{mobileInfoGeneration.prompt}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+                {mobileInfoGeneration.negative_prompt && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      <span>Negative Prompt</span>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-sm line-clamp-2 cursor-help pl-6">{mobileInfoGeneration.negative_prompt}</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="whitespace-pre-wrap break-words">{mobileInfoGeneration.negative_prompt}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Box className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm truncate" title={mobileInfoGeneration.size || "512x512"}>Size: {mobileInfoGeneration.size || "512x512"}</span>
+                  </div>
+                  {mobileInfoGeneration.seed && (
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate" title={Math.floor(Number(mobileInfoGeneration.seed))}>Seed: {Math.floor(Number(mobileInfoGeneration.seed))}</span>
+                    </div>
+                  )}
+                  {mobileInfoGeneration.sample_steps && (
+                    <div className="flex items-center gap-2">
+                      <Box className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm">Steps: {mobileInfoGeneration.sample_steps}</span>
+                    </div>
+                  )}
+                  {mobileInfoGeneration.cfg_scale && (
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm">CFG: {mobileInfoGeneration.cfg_scale}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-              {mobileInfoGeneration.sample_steps && (
                 <div className="flex items-center gap-2">
-                  <Box className="h-4 w-4" />
-                  <span className="text-sm">Steps: {mobileInfoGeneration.sample_steps}</span>
+                  <Cpu className="h-4 w-4 flex-shrink-0" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-sm truncate cursor-help" title={getModelName(mobileInfoGeneration.model)}>Model: {getModelName(mobileInfoGeneration.model)}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>{getModelName(mobileInfoGeneration.model)}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
-              )}
-              {mobileInfoGeneration.cfg_scale && (
+                {(mobileInfoGeneration.model_loading_time_ms !== undefined || mobileInfoGeneration.generation_time_ms !== undefined) && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm">
+                      {mobileInfoGeneration.model_loading_time_ms !== undefined && `Model: ${(mobileInfoGeneration.model_loading_time_ms / 1000).toFixed(1)}s`}
+                      {mobileInfoGeneration.model_loading_time_ms !== undefined && mobileInfoGeneration.generation_time_ms !== undefined && ' • '}
+                      {mobileInfoGeneration.generation_time_ms !== undefined && `Gen: ${(mobileInfoGeneration.generation_time_ms / 1000).toFixed(1)}s`}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
-                  <Cpu className="h-4 w-4" />
-                  <span className="text-sm">CFG: {mobileInfoGeneration.cfg_scale}</span>
+                  <Calendar className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-sm truncate" title={formatDate(mobileInfoGeneration.created_at)}>{formatDate(mobileInfoGeneration.created_at)}</span>
                 </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Cpu className="h-4 w-4" />
-                <span className="text-sm">Model: {getModelName(mobileInfoGeneration.model)}</span>
-              </div>
-              {(mobileInfoGeneration.model_loading_time_ms !== undefined || mobileInfoGeneration.generation_time_ms !== undefined) && (
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-sm">
-                    {mobileInfoGeneration.model_loading_time_ms !== undefined && `Model: ${(mobileInfoGeneration.model_loading_time_ms / 1000).toFixed(1)}s`}
-                    {mobileInfoGeneration.model_loading_time_ms !== undefined && mobileInfoGeneration.generation_time_ms !== undefined && ' • '}
-                    {mobileInfoGeneration.generation_time_ms !== undefined && `Gen: ${(mobileInfoGeneration.generation_time_ms / 1000).toFixed(1)}s`}
-                  </span>
+                  {(() => {
+                    const config = getStatusConfig(mobileInfoGeneration.status);
+                    const StatusIcon = config.icon;
+                    return (
+                      <>
+                        <StatusIcon className={`h-4 w-4 flex-shrink-0 ${config.animate ? 'animate-spin' : ''}`} />
+                        <span className="text-sm capitalize">{config.label}</span>
+                      </>
+                    );
+                  })()}
                 </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm">{formatDate(mobileInfoGeneration.created_at)}</span>
               </div>
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const config = getStatusConfig(mobileInfoGeneration.status);
-                  const StatusIcon = config.icon;
-                  return (
-                    <>
-                      <StatusIcon className={`h-4 w-4 ${config.animate ? 'animate-spin' : ''}`} />
-                      <span className="text-sm capitalize">{config.label}</span>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
+      </TooltipProvider>
 
       {/* Delete All Confirmation Dialog */}
       <Dialog open={isDeleteAllOpen} onOpenChange={(open) => { setIsDeleteAllOpen(open); if (!open) setDeleteFiles(false); }}>
