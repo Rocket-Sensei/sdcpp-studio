@@ -145,9 +145,9 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
     <div className="container mx-auto p-4">
       {/* Main grid layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left sidebar - Generate Panel */}
+        {/* Left sidebar - Generate Panel (desktop only) */}
         {!isFormCollapsed && (
-          <div className="lg:col-span-1">
+          <div className="hidden lg:block lg:col-span-1">
             <GeneratePanel
               selectedModels={selectedModels}
               onModelsChange={handleModelsChange}
@@ -167,12 +167,12 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
         </div>
       </div>
 
-      {/* Floating action button for collapsed form */}
+      {/* Floating action button for collapsed form (desktop only) */}
       {isFormCollapsed && (
         <Button
           onClick={toggleFormCollapse}
           size="lg"
-          className="fixed bottom-6 right-6 rounded-full shadow-lg h-14 w-14 p-0"
+          className="hidden lg:flex fixed bottom-6 right-6 rounded-full shadow-lg h-14 w-14 p-0"
           title="Show Generate Form"
         >
           <Sparkles className="h-6 w-6" />

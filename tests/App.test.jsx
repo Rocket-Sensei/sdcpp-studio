@@ -102,10 +102,11 @@ describe('App Routing', () => {
       expect(screen.getByText('sd.cpp Studio')).toBeInTheDocument();
     });
 
-    it('should render Generate toggle button in header', () => {
+    it('should render Generate buttons (mobile sheet and desktop toggle)', () => {
       renderAppWithRoute(['/studio']);
 
-      expect(screen.getByText('Generate')).toBeInTheDocument();
+      // There should be two "Generate" buttons: one for mobile (Sheet) and one for desktop
+      expect(screen.getAllByText('Generate')).toHaveLength(2);
     });
 
     it('should render WebSocketStatusIndicator', () => {
