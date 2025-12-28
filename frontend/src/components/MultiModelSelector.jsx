@@ -502,11 +502,6 @@ export function MultiModelSelector({
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {model.port && <span className="font-mono">:{model.port}</span>}
-                    <span>•</span>
-                    <span>{model.mode === "preload" ? "Preload" : "On-demand"}</span>
-                  </div>
                 </div>
 
                 {/* Status indicator */}
