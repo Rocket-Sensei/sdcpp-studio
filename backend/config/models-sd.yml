@@ -9,7 +9,7 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/v1-5-pruned-emaonly-fp16.safetensors"
+      - "./models/v1-5-pruned.ckpt"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -23,11 +23,7 @@ models:
       cfg_scale: 7.0
       sample_steps: 30
       sampling_method: "euler_a"
-    huggingface:
-      repo: "runwayml/stable-diffusion-v1-5"
-      files:
-        - path: "v1-5-pruned-emaonly-fp16.safetensors"
-          dest: "./models/"
+
 
   sdxl-turbo:
     name: "SDXL Turbo"

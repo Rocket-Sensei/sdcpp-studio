@@ -4,7 +4,7 @@
 models:
   flux2:
     enabled: false
-    name: "black-forest-labs/FLUX.2-pro"
+    name: "Example"
     description: "External API"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false

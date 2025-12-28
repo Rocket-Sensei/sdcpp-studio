@@ -277,7 +277,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       });
       if (response.ok) {
         toast.success("Generation cancelled");
-        fetchGenerations();
+        fetchGenerations(currentPage);
       } else {
         throw new Error("Failed to cancel");
       }
@@ -293,7 +293,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       });
       if (response.ok) {
         toast.success("Generation deleted");
-        fetchGenerations();
+        fetchGenerations(currentPage);
       } else {
         throw new Error("Failed to delete");
       }
@@ -363,7 +363,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
       if (response.ok) {
         toast.success("Generation requeued");
-        fetchGenerations();
+        fetchGenerations(currentPage);
       } else {
         throw new Error("Failed to retry");
       }
@@ -469,7 +469,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       if (response.ok) {
         const data = await response.json();
         toast.success(`Deleted ${data.count} generation${data.count !== 1 ? 's' : ''}${deleteFiles && data.filesDeleted > 0 ? ` and ${data.filesDeleted} file${data.filesDeleted !== 1 ? 's' : ''}` : ''}`);
-        fetchGenerations();
+        fetchGenerations(currentPage);
       } else {
         throw new Error("Failed to delete all generations");
       }
@@ -489,7 +489,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       if (response.ok) {
         const data = await response.json();
         toast.success(`Cancelled ${data.cancelled} job${data.cancelled !== 1 ? 's' : ''}`);
-        fetchGenerations();
+        fetchGenerations(currentPage);
       } else {
         throw new Error("Failed to cancel all jobs");
       }

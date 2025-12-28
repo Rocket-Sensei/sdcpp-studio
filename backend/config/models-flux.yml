@@ -31,6 +31,37 @@ models:
       sample_steps: 4
       sampling_method: "euler"
 
+  flux1-schnell-fp8-cli:
+    name: "FLUX.1 Schnell FP8 - CLI mode"
+    description: "FLUX.1 Schnell FP8 used via sd-cli"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    # CLI mode command
+    command: "./bin/sd-cli"
+    args:
+      - "--diffusion-model"
+      - "./models/flux1-schnell-Q8_0.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "4"
+    mode: "on_demand"
+    exec_mode: "cli"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 4
+      sampling_method: "euler"
+
+
   fluxed-up-flux-61-q8:
     name: "FluxedUp Flux 61 Q8"
     description: "FluxedUp Flux 61 - Q8 quantized (12GB)"
@@ -97,7 +128,7 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/fuxCapacityNSFWPornFlux_30FP8.safetensors"
+      - "./models/fuxCapacityNSFWPornFlux_40Q80.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--clip_l"

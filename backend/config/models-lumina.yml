@@ -11,9 +11,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/lumina_2.safetensors"
-      - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/lumina-image-2.pth"
+      #- "--vae"
+      #- "./models/ae.safetensors"
       - "--llm"
       - "./models/2b_pt_v2.gguf"
       - "-v"

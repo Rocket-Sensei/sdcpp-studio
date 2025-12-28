@@ -1,17 +1,14 @@
-# Flux Models
 models:
-  # ==================== FluxUnchained Models ====================
-  # FluxUnchained with NF4 quantization
-
-  fluxunchained-nf4:
-    name: "FluxUnchained NF4"
-    description: "FluxUnchained V11 - NF4 quantization"
+  # ==================== Flux Models ====================
+  flux1-schnell-fp8:
+    name: "chroma unlocked v10 Q8_0"
+    description: "chroma unlocked v10 Q8_0"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/fluxUnchainedBySCG_schnfuV13Unet4step.safetensors"
+      - "./models/chroma-unlocked-v10-Q8_0.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--clip_l"
@@ -22,14 +19,15 @@ models:
       - "--offload-to-cpu"
       - "--clip-on-cpu"
       - "--steps"
-      - "4"
+      - "24"
+      - "--chroma-disable-dit-mask"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1537
+    port: 1409
     model_type: "text-to-image"
     default_size: "1024x1024"
     startup_timeout: 120000
     generation_params:
       cfg_scale: 1.0
-      sample_steps: 4
+      sample_steps: 24
       sampling_method: "euler"

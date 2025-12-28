@@ -1,32 +1,6 @@
 # SDXL Models
 # Based on sdcpp/docs/sd.md - SDXL requires VAE for proper operation
 models:
-  # ==================== SDXL Base ====================
-  sd-xl-base:
-    name: "SDXL Base 1.0"
-    description: "Stable Diffusion XL Base 1.0 - requires SDXL VAE"
-    capabilities: ["text-to-image"]
-    supports_negative_prompt: true
-    command: "./bin/sd-server"
-    args:
-      - "-m"
-      - "./models/sd_xl_base_1.0.safetensors"
-      - "--vae"
-      - "./models/sdxl_vae.safetensors"
-      - "-v"
-      - "--offload-to-cpu"
-      - "--steps"
-      - "30"
-    mode: "on_demand"
-    exec_mode: "server"
-    port: 1520
-    model_type: "text-to-image"
-    default_size: "1024x1024"
-    generation_params:
-      cfg_scale: 7.0
-      sample_steps: 30
-      sampling_method: "euler_a"
-
   # ==================== SDXL Finetunes ====================
   # SDXL finetune models - use SDXL VAE
   epicrealism-xl:
@@ -39,7 +13,7 @@ models:
       - "-m"
       - "./models/epicrealismXL_pureFix.safetensors"
       - "--vae"
-      - "./models/sdxl_vae.safetensors"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -64,7 +38,7 @@ models:
       - "-m"
       - "./models/forrealxlV10_v10.safetensors"
       - "--vae"
-      - "./models/sdxl_vae.safetensors"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -72,56 +46,6 @@ models:
     mode: "on_demand"
     exec_mode: "server"
     port: 1522
-    model_type: "text-to-image"
-    default_size: "1024x1024"
-    generation_params:
-      cfg_scale: 7.0
-      sample_steps: 30
-      sampling_method: "euler_a"
-
-  illustrious-xl:
-    name: "Illustrious XL"
-    description: "SDXL architecture - anime/illustration style"
-    capabilities: ["text-to-image"]
-    supports_negative_prompt: true
-    command: "./bin/sd-server"
-    args:
-      - "-m"
-      - "./models/illustriousXL_v01.safetensors"
-      - "--vae"
-      - "./models/sdxl_vae.safetensors"
-      - "-v"
-      - "--offload-to-cpu"
-      - "--steps"
-      - "30"
-    mode: "on_demand"
-    exec_mode: "server"
-    port: 1523
-    model_type: "text-to-image"
-    default_size: "1024x1024"
-    generation_params:
-      cfg_scale: 7.0
-      sample_steps: 30
-      sampling_method: "euler_a"
-
-  hassaku-xl-illustrious:
-    name: "Hassaku XL Illustrious"
-    description: "SDXL architecture - anime style merge"
-    capabilities: ["text-to-image"]
-    supports_negative_prompt: true
-    command: "./bin/sd-server"
-    args:
-      - "-m"
-      - "./models/hassakuXLIllustrious_v21.safetensors"
-      - "--vae"
-      - "./models/sdxl_vae.safetensors"
-      - "-v"
-      - "--offload-to-cpu"
-      - "--steps"
-      - "30"
-    mode: "on_demand"
-    exec_mode: "server"
-    port: 1524
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -139,7 +63,7 @@ models:
       - "-m"
       - "./models/ThinkDiffusionXL.safetensors"
       - "--vae"
-      - "./models/sdxl_vae.safetensors"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -164,7 +88,7 @@ models:
       - "-m"
       - "./models/pornmasterPro_noobV15VAE.safetensors"
       - "--vae"
-      - "./models/sdxl_vae.safetensors"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -189,7 +113,7 @@ models:
       - "-m"
       - "./models/perfectionAmateurILXL_33.safetensors"
       - "--vae"
-      - "./models/sdxl_vae.safetensors"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -214,7 +138,7 @@ models:
       - "-m"
       - "./models/DreamShaperXL_Turbo_dpmppSdeKarras_half_pruned_6.safetensors"
       - "--vae"
-      - "./models/sdxl_vae.safetensors"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
