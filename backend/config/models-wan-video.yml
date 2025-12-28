@@ -1,0 +1,180 @@
+# Wan Video Models Configuration
+# For Wan2.1 and Wan2.2 text-to-video and image-to-video generation
+
+models:
+  # Wan2.1 T2V 1.3B - Text to Video (small/fast)
+  wan-t2v-1.3b:
+    name: "Wan2.1 T2V 1.3B"
+    description: "Fast text-to-video model for quick generations"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/wan2.1_t2v_1.3B_fp16.safetensors"
+      - "--vae"
+      - "../models/wan_2.1_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 6.0
+      sample_steps: 10
+      sampling_method: euler
+
+  # Wan2.1 T2V 14B - Text to Video (high quality)
+  wan-t2v-14b:
+    name: "Wan2.1 T2V 14B"
+    description: "High quality text-to-video generation"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/wan2.1_t2v_14B_fp8_scaled.safetensors"
+      - "--vae"
+      - "../models/wan_2.1_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+      - "--offload-to-cpu"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 6.0
+      sample_steps: 10
+      sampling_method: euler
+
+  # Wan2.1 I2V 14B 480P - Image to Video
+  wan-i2v-14b-480p:
+    name: "Wan2.1 I2V 14B 480P"
+    description: "Image to video generation at 480p"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/wan2.1_i2v_720p_14B_fp8_scaled.safetensors"
+      - "--vae"
+      - "../models/wan_2.1_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--clip_vision"
+      - "../models/clip_vision_h.safetensors"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+      - "--offload-to-cpu"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 6.0
+      sample_steps: 10
+      sampling_method: euler
+
+  # Wan2.2 T2V A14B - Text to Video (dual-noise)
+  wan2.2-t2v-a14b:
+    name: "Wan2.2 T2V A14B"
+    description: "Advanced text-to-video with dual noise models"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+      - "--high-noise-diffusion-model"
+      - "../models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
+      - "--vae"
+      - "../models/wan_2.1_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+      - "--high-noise-sampling-method"
+      - euler
+      - "--high-noise-steps"
+      - "8"
+      - "--offload-to-cpu"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 3.5
+      sample_steps: 10
+      sampling_method: euler
+
+  # Wan2.2 I2V A14B - Image to Video (dual-noise)
+  wan2.2-i2v-a14b:
+    name: "Wan2.2 I2V A14B"
+    description: "Advanced image-to-video with dual noise models"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+      - "--high-noise-diffusion-model"
+      - "../models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
+      - "--vae"
+      - "../models/wan_2.1_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--clip_vision"
+      - "../models/clip_vision_h.safetensors"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+      - "--high-noise-sampling-method"
+      - euler
+      - "--high-noise-steps"
+      - "8"
+      - "--offload-to-cpu"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 3.5
+      sample_steps: 10
+      sampling_method: euler
+
+  # Wan2.2 TI2V 5B - Text/Image to Video (unified)
+  wan2.2-ti2v-5b:
+    name: "Wan2.2 TI2V 5B"
+    description: "Unified text/image-to-video model with wan2.2 VAE"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/wan2.2_ti2v_5B_fp16.safetensors"
+      - "--vae"
+      - "../models/wan2.2_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+      - "--offload-to-cpu"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 6.0
+      sample_steps: 10
+      sampling_method: euler

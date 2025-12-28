@@ -109,7 +109,7 @@ class CLIHandler {
   }
 
   /**
-   * Generate a single image using CLI mode
+   * Generate a single image/video using CLI mode
    * @param {string} modelId - Model identifier
    * @param {Object} params - Generation parameters
    * @param {string} params.prompt - Text prompt for generation
@@ -119,19 +119,28 @@ class CLIHandler {
    * @param {number} [params.n=1] - Number of images to generate
    * @param {string} [params.quality='medium'] - Quality level
    * @param {string} [params.style] - Style preset
-   * @param {string} [params.type] - Generation type ('generate', 'edit', 'variation')
-   * @param {string} [params.input_image_path] - Path to input image for img2img
+   * @param {string} [params.type] - Generation type ('generate', 'edit', 'variation', 'video')
+   * @param {string} [params.input_image_path] - Path to input image for img2img/video
    * @param {number} [params.strength=0.75] - Strength for img2img (variation)
+   * @param {number} [params.video_frames] - Number of video frames
+   * @param {number} [params.video_fps] - Video FPS
+   * @param {number} [params.flow_shift] - Flow shift value for Wan models
+   * @param {string} [params.end_image_path] - Path to end image for FLF2V
    * @param {Object} modelConfig - Model configuration from models.yml
    * @param {string} [generationId] - Optional generation ID for logging
-   * @returns {Promise<Buffer>} Generated image as a Buffer
+   * @returns {Promise<Buffer>} Generated image/video as a Buffer
    */
   async generateImage(modelId, params, modelConfig, generationId = null) {
     // Build the CLI command
     const command = this.buildCommand(modelConfig, params);
 
+    // Determine output extension based on type
+    const type = params.type || 'generate';
+    const isVideo = type === 'video' || modelConfig.model_type === 'video';
+    const fileExtension = isVideo ? 'avi' : 'png';
+
     // Generate unique output path
-    const outputFileName = `img_${modelId}_${randomUUID()}.png`;
+    const outputFileName = `img_${modelId}_${randomUUID()}.${fileExtension}`;
     const outputPath = path.join(this.tempDir, outputFileName);
 
     // Add output path to command
@@ -171,6 +180,7 @@ class CLIHandler {
    * @param {Object} modelConfig - Model configuration
    * @param {string} modelConfig.command - Command to execute (e.g., "./build/bin/sd")
    * @param {string[]} [modelConfig.args] - Base arguments from config
+   * @param {string} [modelConfig.model_type] - Model type ('image', 'video', etc.)
    * @param {Object} params - Generation parameters
    * @returns {string[]} Command and arguments array
    */
@@ -190,21 +200,43 @@ class CLIHandler {
     const quality = params.quality; // Don't default to 'medium' - let sample_steps or model default take precedence
     const style = params.style;
     const n = params.n || 1;
-    const type = params.type || 'generate'; // 'generate', 'edit', 'variation'
+    const type = params.type || 'generate'; // 'generate', 'edit', 'variation', 'video'
+    const isVideo = type === 'video' || modelConfig.model_type === 'video';
 
     // Parse dimensions
     const { width, height } = parseSize(size);
 
-    // For img2img (variation) mode, add input image and strength
-    if (type === 'variation' || type === 'edit') {
+    // Video-specific parameters
+    if (isVideo) {
+      // Video frames (default 33 for ~1 second at 24fps)
+      const videoFrames = params.video_frames ?? 33;
+      cmd.push('--video-frames', videoFrames.toString());
+
+      // Video FPS (default 24)
+      const videoFps = params.video_fps ?? 24;
+      cmd.push('--fps', videoFps.toString());
+
+      // Flow shift (Wan-specific)
+      if (params.flow_shift !== undefined) {
+        cmd.push('--flow-shift', params.flow_shift.toString());
+      }
+
+      // End image for FLF2V (First-Last Frame to Video)
+      if (params.end_image_path) {
+        cmd.push('--end-img', params.end_image_path);
+      }
+    }
+
+    // For img2img (variation) mode or video with init image, add input image and strength
+    if ((type === 'variation' || type === 'edit') || (isVideo && params.input_image_path)) {
       if (params.input_image_path) {
         cmd.push('--init-img', params.input_image_path);
 
-        // Add strength parameter for variation mode
-        // Strength controls how much the original image is preserved
-        // Default: 0.75 (balanced variation)
-        const strength = params.strength !== undefined ? params.strength : 0.75;
-        cmd.push('--strength', String(strength));
+        // Add strength parameter for variation mode (not for video)
+        if (type === 'variation') {
+          const strength = params.strength !== undefined ? params.strength : 0.75;
+          cmd.push('--strength', String(strength));
+        }
       }
     }
 
@@ -354,38 +386,39 @@ class CLIHandler {
   }
 
   /**
-   * Parse CLI output to extract the generated image path
+   * Parse CLI output to extract the generated image/video path
    * @param {string} output - Combined stdout/stderr from CLI
    * @param {string} fallbackPath - Default path if parsing fails
-   * @returns {string} Path to the generated image
+   * @returns {string} Path to the generated image/video
    */
   parseOutput(output, fallbackPath) {
-    // SD-CPP CLI typically outputs the image path in various formats:
+    // SD-CPP CLI typically outputs the image/video path in various formats:
     // - "Saved image to: /path/to/image.png"
     // - "Output: /path/to/image.png"
     // - "/path/to/image.png"
     // - "Writing to /path/to/image.png"
+    // - For video: .avi extension
 
     const patterns = [
       /Saved image to:\s*(.+?)(?:\r?\n|$)/i,
       /Output:\s*(.+?)(?:\r?\n|$)/i,
       /Writing to\s+(.+?)(?:\r?\n|$)/i,
       /Generated:\s*(.+?)(?:\r?\n|$)/i,
-      // Last resort: any absolute path ending in .png
-      /^(\/.+?\.png)$/m,
+      // Last resort: any absolute path ending in .png, .avi, .mp4, .webm
+      /^(\/.+?\.(?:png|avi|mp4|webm))$/m,
     ];
 
     for (const pattern of patterns) {
       const match = output.match(pattern);
       if (match && match[1]) {
-        const imagePath = match[1].trim();
-        logger.debug({ imagePath }, 'Parsed image path');
-        return imagePath;
+        const outputPath = match[1].trim();
+        logger.debug({ outputPath }, 'Parsed output path');
+        return outputPath;
       }
     }
 
     // If no pattern matches, use the fallback path
-    logger.warn({ fallbackPath }, 'Could not parse image path from output, using fallback');
+    logger.warn({ fallbackPath }, 'Could not parse output path from output, using fallback');
     return fallbackPath;
   }
 

@@ -107,6 +107,9 @@ export function initializeDatabase() {
       width INTEGER,
       height INTEGER,
       revised_prompt TEXT,
+      is_video INTEGER DEFAULT 0,
+      video_frames INTEGER,
+      video_fps INTEGER,
       FOREIGN KEY (generation_id) REFERENCES generations(id) ON DELETE CASCADE
     )
   `);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Wand2, Upload, Image as ImageIcon, Sparkles, List,
-  ChevronDown, ChevronUp, Download, Loader2, MinusCircle, ChevronLeft, ChevronRight
+  ChevronDown, ChevronUp, Download, Loader2, MinusCircle, ChevronLeft, ChevronRight, Video
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -21,10 +21,11 @@ import { MultiModelSelector } from "./MultiModelSelector";
 const FORM_STATE_KEY = "sd-cpp-studio-generate-form-state";
 
 const MODES = [
-  { value: "txt2img", label: "Text to Image", icon: Wand2, needsImage: false },
-  { value: "img2img", label: "Image to Image", icon: ImageIcon, needsImage: true },
-  { value: "imgedit", label: "Image Edit", icon: ImageIcon, needsImage: true },
-  { value: "upscale", label: "Upscale", icon: ImageIcon, needsImage: true },
+  { value: "txt2img", label: "T2I", icon: Wand2, needsImage: false, description: "Text to Image" },
+  { value: "img2img", label: "I2I", icon: ImageIcon, needsImage: true, description: "Image to Image" },
+  { value: "imgedit", label: "Edit", icon: ImageIcon, needsImage: true, description: "Image Edit" },
+  { value: "video", label: "Video", icon: Video, needsImage: false, description: "Text/Image to Video" },
+  { value: "upscale", label: "Upscale", icon: ImageIcon, needsImage: true, description: "Upscale" },
 ];
 
 // Size presets for quick selection
@@ -135,6 +136,15 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
   const [upscaleResizeMode, setUpscaleResizeMode] = useState(0);
   const [upscalerName, setUpscalerName] = useState("RealESRGAN 4x+");
   const [availableUpscalers, setAvailableUpscalers] = useState([]);
+
+  // Video settings
+  const [videoFrames, setVideoFrames] = useState(33);
+  const [videoFps, setVideoFps] = useState(24);
+  const [flowShift, setFlowShift] = useState(false);
+  const [flowShiftValue, setFlowShiftValue] = useState(3.0);
+  const [endImage, setEndImage] = useState(null);
+  const [endImagePreview, setEndImagePreview] = useState(null);
+  const endImageInputRef = useRef(null);
 
   // SD.cpp Advanced Settings
   const [cfgScale, setCfgScale] = useState(2.5);
@@ -340,6 +350,10 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
       samplingMethod,
       sampleSteps,
       clipSkip,
+      videoFrames,
+      videoFps,
+      flowShift,
+      flowShiftValue,
     };
 
     try {
@@ -352,6 +366,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
     mode, prompt, negativePrompt, width, height, seed, n, useQueue,
     strength, upscaleFactor, upscalerName, upscaleResizeMode, upscaleAfterGeneration,
     cfgScale, samplingMethod, sampleSteps, clipSkip,
+    videoFrames, videoFps, flowShift, flowShiftValue,
     settings, editImageSettings,
   ]);
 
@@ -384,6 +399,10 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
         if (formState.samplingMethod !== undefined) setSamplingMethod(formState.samplingMethod);
         if (formState.sampleSteps !== undefined) setSampleSteps(formState.sampleSteps);
         if (formState.clipSkip !== undefined) setClipSkip(formState.clipSkip);
+        if (formState.videoFrames !== undefined) setVideoFrames(formState.videoFrames);
+        if (formState.videoFps !== undefined) setVideoFps(formState.videoFps);
+        if (formState.flowShift !== undefined) setFlowShift(formState.flowShift);
+        if (formState.flowShiftValue !== undefined) setFlowShiftValue(formState.flowShiftValue);
       }
     } catch (err) {
       // Ignore localStorage errors (e.g., invalid JSON)
@@ -432,6 +451,37 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
     }
   };
 
+  const handleEndImageFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Image size must be less than 50MB");
+      return;
+    }
+
+    setEndImage(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setEndImagePreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearEndImage = () => {
+    setEndImage(null);
+    setEndImagePreview(null);
+    if (endImageInputRef.current) {
+      endImageInputRef.current.value = "";
+    }
+  };
+
   const handleGenerate = async () => {
     if (selectedModels.length === 0) {
       toast.error("Please select at least one model");
@@ -439,7 +489,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
     }
 
     // Validate based on mode
-    if (mode !== "upscale" && !prompt.trim()) {
+    if (mode !== "upscale" && mode !== "video" && !prompt.trim()) {
       toast.error("Please enter a prompt");
       return;
     }
@@ -470,6 +520,21 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
         sample_steps: sampleSteps,
         clip_skip: clipSkip,
       };
+
+      // Video-specific parameters
+      if (mode === "video") {
+        baseParams.video_frames = videoFrames;
+        baseParams.video_fps = videoFps;
+        if (flowShift) {
+          baseParams.flow_shift = flowShiftValue;
+        }
+        if (sourceImage) {
+          baseParams.image = sourceImage;
+        }
+        if (endImage) {
+          baseParams.end_image = endImage;
+        }
+      }
 
       // Add image for img2img modes
       if ((mode === "img2img" || mode === "imgedit") && sourceImage) {
@@ -586,6 +651,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
           {mode === "txt2img" && "Generate images from text descriptions"}
           {mode === "img2img" && "Create variations of images"}
           {mode === "imgedit" && "Edit and transform images"}
+          {mode === "video" && "Generate videos from text or images"}
           {mode === "upscale" && "Enhance and upscale images"}
         </CardDescription>
       </CardHeader>
@@ -631,7 +697,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
           {/* Mode Selector */}
           <div className="space-y-2">
             <Label>Generation Mode</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {MODES.map((modeOption) => {
                 const Icon = modeOption.icon;
                 return (
@@ -639,14 +705,15 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
                     key={modeOption.value}
                     onClick={() => setMode(modeOption.value)}
                     className={cn(
-                      "flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center transition-colors",
+                      "flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors",
                       mode === modeOption.value
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border hover:border-primary/50"
                     )}
+                    title={modeOption.description}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-xs">{modeOption.label}</span>
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-xs font-medium">{modeOption.label}</span>
                   </button>
                 );
               })}
@@ -730,6 +797,8 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
                       ? "A serene landscape with rolling hills, a small cottage with a thatched roof, golden hour lighting..."
                       : mode === "imgedit"
                       ? "Transform this image into a watercolor painting..."
+                      : mode === "video"
+                      ? "A lovely cat running through a field of flowers..."
                       : "Create a variation of this image..."
                   }
                   value={prompt}
@@ -775,6 +844,132 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
               <p className="text-xs text-muted-foreground">
                 How much to transform the source image. Lower = closer to original, Higher = more different.
               </p>
+            </div>
+          )}
+
+          {/* Video Settings */}
+          {mode === "video" && (
+            <div className="space-y-4 bg-muted/50 rounded-lg p-4">
+              <h3 className="font-semibold">Video Settings</h3>
+
+              {/* Video Frames */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="video-frames">Frames: {videoFrames}</Label>
+                </div>
+                <Slider
+                  id="video-frames"
+                  min={1}
+                  max={300}
+                  step={1}
+                  value={[videoFrames]}
+                  onValueChange={(v) => setVideoFrames(v[0])}
+                  disabled={isLoading || isUpscaling}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of frames to generate (1 for single image, ~33 for 1 second video at 24fps)
+                </p>
+              </div>
+
+              {/* Video FPS */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="video-fps">FPS: {videoFps}</Label>
+                </div>
+                <Slider
+                  id="video-fps"
+                  min={1}
+                  max={60}
+                  step={1}
+                  value={[videoFps]}
+                  onValueChange={(v) => setVideoFps(v[0])}
+                  disabled={isLoading || isUpscaling}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Flow Shift */}
+              <div className="flex items-center justify-between p-3 bg-background rounded-lg">
+                <div className="space-y-0.5">
+                  <Label htmlFor="flow-shift">Enable Flow Shift</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Wan-specific parameter for motion control
+                  </p>
+                </div>
+                <Switch
+                  id="flow-shift"
+                  checked={flowShift}
+                  onCheckedChange={setFlowShift}
+                  disabled={isLoading || isUpscaling}
+                />
+              </div>
+
+              {flowShift && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="flow-shift-value">Flow Shift Value: {flowShiftValue.toFixed(1)}</Label>
+                  </div>
+                  <Slider
+                    id="flow-shift-value"
+                    min={1.0}
+                    max={12.0}
+                    step={0.1}
+                    value={[flowShiftValue]}
+                    onValueChange={(v) => setFlowShiftValue(v[0])}
+                    disabled={isLoading || isUpscaling}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Controls motion intensity. Higher = more motion.
+                  </p>
+                </div>
+              )}
+
+              {/* End Image (for FLF2V - First-Last Frame to Video) */}
+              <div className="space-y-2">
+                <Label>End Frame Image (Optional - for FLF2V)</Label>
+                <div className="flex items-center gap-4">
+                  {endImagePreview ? (
+                    <div className="relative group">
+                      <img
+                        src={endImagePreview}
+                        alt="End frame"
+                        className="w-32 h-32 object-cover rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={handleClearEndImage}
+                        disabled={isLoading || isUpscaling}
+                      >
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className="w-32 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => endImageInputRef.current?.click()}
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">Upload</span>
+                    </div>
+                  )}
+                  <input
+                    ref={endImageInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleEndImageFileSelect}
+                    className="hidden"
+                    disabled={isLoading || isUpscaling}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload an end frame for First-Last Frame to Video (FLF2V) generation
+                </p>
+              </div>
             </div>
           )}
 

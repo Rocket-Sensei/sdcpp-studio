@@ -349,7 +349,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
 
       // Switch to img2img mode
-      fireEvent.click(screen.getByText('Image to Image'));
+      fireEvent.click(screen.getByText('I2I'));
 
       // Negative prompt should still not be visible
       await waitFor(() => {
@@ -369,7 +369,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
 
       // Switch to img2img mode
-      fireEvent.click(screen.getByText('Image to Image'));
+      fireEvent.click(screen.getByText('I2I'));
 
       // Negative prompt should still be visible in img2img mode
       await waitFor(() => {
@@ -389,7 +389,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
 
       // Switch to imagedit mode
-      fireEvent.click(screen.getByText('Image Edit'));
+      fireEvent.click(screen.getByText('Edit'));
 
       // Negative prompt should still be visible in imagedit mode
       await waitFor(() => {
