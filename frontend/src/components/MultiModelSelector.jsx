@@ -481,7 +481,7 @@ export function MultiModelSelector({
               )}
             >
               {/* Main row */}
-              <div className="flex items-center gap-3 p-3">
+              <div className="flex items-center gap-3 p-1">
                 {/* Expand/collapse button */}
                 <button
                   onClick={() => toggleExpand(model.id)}
@@ -573,7 +573,7 @@ export function MultiModelSelector({
 
               {/* Expanded details */}
               {isExpanded && (
-                <div className="border-t border-border bg-muted/30 p-3 space-y-2 text-sm">
+                <div className="border-t border-border bg-muted/30 p-1 space-y-2 text-sm">
                   {model.description && (
                     <div>
                       <span className="text-muted-foreground">Description: </span>
