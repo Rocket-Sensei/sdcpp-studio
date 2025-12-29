@@ -4,8 +4,8 @@ models:
   # FluxUnchained with NF4 quantization
 
   fluxunchained-nf4:
-    name: "FluxUnchained NF4"
-    description: "FluxUnchained V11 - NF4 quantization"
+    name: "FluxUnchained v13"
+    description: "FluxUnchained V13"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"

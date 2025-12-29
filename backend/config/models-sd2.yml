@@ -10,12 +10,19 @@ models:
     args:
       - "--diffusion-model"
       - "./models/v2-1_768-ema-pruned.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
       - "--clip_g"
       - "./models/clip_g.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "--vae"
+      - "./models/sd35-vae.safetensors"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--steps"
-      - "30"
+      - "25"
     mode: "on_demand"
     exec_mode: "server"
     port: 1533
@@ -23,5 +30,5 @@ models:
     default_size: "768x768"
     generation_params:
       cfg_scale: 7.0
-      sample_steps: 30
+      sample_steps: 25
       sampling_method: "euler_a"

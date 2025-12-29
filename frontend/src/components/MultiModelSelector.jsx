@@ -40,23 +40,18 @@ const DOWNLOAD_STATUS = {
 /**
  * Filter models based on mode
  * @param {Array} allModels - All models from API
- * @param {string} mode - Mode to filter by ('txt2img', 'img2img', 'imgedit', 'video', 'upscale')
+ * @param {string} mode - Mode to filter by ('image', 'imgedit', 'video', 'upscale')
  * @returns {Array} Filtered models
  */
 const filterModels = (allModels, mode) => {
   switch (mode) {
-    case "txt2img":
-      // Only models with text-to-image capability (exclude video models)
-      return allModels.filter((m) =>
-        m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video")
-      );
-    case "img2img":
-      // All models support img2img via --init-img (exclude video models)
+    case "image":
+      // All models with text-to-image capability support both T2I and I2I (exclude video models)
       return allModels.filter((m) =>
         m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video")
       );
     case "imgedit":
-      // Only models with imgedit capability support --ref-image (exclude video models)
+      // Only models with imagedit capability support --ref-image (exclude video models)
       return allModels.filter((m) =>
         m.capabilities?.includes("imgedit") && !m.capabilities?.includes("video")
       );
@@ -79,7 +74,7 @@ const filterModels = (allModels, mode) => {
  * @param {string[]} props.selectedModels - Array of selected model IDs
  * @param {function} props.onModelsChange - Callback when model selection changes
  * @param {string[]} props.filterCapabilities - Optional capability filter (e.g., ['text-to-image'])
- * @param {string} props.mode - Mode for filtering ('txt2img', 'img2img', 'imgedit', 'upscale')
+ * @param {string} props.mode - Mode for filtering ('image', 'imgedit', 'video', 'upscale')
  * @param {string} props.className - Additional CSS classes
  */
 export function MultiModelSelector({

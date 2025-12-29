@@ -21,8 +21,7 @@ import { MultiModelSelector } from "./MultiModelSelector";
 const FORM_STATE_KEY = "sd-cpp-studio-generate-form-state";
 
 const MODES = [
-  { value: "txt2img", label: "T2I", icon: Wand2, needsImage: false, description: "Text to Image" },
-  { value: "img2img", label: "I2I", icon: ImageIcon, needsImage: true, description: "Image to Image" },
+  { value: "image", label: "Image", icon: ImageIcon, needsImage: false, optionalImage: true, description: "Text to Image / Image to Image" },
   { value: "imgedit", label: "Edit", icon: ImageIcon, needsImage: true, description: "Image Edit" },
   { value: "video", label: "Video", icon: Video, needsImage: false, description: "Text/Image to Video" },
   { value: "upscale", label: "Upscale", icon: ImageIcon, needsImage: true, description: "Upscale" },
@@ -93,7 +92,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
   const editImageUrlRef = useRef(null); // Track object URL for cleanup
 
   // Mode selection
-  const [mode, setMode] = useState("txt2img");
+  const [mode, setMode] = useState("image");
 
   // Common settings
   const [prompt, setPrompt] = useState("");
@@ -241,7 +240,8 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
       }
       if (settings.strength !== undefined) setStrength(settings.strength);
       if (settings.type === 'edit' || settings.type === 'variation') {
-        setMode(settings.type === 'edit' ? 'imgedit' : 'img2img');
+        // For backwards compatibility, map both 'variation' and 'edit' to appropriate modes
+        setMode(settings.type === 'edit' ? 'imgedit' : 'image');
       }
 
       // Load source image for edit/variation modes
@@ -379,7 +379,13 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
         const formState = JSON.parse(savedState);
 
         // Only restore fields that exist in saved state
-        if (formState.mode !== undefined) setMode(formState.mode);
+        if (formState.mode !== undefined) {
+          // Map old modes to new modes for backwards compatibility
+          const mappedMode = formState.mode === 'txt2img' || formState.mode === 'img2img'
+            ? 'image'
+            : formState.mode;
+          setMode(mappedMode);
+        }
         if (formState.prompt !== undefined) setPrompt(formState.prompt);
         if (formState.negativePrompt !== undefined) setNegativePrompt(formState.negativePrompt);
         if (formState.width !== undefined) setWidth(formState.width);
@@ -411,9 +417,12 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
 
   const getApiMode = useCallback((modeValue) => {
     if (modeValue === "imgedit") return "edit";
-    if (modeValue === "img2img") return "variation";
+    // "image" mode: use "variation" if source image is provided, otherwise "generate"
+    if (modeValue === "image") {
+      return sourceImage ? "variation" : "generate";
+    }
     return "generate";
-  }, []);
+  }, [sourceImage]);
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -534,12 +543,12 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
       }
 
       // Add image for img2img modes
-      if ((mode === "img2img" || mode === "imgedit") && sourceImage) {
+      if ((mode === "image" || mode === "imgedit") && sourceImage) {
         baseParams.image = sourceImage;
       }
 
-      // Add strength for img2img
-      if (mode === "img2img") {
+      // Add strength for image mode when source image is provided
+      if (mode === "image" && sourceImage) {
         baseParams.strength = strength;
       }
 
@@ -669,7 +678,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
           {/* Mode Selector */}
           <div className="space-y-2">
             <Label>Generation Mode</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {MODES.map((modeOption) => {
                 const Icon = modeOption.icon;
                 return (
@@ -701,9 +710,9 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
           />
 
           {/* Image Upload for modes that need it */}
-          {currentModeConfig.needsImage && (
+          {(currentModeConfig.needsImage || currentModeConfig.optionalImage) && (
             <div className="space-y-2">
-              <Label>Source Image *</Label>
+              <Label>Source Image {currentModeConfig.needsImage ? "*" : "(Optional)"}</Label>
               <div className="flex items-center gap-4">
                 {(upscaleResult || sourceImagePreview) ? (
                   <div className="relative group">
@@ -765,13 +774,15 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
                 <Textarea
                   id="prompt"
                   placeholder={
-                    mode === "txt2img"
-                      ? "A serene landscape with rolling hills, a small cottage with a thatched roof, golden hour lighting..."
+                    mode === "image"
+                      ? sourceImage
+                        ? "Transform this image into a watercolor painting..."
+                        : "A serene landscape with rolling hills, a small cottage with a thatched roof, golden hour lighting..."
                       : mode === "imgedit"
                       ? "Transform this image into a watercolor painting..."
                       : mode === "video"
                       ? "A lovely cat running through a field of flowers..."
-                      : "Create a variation of this image..."
+                      : "Describe your image..."
                   }
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -797,8 +808,8 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
             </>
           )}
 
-          {/* Strength slider for img2img mode */}
-          {mode === "img2img" && (
+          {/* Strength slider for image mode when source image is provided (img2img functionality) */}
+          {mode === "image" && sourceImage && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="strength">Strength: {strength.toFixed(2)}</Label>

@@ -1,6 +1,5 @@
 models:
-  # ==================== Flux Models ====================
-  flux1-schnell-fp8:
+  chroma-unlocked:
     name: "chroma unlocked v10 Q8_0"
     description: "chroma unlocked v10 Q8_0"
     capabilities: ["text-to-image"]

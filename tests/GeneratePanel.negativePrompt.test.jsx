@@ -303,7 +303,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
         onModelsChange: mockOnModelsChange,
       }));
 
-      // First verify negative prompt is shown in txt2img mode
+      // First verify negative prompt is shown in image mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
@@ -323,7 +323,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
         onModelsChange: mockOnModelsChange,
       }));
 
-      // First verify negative prompt is shown in txt2img mode
+      // First verify negative prompt is shown in image mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
@@ -337,19 +337,19 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
     });
 
-    it('should keep negative prompt hidden in img2img mode when FLUX model is selected', async () => {
+    it('should keep negative prompt hidden in image mode when FLUX model is selected', async () => {
       render(React.createElement(GeneratePanel, {
         selectedModels: ['flux1-schnell'],
         onModelsChange: mockOnModelsChange,
       }));
 
-      // Verify negative prompt is not shown initially
+      // Verify negative prompt is not shown initially (image mode with FLUX)
       await waitFor(() => {
         expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
       });
 
-      // Switch to img2img mode
-      fireEvent.click(screen.getByText('I2I'));
+      // Switch to edit mode
+      fireEvent.click(screen.getByText('Edit'));
 
       // Negative prompt should still not be visible
       await waitFor(() => {
@@ -357,38 +357,38 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
     });
 
-    it('should show negative prompt in img2img mode when SD1.5 model is selected', async () => {
+    it('should show negative prompt in image mode when SD1.5 model is selected', async () => {
       render(React.createElement(GeneratePanel, {
         selectedModels: ['v1-5-pruned'],
         onModelsChange: mockOnModelsChange,
       }));
 
-      // First verify negative prompt is shown in txt2img mode
+      // Verify negative prompt is shown in image mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
 
-      // Switch to img2img mode
-      fireEvent.click(screen.getByText('I2I'));
+      // Switch to edit mode
+      fireEvent.click(screen.getByText('Edit'));
 
-      // Negative prompt should still be visible in img2img mode
+      // Negative prompt should still be visible in edit mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
     });
 
-    it('should show negative prompt in imagedit mode when Pony model is selected', async () => {
+    it('should show negative prompt in edit mode when Pony model is selected', async () => {
       render(React.createElement(GeneratePanel, {
         selectedModels: ['cyberrealistic-pony'],
         onModelsChange: mockOnModelsChange,
       }));
 
-      // First verify negative prompt is shown in txt2img mode
+      // First verify negative prompt is shown in image mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
 
-      // Switch to imagedit mode
+      // Switch to edit mode
       fireEvent.click(screen.getByText('Edit'));
 
       // Negative prompt should still be visible in imagedit mode

@@ -141,33 +141,17 @@ describe('MultiModelSelector', () => {
       });
     });
 
-    it('should filter models by mode (txt2img)', async () => {
+    it('should filter models by mode (image)', async () => {
       render(
         <MultiModelSelector
           selectedModels={[]}
           onModelsChange={mockOnModelsChange}
-          mode="txt2img"
+          mode="image"
         />
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
-        expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
-        expect(screen.getByText('CLI Model')).toBeInTheDocument();
-      });
-    });
-
-    it('should filter models by mode (img2img)', async () => {
-      render(
-        <MultiModelSelector
-          selectedModels={[]}
-          onModelsChange={mockOnModelsChange}
-          mode="img2img"
-        />
-      );
-
-      await waitFor(() => {
-        // All models support img2img via --init-img
+        // All text-to-image models support both T2I and I2I
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
         expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
         expect(screen.getByText('CLI Model')).toBeInTheDocument();

@@ -2,20 +2,28 @@
 # Based on sdcpp/docs/sd.md and sdcpp/docs/sd3.md
 models:
   # ==================== SD3 Medium ====================
-  # SD3 Medium with included CLIP and T5XXL - self-contained
-  sd3-medium-fp16:
-    name: "SD3 Medium FP16"
-    description: "Stable Diffusion 3 Medium - 2B params with included CLIP and T5XXL (FP16)"
+  sd3-medium:
+    name: "SD3.5 Medium"
+    description: "Stable Diffusion 3.5 Medium"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/sd3_medium_incl_clips_t5xxlfp16.safetensors"
+      - "./models/sd3.5_medium.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--clip_g"
+      - "./models/clip_g.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "--vae"
+      - "./models/sd35-vae.safetensors"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--steps"
-      - "30"
+      - "28"
     mode: "on_demand"
     exec_mode: "server"
     port: 1538
@@ -23,50 +31,34 @@ models:
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 4.5
-      sample_steps: 30
+      sample_steps: 28
       sampling_method: "euler"
 
-  sd3-medium-fp8:
-    name: "SD3 Medium FP8"
-    description: "Stable Diffusion 3 Medium - 2B params with included CLIP and T5XXL (FP8)"
+  sd35-medium:
+    name: "SD3.5 Medium"
+    description: "Stable Diffusion 3.5 Medium"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/sd3_medium_incl_clips_t5xxlfp8.safetensors"
+      - "./models/sd3.5_medium.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--clip_g"
+      - "./models/clip_g.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "--vae"
+      - "./models/sd35-vae.safetensors"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--steps"
-      - "30"
+      - "40"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1539
-    model_type: "text-to-image"
-    default_size: "1024x1024"
-    generation_params:
-      cfg_scale: 4.5
-      sample_steps: 30
-      sampling_method: "euler"
-
-  # ==================== SD3.5 Medium ====================
-  # SD3.5 Medium with included CLIP and T5XXL - self-contained
-  sd3.5-medium-fp8:
-    name: "SD3.5 Medium FP8"
-    description: "Stable Diffusion 3.5 Medium with included CLIP and T5XXL (FP8 scaled)"
-    capabilities: ["text-to-image"]
-    supports_negative_prompt: true
-    command: "./bin/sd-server"
-    args:
-      - "--diffusion-model"
-      - "./models/sd3.5_medium_incl_clips_t5xxlfp8scaled.safetensors"
-      - "-v"
-      - "--offload-to-cpu"
-      - "--steps"
-      - "30"
-    mode: "on_demand"
-    exec_mode: "server"
-    port: 1540
+    port: 1538
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -91,11 +83,13 @@ models:
       - "./models/clip_g.safetensors"
       - "--t5xxl"
       - "./models/t5xxl_fp16.safetensors"
+      - "--vae"
+      - "./models/sd35-vae.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
       - "--steps"
-      - "30"
+      - "28"
     mode: "on_demand"
     exec_mode: "server"
     port: 1541
@@ -103,5 +97,5 @@ models:
     default_size: "1024x1024"
     generation_params:
       cfg_scale: 4.5
-      sample_steps: 30
+      sample_steps: 28
       sampling_method: "euler"
