@@ -455,6 +455,11 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     setIsFailedLogsOpen(true);
   };
 
+  const handleViewLogs = (generation) => {
+    setFailedLogsGeneration(generation);
+    setIsFailedLogsOpen(true);
+  };
+
   const handleViewMobileInfo = (generation) => {
     setMobileInfoGeneration(generation);
     setIsMobileInfoOpen(true);
@@ -760,6 +765,24 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                         </TooltipContent>
                       </Tooltip>
                     )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewLogs(generation);
+                          }}
+                        >
+                          <Terminal className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>View logs</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   {/* Model name at bottom right */}
                   {generation.model && (
@@ -884,7 +907,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       <Dialog open={isFailedLogsOpen} onOpenChange={(open) => { setIsFailedLogsOpen(open); if (!open) setFailedLogsGeneration(null); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Generation Logs - {failedLogsGeneration?.status === GENERATION_STATUS.FAILED ? "Failed" : "Cancelled"}</DialogTitle>
+            <DialogTitle>Generation Logs{failedLogsGeneration?.status === GENERATION_STATUS.FAILED ? " - Failed" : failedLogsGeneration?.status === GENERATION_STATUS.CANCELLED ? " - Cancelled" : ""}</DialogTitle>
             <DialogDescription>
               {failedLogsGeneration?.prompt || "No prompt"}
             </DialogDescription>
