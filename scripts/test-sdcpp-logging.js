@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 /**
- * Test script to verify sd.cpp logs are properly tagged with generation_id
+ * Test script to verify sd.cpp logs are properly tagged
  *
  * This script:
  * 1. Runs an actual generation using flux1-schnell-fp8 (server mode)
+ *    - Server mode logs should have modelId tag (not generation_id)
+ *    - This is because server is a long-running process handling many generations
  * 2. Runs an actual generation using flux1-schnell-fp8-cli (CLI mode)
+ *    - CLI mode logs should have generation_id tag
+ *    - This is because each CLI invocation is tied to a specific generation
  * 3. Reads the actual log file at backend/logs/sdcpp.log
- * 4. Verifies that log entries contain the generation_id tag
+ * 4. Verifies proper tagging for each mode
  *
  * Usage: node scripts/test-sdcpp-logging.js
  */
@@ -20,6 +24,11 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, '..');
 
 const LOG_FILE_PATH = join(PROJECT_ROOT, 'backend', 'logs', 'sdcpp.log');
+const API_BASE_URL = 'http://127.0.0.1:3000/api';
+
+// Test models
+const SERVER_MODEL = 'flux1-schnell-fp8';
+const CLI_MODEL = 'flux1-schnell-fp8-cli';
 
 // ANSI color codes
 const colors = {
@@ -53,19 +62,22 @@ function warning(message) {
 }
 
 /**
- * Parse a log line and extract the generation_id if present
+ * Parse a log line and extract relevant fields
  */
 function parseLogLine(line) {
   try {
     const logEntry = JSON.parse(line);
     return {
       generation_id: logEntry.generation_id || null,
+      modelId: logEntry.modelId || null,
       module: logEntry.module || null,
       level: logEntry.level || null,
       message: logEntry.msg || logEntry.message || '',
       eventType: logEntry.eventType || null,
       stdout: logEntry.stdout || null,
       stderr: logEntry.stderr || null,
+      time: logEntry.time || null,
+      type: logEntry.type || null,
     };
   } catch (e) {
     return null;
@@ -106,11 +118,9 @@ function getSdCppOutputLogs(logs, generationId) {
  * Run a test generation via the API
  */
 async function runGeneration(modelId, prompt = 'a cat') {
-  const API_URL = 'http://127.0.0.1:3000/api/queue';
-
   info(`Queuing generation with model: ${modelId}`);
 
-  const response = await fetch(API_URL, {
+  const response = await fetch(`${API_BASE_URL}/queue`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -135,12 +145,11 @@ async function runGeneration(modelId, prompt = 'a cat') {
  * Poll for generation completion
  */
 async function waitForGeneration(generationId, timeoutMs = 120000) {
-  const API_URL = `http://127.0.0.1:3000/api/generations/${generationId}`;
   const startTime = Date.now();
   const pollInterval = 1000;
 
   while (Date.now() - startTime < timeoutMs) {
-    const response = await fetch(API_URL);
+    const response = await fetch(`${API_BASE_URL}/generations/${generationId}`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch generation status: ${response.status}`);
@@ -187,9 +196,21 @@ function analyzeLogsForGeneration(logs, generationId) {
 /**
  * Check if there are ANY sd.cpp logs (for server mode, which won't have generation_id)
  */
-function checkAnySdCppLogs(logs, modelId = null) {
+function checkAnySdCppLogs(logs, modelId = null, startTime = null) {
   // Filter for logs with module='sdcpp'
-  const sdcppLogs = logs.filter(entry => entry.module === 'sdcpp');
+  let sdcppLogs = logs.filter(entry => entry.module === 'sdcpp');
+
+  // Filter by time if startTime provided (to get only logs after test started)
+  if (startTime) {
+    sdcppLogs = sdcppLogs.filter(entry => {
+      if (!entry.time) return false;
+      try {
+        return new Date(entry.time) >= new Date(startTime);
+      } catch {
+        return false;
+      }
+    });
+  }
 
   // For server mode, look for logs with modelId
   const modelLogs = modelId
@@ -204,6 +225,7 @@ function checkAnySdCppLogs(logs, modelId = null) {
       hasModelId: !!log.modelId,
       level: log.level,
       eventType: log.eventType,
+      time: log.time,
       message: log.message?.substring(0, 100) || log.stdout?.substring(0, 100) || log.stderr?.substring(0, 100) || '',
     })),
   };
@@ -214,12 +236,22 @@ function checkAnySdCppLogs(logs, modelId = null) {
  */
 async function main() {
   log('\n=== sd.cpp Logging Test ===', 'bright');
-  log('This script tests that generation_id is properly tagged in sdcpp.log\n', 'cyan');
+  log('This script tests that sd.cpp logs are properly tagged\n', 'cyan');
+  log('Expected behavior:', 'blue');
+  log('  - Server mode: Logs tagged with modelId (long-running process)', 'blue');
+  log('  - CLI mode: Logs tagged with generation_id (one-shot per generation)\n', 'blue');
+
+  // Record test start time for log filtering
+  const testStartTime = new Date().toISOString();
+  info(`Test started at: ${testStartTime}`);
 
   // Check if backend is running
   info('Checking if backend is running...');
   try {
-    await fetch('http://127.0.0.1:3000/api/health', { signal: AbortSignal.timeout(5000) });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+    clearTimeout(timeout);
     success('Backend is running');
   } catch (e) {
     error('Backend is not running. Please start it with: npm run dev:backend');
@@ -240,10 +272,10 @@ async function main() {
   info(`Initial log file has ${initialCount} entries\n`);
 
   // Test 1: Server mode generation
-  log('\n--- Test 1: Server Mode (flux1-schnell-fp8) ---', 'bright');
+  log(`\n--- Test 1: Server Mode (${SERVER_MODEL}) ---`, 'bright');
   let serverGenId;
   try {
-    serverGenId = await runGeneration('flux1-schnell-fp8', 'a red cat');
+    serverGenId = await runGeneration(SERVER_MODEL, 'a red cat');
     success(`Queued server mode generation: ${serverGenId}`);
     info('Waiting for generation to complete...');
 
@@ -255,10 +287,10 @@ async function main() {
   }
 
   // Test 2: CLI mode generation
-  log('\n--- Test 2: CLI Mode (flux1-schnell-fp8-cli) ---', 'bright');
+  log(`\n--- Test 2: CLI Mode (${CLI_MODEL}) ---`, 'bright');
   let cliGenId;
   try {
-    cliGenId = await runGeneration('flux1-schnell-fp8-cli', 'a blue dog');
+    cliGenId = await runGeneration(CLI_MODEL, 'a blue dog');
     success(`Queued CLI mode generation: ${cliGenId}`);
     info('Waiting for generation to complete...');
 
@@ -289,16 +321,16 @@ async function main() {
   // Test server mode logging
   if (serverGenId) {
     totalTests++;
-    log('\nServer Mode (flux1-schnell-fp8):', 'cyan');
+    log(`\nServer Mode (${SERVER_MODEL}):`, 'cyan');
 
     // For server mode, we need to check for logs with modelId since generation_id won't be present
     // The server is a long-running process so its output isn't tied to specific generations
-    const serverAnalysis = checkAnySdCppLogs(finalLogs, 'flux1-schnell-fp8');
+    const serverAnalysis = checkAnySdCppLogs(finalLogs, SERVER_MODEL, testStartTime);
 
     // Also check if there are any logs with generation_id (there shouldn't be for server mode)
     const serverGenAnalysis = analyzeLogsForGeneration(finalLogs, serverGenId);
 
-    log(`  Server mode sdcpp logs (with modelId): ${serverAnalysis.forModel}`, 'blue');
+    log(`  Server mode sdcpp logs (with modelId, since ${testStartTime}): ${serverAnalysis.forModel}`, 'blue');
     log(`  Generation-specific logs (with generation_id): ${serverGenAnalysis.total}`, 'blue');
 
     // Server mode is expected to have logs with modelId but not necessarily with generation_id
@@ -333,7 +365,7 @@ async function main() {
   // Test CLI mode logging
   if (cliGenId) {
     totalTests++;
-    log('\nCLI Mode (flux1-schnell-fp8-cli):', 'cyan');
+    log(`\nCLI Mode (${CLI_MODEL}):`, 'cyan');
     const cliAnalysis = analyzeLogsForGeneration(finalLogs, cliGenId);
 
     // CLI mode SHOULD have logs with generation_id
@@ -365,7 +397,7 @@ async function main() {
   log(`Tests passed: ${passedTests}/${totalTests}`, passedTests === totalTests ? 'green' : 'yellow');
 
   if (passedTests === totalTests) {
-    success('All tests passed! Generation IDs are properly tagged in sdcpp.log');
+    success('All tests passed! sd.cpp logs are properly tagged');
     process.exit(0);
   } else {
     error('Some tests failed. See details above.');
