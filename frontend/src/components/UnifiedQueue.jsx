@@ -29,6 +29,7 @@ import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
+import { Checkbox } from "./ui/checkbox";
 import { LogViewer } from "./LogViewer";
 import { LightboxWithImage, LightboxGalleryWithImages } from "@didik-mulyadi/react-modal-images";
 import { useGenerations } from "../hooks/useImageGeneration";
@@ -218,6 +219,19 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
   // Search query state
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Status filter options
+  const STATUS_FILTER_OPTIONS = [
+    { value: GENERATION_STATUS.PENDING, label: "Pending" },
+    { value: GENERATION_STATUS.MODEL_LOADING, label: "Loading Model" },
+    { value: GENERATION_STATUS.PROCESSING, label: "Processing" },
+    { value: GENERATION_STATUS.COMPLETED, label: "Completed" },
+    { value: GENERATION_STATUS.FAILED, label: "Failed" },
+    { value: GENERATION_STATUS.CANCELLED, label: "Cancelled" },
+  ];
+
+  // Status filter state (array of selected status values)
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
 
   // Persist filter panel state to localStorage
   useEffect(() => {
@@ -601,16 +615,25 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     g.status === GENERATION_STATUS.PENDING || g.status === GENERATION_STATUS.PROCESSING
   );
 
-  // Filter generations by search query (case-insensitive prompt search)
+  // Filter generations by search query and status
   const filteredGenerations = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return generations;
+    let filtered = generations;
+
+    // Apply search filter (case-insensitive prompt search)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(g =>
+        g.prompt && g.prompt.toLowerCase().includes(query)
+      );
     }
-    const query = searchQuery.toLowerCase();
-    return generations.filter(g =>
-      g.prompt && g.prompt.toLowerCase().includes(query)
-    );
-  }, [generations, searchQuery]);
+
+    // Apply status filter
+    if (selectedStatuses.length > 0) {
+      filtered = filtered.filter(g => selectedStatuses.includes(g.status));
+    }
+
+    return filtered;
+  }, [generations, searchQuery, selectedStatuses]);
 
   return (
     <>
@@ -868,7 +891,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                   </Button>
                 </div>
                 {/* Search by prompt */}
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   <label className="text-sm font-medium">Search Prompts</label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -880,12 +903,94 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                       className="pl-9"
                     />
                   </div>
-                  {searchQuery && filteredGenerations.length !== generations.length && (
+                </div>
+
+                {/* Status filter */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Status</label>
+                    {selectedStatuses.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setSelectedStatuses([])}
+                      >
+                        Clear all
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Selected status badges */}
+                  {selectedStatuses.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedStatuses.map(status => {
+                        const option = STATUS_FILTER_OPTIONS.find(o => o.value === status);
+                        return (
+                          <Badge
+                            key={status}
+                            variant="secondary"
+                            className="gap-1 pl-2 pr-1.5 py-0.5"
+                          >
+                            {option?.label || status}
+                            <button
+                              onClick={() => setSelectedStatuses(prev => prev.filter(s => s !== status))}
+                              className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Status checkboxes */}
+                  <div className="space-y-2">
+                    {STATUS_FILTER_OPTIONS.map(option => {
+                      const config = STATUS_CONFIG[option.value];
+                      const StatusIcon = config?.icon;
+                      const isSelected = selectedStatuses.includes(option.value);
+
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
+                            isSelected ? 'bg-accent' : 'hover:bg-accent/50'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => {
+                              setSelectedStatuses(prev => {
+                                if (prev.includes(option.value)) {
+                                  return prev.filter(s => s !== option.value);
+                                } else {
+                                  return [...prev, option.value];
+                                }
+                              });
+                            }}
+                          />
+                          {StatusIcon && (
+                            <StatusIcon className={`h-3.5 w-3.5 text-muted-foreground ${
+                              config?.animate ? 'animate-spin' : ''
+                            }`} />
+                          )}
+                          <span className="text-sm">{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Filter results count */}
+                {(searchQuery || selectedStatuses.length > 0) && filteredGenerations.length !== generations.length && (
+                  <div className="mt-4 pt-3 border-t border-border/50">
                     <p className="text-xs text-muted-foreground">
                       Showing {filteredGenerations.length} of {generations.length} generations
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
