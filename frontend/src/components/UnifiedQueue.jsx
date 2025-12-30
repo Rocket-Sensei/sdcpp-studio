@@ -204,6 +204,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   const [models, setModels] = useState({});
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [isCancelAllOpen, setIsCancelAllOpen] = useState(false);
+  const [isClearFailedOpen, setIsClearFailedOpen] = useState(false);
   const [deleteFiles, setDeleteFiles] = useState(false);
   const [mobileInfoGeneration, setMobileInfoGeneration] = useState(null);
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
@@ -548,6 +549,33 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     }
   };
 
+  const handleClearFailed = async () => {
+    try {
+      const failedGenerations = generations.filter(g => g.status === GENERATION_STATUS.FAILED);
+      let deletedCount = 0;
+
+      for (const generation of failedGenerations) {
+        const response = await authenticatedFetch(`/api/generations/${generation.id}`, {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          deletedCount++;
+        }
+      }
+
+      if (deletedCount > 0) {
+        toast.success(`Cleared ${deletedCount} failed generation${deletedCount !== 1 ? 's' : ''}`);
+        fetchGenerations(currentPage);
+      } else {
+        throw new Error("Failed to clear failed generations");
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsClearFailedOpen(false);
+    }
+  };
+
   const handleEditImage = async (generation) => {
     try {
       // Get the first image URL from the generation
@@ -618,6 +646,9 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     g.status === GENERATION_STATUS.PENDING || g.status === GENERATION_STATUS.PROCESSING
   );
 
+  // Compute if there are any failed generations
+  const hasFailed = generations.some(g => g.status === GENERATION_STATUS.FAILED);
+
   // Filter generations by search query and status
   const filteredGenerations = useMemo(() => {
     let filtered = generations;
@@ -672,6 +703,16 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
           >
             <X className="h-4 w-4 mr-1" />
             Cancel All
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsClearFailedOpen(true)}
+            disabled={!hasFailed}
+            className="border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700"
+          >
+            <XCircle className="h-4 w-4 mr-1" />
+            Clear Failed
           </Button>
           <Button
             variant="outline"
@@ -1395,6 +1436,36 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
               onClick={handleCancelAll}
             >
               Cancel All Jobs
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear Failed Confirmation Dialog */}
+      <Dialog open={isClearFailedOpen} onOpenChange={setIsClearFailedOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-orange-600" />
+              Clear Failed Generations
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete all failed generations? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsClearFailedOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleClearFailed}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Clear Failed
             </Button>
           </div>
         </DialogContent>
