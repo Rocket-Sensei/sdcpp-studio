@@ -21,9 +21,11 @@ import {
   Info,
   Filter,
   ChevronDown,
+  Search,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
@@ -213,6 +215,9 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     }
     return false;
   });
+
+  // Search query state
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Persist filter panel state to localStorage
   useEffect(() => {
@@ -596,6 +601,17 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     g.status === GENERATION_STATUS.PENDING || g.status === GENERATION_STATUS.PROCESSING
   );
 
+  // Filter generations by search query (case-insensitive prompt search)
+  const filteredGenerations = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return generations;
+    }
+    const query = searchQuery.toLowerCase();
+    return generations.filter(g =>
+      g.prompt && g.prompt.toLowerCase().includes(query)
+    );
+  }, [generations, searchQuery]);
+
   return (
     <>
       {/* Toolbar with Filter, Delete All, and Cancel All buttons */}
@@ -646,7 +662,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
         }`}>
           {/* Gallery Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {generations.map((generation) => {
+          {filteredGenerations.map((generation) => {
             const config = getStatusConfig(generation.status);
             const StatusIcon = config.icon;
             const canCancel = isPendingOrProcessing(generation.status);
@@ -851,8 +867,25 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                {/* Filter content will be added in future tasks */}
-                <p className="text-sm text-muted-foreground">Filter options coming soon...</p>
+                {/* Search by prompt */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Search Prompts</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search prompts..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  {searchQuery && filteredGenerations.length !== generations.length && (
+                    <p className="text-xs text-muted-foreground">
+                      Showing {filteredGenerations.length} of {generations.length} generations
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
