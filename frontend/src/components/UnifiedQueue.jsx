@@ -19,6 +19,8 @@ import {
   Edit3,
   AlertTriangle,
   Info,
+  Filter,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -77,6 +79,9 @@ const STATUS_CONFIG = {
     color: "secondary",
   },
 };
+
+// localStorage key for filter panel persistence
+const FILTER_PANEL_KEY = "sd-cpp-studio-filter-panel-open";
 
 // Helper functions - defined outside component to avoid recreation on each render
 const getStatusConfig = (status) => {
@@ -199,6 +204,22 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   const [deleteFiles, setDeleteFiles] = useState(false);
   const [mobileInfoGeneration, setMobileInfoGeneration] = useState(null);
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
+
+  // Filter panel state with localStorage persistence
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(FILTER_PANEL_KEY);
+      return saved === "true";
+    }
+    return false;
+  });
+
+  // Persist filter panel state to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(FILTER_PANEL_KEY, String(isFilterPanelOpen));
+    }
+  }, [isFilterPanelOpen]);
 
   // Use a ref to track fetchGenerations so the WebSocket onMessage callback doesn't change
   const fetchGenerationsRef = useRef(() => fetchGenerations(currentPage));
@@ -577,7 +598,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
   return (
     <>
-      {/* Toolbar with Delete All and Cancel All buttons */}
+      {/* Toolbar with Filter, Delete All, and Cancel All buttons */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
@@ -585,6 +606,17 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Filter Panel Toggle Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+            className={isFilterPanelOpen ? "bg-accent" : ""}
+          >
+            <Filter className="h-4 w-4 mr-1" />
+            Filters
+            <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
+          </Button>
           <Button
             variant="destructive"
             size="sm"
@@ -606,7 +638,14 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       </div>
 
       <TooltipProvider>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Main layout with optional filter panel */}
+        <div className={`grid gap-4 transition-all duration-300 ${
+          isFilterPanelOpen
+            ? 'grid-cols-1 xl:grid-cols-[1fr_300px]'
+            : 'grid-cols-1'
+        }`}>
+          {/* Gallery Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {generations.map((generation) => {
             const config = getStatusConfig(generation.status);
             const StatusIcon = config.icon;
@@ -796,6 +835,27 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
               </Card>
             );
           })}
+          </div>
+
+          {/* Filter Panel */}
+          {isFilterPanelOpen && (
+            <Card className="hidden xl:block h-fit sticky top-4">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Filters</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsFilterPanelOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                {/* Filter content will be added in future tasks */}
+                <p className="text-sm text-muted-foreground">Filter options coming soon...</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </TooltipProvider>
 
