@@ -3,7 +3,7 @@ models:
   # ==================== Qwen Image Edit Models (Server Mode) ====================
   # NOTE: 2511 models require --qwen-image-zero-cond-t flag for proper quality
   qwen-image-edit-2511-q4-0:
-    enabled: false
+    enabled: true
     name: "Qwen Image Edit 2511 Q4_0"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
@@ -36,8 +36,75 @@ models:
       sample_steps: 24
       sampling_method: "euler"
 
+  qwen-image-edit-2511-Q5ks:
+    enabled: true
+    name: "Qwen Image Edit 2511 Q5_K_S"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/qwen-image-edit-2511-Q5_K_S.gguf"
+      - "--vae"
+      - "./models/qwen_image_vae.safetensors"
+      - "--llm"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+      - "--llm_vision"
+      - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--flow-shift"
+      - "3"
+      - "--steps"
+      - "24"
+      - "--qwen-image-zero-cond-t"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1402
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
+
+  qwen-image-edit-2511-Q5km:
+    name: "Qwen Image Edit 2511 Q5_K_M"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/qwen-image-edit-2511-Q5_K_M.gguf"
+      - "--vae"
+      - "./models/qwen_image_vae.safetensors"
+      - "--llm"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+      - "--llm_vision"
+      - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--flow-shift"
+      - "3"
+      - "--steps"
+      - "24"
+      - "--qwen-image-zero-cond-t"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1403
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
+
   qwen-image-edit-2511-q5-0:
-    enabled: false
+    enabled: true
     name: "Qwen Image Edit 2511 Q5_0"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
@@ -104,7 +171,7 @@ models:
       sampling_method: "euler"
 
   qwen-image-edit-2511-q2-k:
-    enabled: false
+    enabled: true
     name: "Qwen Image Edit 2511 Q2_K"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false

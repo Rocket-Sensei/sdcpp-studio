@@ -625,22 +625,6 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
     }
   };
 
-  if (generations.length === 0 && !isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-12">
-          <div className="text-center">
-            <ImageIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No generations yet</h3>
-            <p className="text-muted-foreground">
-              Generate your first image to see it here
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Compute if there are any pending or processing generations
   const hasPendingOrProcessing = generations.some(g =>
     g.status === GENERATION_STATUS.PENDING || g.status === GENERATION_STATUS.PROCESSING
@@ -673,6 +657,22 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
     return filtered;
   }, [generations, searchQuery, selectedStatuses, selectedModels]);
+
+  if (generations.length === 0 && !isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center">
+            <ImageIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No generations yet</h3>
+            <p className="text-muted-foreground">
+              Generate your first image to see it here
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>

@@ -3,14 +3,14 @@
 models:
   # ==================== SD3 Medium ====================
   sd3-medium:
-    name: "SD3.5 Medium"
-    description: "Stable Diffusion 3.5 Medium"
+    name: "SD3 Medium"
+    description: "Stable Diffusion 3 Medium"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/sd3.5_medium.safetensors"
+      - "./models/sd3_medium.safetensors"
       - "--clip_l"
       - "./models/clip_l.safetensors"
       - "--clip_g"
@@ -69,6 +69,7 @@ models:
   # ==================== SD3.5 Large ====================
   # SD3.5 Large requires separate CLIP and T5XXL files
   sd3.5-large:
+    enabled: false
     name: "SD3.5 Large"
     description: "Stable Diffusion 3.5 Large - 8B params (requires CLIP_L, CLIP_G, T5XXL)"
     capabilities: ["text-to-image"]
