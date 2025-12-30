@@ -233,6 +233,9 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   // Status filter state (array of selected status values)
   const [selectedStatuses, setSelectedStatuses] = useState([]);
 
+  // Model filter state (array of selected model IDs)
+  const [selectedModels, setSelectedModels] = useState([]);
+
   // Persist filter panel state to localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -632,8 +635,13 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
       filtered = filtered.filter(g => selectedStatuses.includes(g.status));
     }
 
+    // Apply model filter
+    if (selectedModels.length > 0) {
+      filtered = filtered.filter(g => selectedModels.includes(g.model));
+    }
+
     return filtered;
-  }, [generations, searchQuery, selectedStatuses]);
+  }, [generations, searchQuery, selectedStatuses, selectedModels]);
 
   return (
     <>
@@ -983,8 +991,86 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
                   </div>
                 </div>
 
+                {/* Model filter */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Models</label>
+                    {selectedModels.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setSelectedModels([])}
+                      >
+                        Clear all
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Selected model badges */}
+                  {selectedModels.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedModels.map(modelId => (
+                        <Badge
+                          key={modelId}
+                          variant="secondary"
+                          className="gap-1 pl-2 pr-1.5 py-0.5"
+                        >
+                          {getModelName(modelId)}
+                          <button
+                            onClick={() => setSelectedModels(prev => prev.filter(m => m !== modelId))}
+                            className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Model checkboxes - show only models that have generations */}
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {Object.keys(models).length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Loading models...</p>
+                    ) : (
+                      // Get unique models from generations and filter those that exist in our models map
+                      generations
+                        .map(g => g.model)
+                        .filter((modelId, index, self) => modelId && self.indexOf(modelId) === index)
+                        .sort((a, b) => (models[a] || a).localeCompare(models[b] || b))
+                        .map(modelId => {
+                          const isSelected = selectedModels.includes(modelId);
+                          const modelName = models[modelId] || modelId;
+
+                          return (
+                            <label
+                              key={modelId}
+                              className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
+                                isSelected ? 'bg-accent' : 'hover:bg-accent/50'
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() => {
+                                  setSelectedModels(prev => {
+                                    if (prev.includes(modelId)) {
+                                      return prev.filter(m => m !== modelId);
+                                    } else {
+                                      return [...prev, modelId];
+                                    }
+                                  });
+                                }}
+                              />
+                              <span className="text-sm truncate">{modelName}</span>
+                            </label>
+                          );
+                        })
+                    )}
+                  </div>
+                </div>
+
                 {/* Filter results count */}
-                {(searchQuery || selectedStatuses.length > 0) && filteredGenerations.length !== generations.length && (
+                {(searchQuery || selectedStatuses.length > 0 || selectedModels.length > 0) && filteredGenerations.length !== generations.length && (
                   <div className="mt-4 pt-3 border-t border-border/50">
                     <p className="text-xs text-muted-foreground">
                       Showing {filteredGenerations.length} of {generations.length} generations
