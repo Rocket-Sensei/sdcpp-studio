@@ -67,7 +67,7 @@ models:
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
-      - "30"
+      - "24"
     mode: "on_demand"
     exec_mode: "server"
     port: 1525

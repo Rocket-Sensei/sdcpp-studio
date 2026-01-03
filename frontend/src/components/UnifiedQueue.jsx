@@ -677,14 +677,12 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   return (
     <>
       {/* Toolbar with Filter, Delete All, and Cancel All buttons */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className="space-y-2 mb-4">
+        {/* First row: Total count and Filter button */}
+        <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
             {pagination.total} total generation{pagination.total !== 1 ? 's' : ''}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Filter Panel Toggle Button */}
           <Button
             variant="outline"
             size="sm"
@@ -695,6 +693,10 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
             Filters
             <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
           </Button>
+        </div>
+
+        {/* Second row: Action buttons - stack on mobile, row on larger screens */}
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <Button
             variant="destructive"
             size="sm"

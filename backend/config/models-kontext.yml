@@ -14,7 +14,7 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux1-kontext-dev-Q8_0.gguf"
+      - "./models/flux1-kontext-dev-Q8_0_v2.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--clip_l"

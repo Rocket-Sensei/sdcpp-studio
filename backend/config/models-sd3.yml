@@ -55,7 +55,7 @@ models:
       - "--offload-to-cpu"
       - "--clip-on-cpu"
       - "--steps"
-      - "40"
+      - "28"
     mode: "on_demand"
     exec_mode: "server"
     port: 1538

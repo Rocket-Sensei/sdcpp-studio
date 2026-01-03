@@ -8,7 +8,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/v1-5-pruned.ckpt"
       - "-v"
       - "--offload-to-cpu"
