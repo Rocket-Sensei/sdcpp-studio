@@ -9,7 +9,6 @@ import { useGenerations } from "./hooks/useImageGeneration";
 import { ApiKeyProvider } from "./components/ApiKeyModal";
 import { Button } from "./components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./components/ui/sheet";
-import { GeneratePanel } from "./components/GeneratePanel";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { Checkbox } from "./components/ui/checkbox";
@@ -85,12 +84,6 @@ function App() {
     }
     return false;
   });
-
-  // Mobile sheet open state
-  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
-
-  // State for mobile sheet form
-  const [selectedModels, setSelectedModels] = useState([]);
 
   // Filter panel state with localStorage persistence
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(() => {
@@ -259,17 +252,6 @@ function App() {
     setIsFormCollapsed(value);
   }, []);
 
-  // Handle models change from mobile sheet
-  const handleModelsChange = useCallback((models) => {
-    setSelectedModels(models);
-  }, []);
-
-  // Handle generation complete from mobile sheet
-  const handleGenerated = useCallback(() => {
-    // Close the sheet after generation
-    setIsMobileSheetOpen(false);
-  }, []);
-
   return (
     <ApiKeyProvider>
       <WebSocketProvider>
@@ -278,39 +260,15 @@ function App() {
           <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
             <div className="container mx-auto px-4 py-3">
               <div className="flex items-center justify-between gap-4">
-                {/* Mobile Generate Button - Opens Sheet */}
-                <div className="lg:hidden flex items-center gap-2">
-                  <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
-                    <SheetTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 flex-shrink-0"
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        Generate
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" className="w-full sm:w-[400px] overflow-y-auto">
-                      <div className="mt-8">
-                        <GeneratePanel
-                          selectedModels={selectedModels}
-                          onModelsChange={handleModelsChange}
-                          onGenerated={handleGenerated}
-                        />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                </div>
-
-                {/* Desktop Generate Toggle Button */}
+                {/* Generate Toggle Button - Opens Sheet for all screen sizes */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleToggleForm}
-                  className="gap-2 hidden lg:flex flex-shrink-0"
+                  className="gap-2 flex-shrink-0"
                 >
-                  Generate
+                  <Sparkles className="h-4 w-4" />
+                  <span className="hidden sm:inline">Generate</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${isFormCollapsed ? '' : 'rotate-180'}`} />
                 </Button>
 

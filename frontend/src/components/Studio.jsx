@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
 import { Button } from "./ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Sparkles, ChevronDown } from "lucide-react";
 
 // Default editing model
@@ -146,11 +147,22 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
 
   return (
     <div className="container mx-auto p-4">
-      {/* Main grid layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left sidebar - Generate Panel (desktop only) */}
+      {/* Desktop Generate Sheet - Offcanvas menu */}
+      <Sheet open={!isFormCollapsed} onOpenChange={(open) => setFormCollapsed(!open)}>
+        {/* Generate button trigger - shown when form is collapsed */}
         {!isFormCollapsed && (
-          <div className="hidden lg:block lg:col-span-1">
+          <SheetTrigger asChild>
+            <div className="sr-only">
+              {/* Hidden trigger - Sheet is controlled programmatically */}
+            </div>
+          </SheetTrigger>
+        )}
+
+        <SheetContent side="right" className="w-full sm:w-[500px] lg:w-[600px] overflow-y-auto p-0">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold">Generate</h2>
+            </div>
             <GeneratePanel
               selectedModels={selectedModels}
               onModelsChange={handleModelsChange}
@@ -159,29 +171,31 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
               onGenerated={(...args) => {
                 handleGenerated(...args);
                 handleSettingsApplied();
+                // Optionally close the sheet after generation
+                // setFormCollapsed(true);
               }}
             />
           </div>
-        )}
+        </SheetContent>
+      </Sheet>
 
-        {/* Right area - UnifiedQueue Gallery */}
-        <div className={isFormCollapsed ? "lg:col-span-3" : "lg:col-span-2"}>
-          <UnifiedQueue
-            onCreateMore={handleCreateMore}
-            onEditImage={handleEditImage}
-            searchQuery={searchQuery}
-            selectedStatuses={selectedStatuses}
-            selectedModelsFilter={selectedModelsFilter}
-          />
-        </div>
+      {/* Main content - UnifiedQueue Gallery */}
+      <div className="grid grid-cols-1 gap-6">
+        <UnifiedQueue
+          onCreateMore={handleCreateMore}
+          onEditImage={handleEditImage}
+          searchQuery={searchQuery}
+          selectedStatuses={selectedStatuses}
+          selectedModelsFilter={selectedModelsFilter}
+        />
       </div>
 
-      {/* Floating action button for collapsed form (desktop only) */}
+      {/* Floating action button for collapsed form */}
       {isFormCollapsed && (
         <Button
           onClick={toggleFormCollapse}
           size="lg"
-          className="hidden lg:flex fixed bottom-6 right-6 rounded-full shadow-lg h-14 w-14 p-0"
+          className="hidden lg:flex fixed bottom-6 right-6 rounded-full shadow-lg h-14 w-14 p-0 z-40"
           title="Show Generate Form"
         >
           <Sparkles className="h-6 w-6" />
