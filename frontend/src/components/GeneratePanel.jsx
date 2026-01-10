@@ -637,7 +637,7 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
   const currentModeConfig = MODES.find(m => m.value === mode);
 
   return (
-    <Card>
+    <Card data-testid="generate-panel">
       <CardContent className="space-y-6">
           {/* Sticky Generate Bar */}
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border rounded-lg p-3 shadow-sm">
