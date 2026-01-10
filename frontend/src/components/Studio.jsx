@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
 import { Button } from "./ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Sparkles, ChevronDown } from "lucide-react";
 
 // Default editing model
@@ -159,10 +159,10 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
         )}
 
         <SheetContent side="left" className="w-full sm:w-[500px] md:w-[600px] lg:w-[700px] xl:w-[800px] overflow-y-auto p-0">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Generate</h2>
-            </div>
+          <SheetHeader className="p-6 pb-0">
+            <SheetTitle>Generate</SheetTitle>
+          </SheetHeader>
+          <div className="p-6 pt-2">
             <GeneratePanel
               selectedModels={selectedModels}
               onModelsChange={handleModelsChange}

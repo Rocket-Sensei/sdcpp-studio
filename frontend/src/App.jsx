@@ -8,7 +8,7 @@ import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { useGenerations } from "./hooks/useImageGeneration";
 import { ApiKeyProvider } from "./components/ApiKeyModal";
 import { Button } from "./components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "./components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./components/ui/sheet";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { Checkbox } from "./components/ui/checkbox";
@@ -299,11 +299,10 @@ function App() {
                       </Button>
                     </SheetTrigger>
                     <SheetContent side="right" className="w-full sm:w-[360px] overflow-y-auto">
-                      <div className="mt-8 space-y-6">
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-lg">Filters</h3>
-                        </div>
+                      <SheetHeader className="mt-8 mb-6 px-6">
+                        <SheetTitle>Filters</SheetTitle>
+                      </SheetHeader>
+                      <div className="px-6 space-y-6">
 
                         {/* Search by prompt */}
                         <div className="space-y-2">
@@ -534,17 +533,15 @@ function App() {
                       </Button>
                     </SheetTrigger>
                     <SheetContent side="right" className="w-full sm:w-[360px] overflow-y-auto">
-                      <div className="mt-8 space-y-6">
+                      <SheetHeader className="mt-8 mb-6 px-6">
+                        <SheetTitle>Filters</SheetTitle>
+                      </SheetHeader>
+                      <div className="px-6 space-y-6">
                         {/* Mobile count */}
                         <div className="pb-3 border-b border-border">
                           <p className="text-sm text-muted-foreground">
                             {(pagination?.total || 0)} total generation{(pagination?.total || 0) !== 1 ? 's' : ''}
                           </p>
-                        </div>
-
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-lg">Filters</h3>
                         </div>
 
                         {/* Search by prompt */}

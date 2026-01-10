@@ -53,6 +53,24 @@
   }
 }
 
+@keyframes slideInFromLeftSmooth {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutToLeftSmooth {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -78,6 +96,14 @@
 
 .animate-slide-out-right {
   animation: slideOutToRightSmooth 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeftSmooth 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-out-left {
+  animation: slideOutToLeftSmooth 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-fade-in {
