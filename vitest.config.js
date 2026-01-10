@@ -7,7 +7,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.js'],
-    include: ['tests/**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'],
+    include: [
+      'tests/**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}',
+      'frontend/src/**/__tests__/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}',
+    ],
     // Run test files sequentially to avoid port conflicts when starting/stopping servers
     fileParallelism: false,
     // Increase hook timeout for server startup

@@ -9,9 +9,11 @@ import React from 'react';
 import { GeneratePanel } from '../frontend/src/components/GeneratePanel';
 
 // Mock the useImageGeneration hook
+const mockGenerateQueued = vi.fn().mockResolvedValue({ success: true });
+
 vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
   useImageGeneration: () => ({
-    generateQueued: vi.fn().mockResolvedValue({ success: true }),
+    generateQueued: () => mockGenerateQueued(),
     isLoading: false,
     error: null,
     result: null,
@@ -29,6 +31,17 @@ vi.mock('sonner', () => ({
 // Mock authenticatedFetch
 vi.mock('../frontend/src/utils/api', () => ({
   authenticatedFetch: vi.fn(),
+}));
+
+// Mock MultiModelSelector component
+vi.mock('../frontend/src/components/MultiModelSelector', () => ({
+  MultiModelSelector: ({ selectedModels, onModelsChange }) => (
+    <div data-testid="multi-model-selector">
+      <span>Selected: {selectedModels.length}</span>
+      <button onClick={() => onModelsChange(['model1'])}>Select Model 1</button>
+      <button onClick={() => onModelsChange(['flux1-schnell'])}>Select FLUX</button>
+    </div>
+  ),
 }));
 
 // Mock models data with supports_negative_prompt field
@@ -337,7 +350,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
     });
 
-    it('should keep negative prompt hidden in image mode when FLUX model is selected', async () => {
+    it('should keep negative prompt hidden in video mode when FLUX model is selected', async () => {
       render(React.createElement(GeneratePanel, {
         selectedModels: ['flux1-schnell'],
         onModelsChange: mockOnModelsChange,
@@ -348,8 +361,8 @@ describe('GeneratePanel - Negative Prompt Support', () => {
         expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
       });
 
-      // Switch to edit mode
-      fireEvent.click(screen.getByText('Edit'));
+      // Switch to video mode
+      fireEvent.click(screen.getByText('Video'));
 
       // Negative prompt should still not be visible
       await waitFor(() => {
@@ -357,7 +370,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       });
     });
 
-    it('should show negative prompt in image mode when SD1.5 model is selected', async () => {
+    it('should show negative prompt in video mode when SD1.5 model is selected', async () => {
       render(React.createElement(GeneratePanel, {
         selectedModels: ['v1-5-pruned'],
         onModelsChange: mockOnModelsChange,
@@ -368,10 +381,10 @@ describe('GeneratePanel - Negative Prompt Support', () => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
 
-      // Switch to edit mode
-      fireEvent.click(screen.getByText('Edit'));
+      // Switch to video mode
+      fireEvent.click(screen.getByText('Video'));
 
-      // Negative prompt should still be visible in edit mode
+      // Negative prompt should still be visible in video mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
@@ -391,7 +404,7 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       // Switch to edit mode
       fireEvent.click(screen.getByText('Edit'));
 
-      // Negative prompt should still be visible in imagedit mode
+      // Negative prompt should still be visible in edit mode
       await waitFor(() => {
         expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
       });
