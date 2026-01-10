@@ -158,7 +158,7 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
           </SheetTrigger>
         )}
 
-        <SheetContent side="right" className="w-full sm:w-[500px] lg:w-[600px] overflow-y-auto p-0">
+        <SheetContent side="left" className="w-full sm:w-[500px] md:w-[600px] lg:w-[700px] xl:w-[800px] overflow-y-auto p-0">
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">Generate</h2>
@@ -195,7 +195,7 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
         <Button
           onClick={toggleFormCollapse}
           size="lg"
-          className="hidden lg:flex fixed bottom-6 right-6 rounded-full shadow-lg h-14 w-14 p-0 z-40"
+          className="hidden lg:flex fixed bottom-6 left-6 rounded-full shadow-lg h-14 w-14 p-0 z-40"
           title="Show Generate Form"
         >
           <Sparkles className="h-6 w-6" />
