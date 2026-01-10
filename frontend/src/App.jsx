@@ -14,6 +14,7 @@ import { Badge } from "./components/ui/badge";
 import { Checkbox } from "./components/ui/checkbox";
 import { authenticatedFetch } from "./utils/api";
 import { toast } from "sonner";
+import { MultiModelSelector } from "./components/MultiModelSelector";
 
 const STORAGE_KEY = "studio-form-collapsed";
 const FILTER_PANEL_KEY = "sd-cpp-studio-filter-panel-open";
@@ -103,9 +104,6 @@ function App() {
   // Model filter state (array of selected model IDs)
   const [selectedModelsFilter, setSelectedModelsFilter] = useState([]);
 
-  // Models map for filter display
-  const [models, setModels] = useState({});
-
   useEffect(() => {
     fetchGenerations();
   }, [fetchGenerations]);
@@ -116,35 +114,6 @@ function App() {
       localStorage.setItem(FILTER_PANEL_KEY, String(isFilterPanelOpen));
     }
   }, [isFilterPanelOpen]);
-
-  // Fetch models on mount to get model names for filter
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response = await authenticatedFetch('/api/models');
-        if (response.ok) {
-          const data = await response.json();
-          // Create a map of model ID to model name
-          const modelMap = {};
-          if (data.models) {
-            data.models.forEach(model => {
-              modelMap[model.id] = model.name || model.id;
-            });
-          }
-          setModels(modelMap);
-        }
-      } catch (error) {
-        console.error('Failed to fetch models:', error);
-      }
-    };
-    fetchModels();
-  }, []);
-
-  // Helper function to get model name from model ID
-  const getModelName = useCallback((modelId) => {
-    if (!modelId) return 'Unknown Model';
-    return models[modelId] || modelId;
-  }, [models]);
 
   // Compute filtered generations count
   const filteredGenerationsCount = (generations || []).filter(g => {
@@ -298,7 +267,7 @@ function App() {
                         Filters
                       </Button>
                     </SheetTrigger>
-                    <SheetContent side="right" className="w-full sm:w-[360px] overflow-y-auto">
+                    <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
                       <SheetHeader className="mt-8 mb-6 px-6">
                         <SheetTitle>Filters</SheetTitle>
                       </SheetHeader>
@@ -399,80 +368,11 @@ function App() {
 
                         {/* Model filter */}
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">Models</label>
-                            {selectedModelsFilter.length > 0 && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() => setSelectedModelsFilter([])}
-                              >
-                                Clear all
-                              </Button>
-                            )}
-                          </div>
-
-                          {/* Selected model badges */}
-                          {selectedModelsFilter.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedModelsFilter.map(modelId => (
-                                <Badge
-                                  key={modelId}
-                                  variant="secondary"
-                                  className="gap-1 pl-2 pr-1.5 py-0.5"
-                                >
-                                  {getModelName(modelId)}
-                                  <button
-                                    onClick={() => setSelectedModelsFilter(prev => prev.filter(m => m !== modelId))}
-                                    className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Model checkboxes - show only models that have generations */}
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {Object.keys(models).length === 0 ? (
-                              <p className="text-xs text-muted-foreground">Loading models...</p>
-                            ) : (
-                              // Get unique models from generations and filter those that exist in our models map
-                              (generations || [])
-                                .map(g => g.model)
-                                .filter((modelId, index, self) => modelId && self.indexOf(modelId) === index)
-                                .sort((a, b) => (models[a] || a).localeCompare(models[b] || b))
-                                .map(modelId => {
-                                  const isSelected = selectedModelsFilter.includes(modelId);
-                                  const modelName = models[modelId] || modelId;
-
-                                  return (
-                                    <label
-                                      key={modelId}
-                                      className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
-                                        isSelected ? 'bg-accent' : 'hover:bg-accent/50'
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        checked={isSelected}
-                                        onChange={() => {
-                                          setSelectedModelsFilter(prev => {
-                                            if (prev.includes(modelId)) {
-                                              return prev.filter(m => m !== modelId);
-                                            } else {
-                                              return [...prev, modelId];
-                                            }
-                                          });
-                                        }}
-                                      />
-                                      <span className="text-sm truncate">{modelName}</span>
-                                    </label>
-                                  );
-                                })
-                            )}
-                          </div>
+                          <MultiModelSelector
+                            selectedModels={selectedModelsFilter}
+                            onModelsChange={setSelectedModelsFilter}
+                            className="max-h-96 overflow-y-auto"
+                          />
                         </div>
 
                         {/* Filter results count */}
@@ -532,7 +432,7 @@ function App() {
                         <Filter className="h-4 w-4" />
                       </Button>
                     </SheetTrigger>
-                    <SheetContent side="right" className="w-full sm:w-[360px] overflow-y-auto">
+                    <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
                       <SheetHeader className="mt-8 mb-6 px-6">
                         <SheetTitle>Filters</SheetTitle>
                       </SheetHeader>
@@ -639,80 +539,11 @@ function App() {
 
                         {/* Model filter */}
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">Models</label>
-                            {selectedModelsFilter.length > 0 && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() => setSelectedModelsFilter([])}
-                              >
-                                Clear all
-                              </Button>
-                            )}
-                          </div>
-
-                          {/* Selected model badges */}
-                          {selectedModelsFilter.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedModelsFilter.map(modelId => (
-                                <Badge
-                                  key={modelId}
-                                  variant="secondary"
-                                  className="gap-1 pl-2 pr-1.5 py-0.5"
-                                >
-                                  {getModelName(modelId)}
-                                  <button
-                                    onClick={() => setSelectedModelsFilter(prev => prev.filter(m => m !== modelId))}
-                                    className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Model checkboxes - show only models that have generations */}
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {Object.keys(models).length === 0 ? (
-                              <p className="text-xs text-muted-foreground">Loading models...</p>
-                            ) : (
-                              // Get unique models from generations and filter those that exist in our models map
-                              (generations || [])
-                                .map(g => g.model)
-                                .filter((modelId, index, self) => modelId && self.indexOf(modelId) === index)
-                                .sort((a, b) => (models[a] || a).localeCompare(models[b] || b))
-                                .map(modelId => {
-                                  const isSelected = selectedModelsFilter.includes(modelId);
-                                  const modelName = models[modelId] || modelId;
-
-                                  return (
-                                    <label
-                                      key={modelId}
-                                      className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
-                                        isSelected ? 'bg-accent' : 'hover:bg-accent/50'
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        checked={isSelected}
-                                        onChange={() => {
-                                          setSelectedModelsFilter(prev => {
-                                            if (prev.includes(modelId)) {
-                                              return prev.filter(m => m !== modelId);
-                                            } else {
-                                              return [...prev, modelId];
-                                            }
-                                          });
-                                        }}
-                                      />
-                                      <span className="text-sm truncate">{modelName}</span>
-                                    </label>
-                                  );
-                                })
-                            )}
-                          </div>
+                          <MultiModelSelector
+                            selectedModels={selectedModelsFilter}
+                            onModelsChange={setSelectedModelsFilter}
+                            className="max-h-96 overflow-y-auto"
+                          />
                         </div>
 
                         {/* Filter results count */}

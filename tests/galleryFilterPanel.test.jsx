@@ -135,41 +135,23 @@ describe('Gallery Filter Panel - Static Analysis Tests', () => {
       expect(source).toContain('const [selectedModelsFilter, setSelectedModelsFilter]');
     });
 
-    it('should have models state for model names', () => {
-      expect(source).toContain('const [models, setModels]');
+    it('should import MultiModelSelector component', () => {
+      expect(source).toContain('import { MultiModelSelector }');
+      expect(source).toContain('from "./components/MultiModelSelector"');
     });
 
-    it('should fetch models from API', () => {
-      expect(source).toContain('/api/models');
-      expect(source).toContain('fetchModels');
-      expect(source).toContain('modelMap[model.id] = model.name');
+    it('should use MultiModelSelector in filter panel', () => {
+      expect(source).toContain('<MultiModelSelector');
+      expect(source).toContain('selectedModels={selectedModelsFilter}');
+      expect(source).toContain('onModelsChange={setSelectedModelsFilter}');
     });
 
-    it('should have model checkboxes in filter panel', () => {
-      expect(source).toContain('Models');
-      expect(source).toContain('getModelName(modelId)');
-      expect(source).toMatch(/\.map\(g => g\.model\)/);
-    });
-
-    it('should show selected model badges', () => {
-      expect(source).toContain('selectedModelsFilter.map(modelId =>');
-      expect(source).toContain('<Badge');
-      expect(source).toContain('variant=');
-    });
-
-    it('should have Clear all button for model filters', () => {
-      expect(source).toMatch(/selectedModelsFilter\.length\s*>\s*0/);
-      expect(source).toContain('onClick={() => setSelectedModelsFilter([])}');
+    it('should apply max-height constraint to model selector', () => {
+      expect(source).toContain('className="max-h-96 overflow-y-auto"');
     });
 
     it('should pass selectedModelsFilter to Studio component', () => {
       expect(source).toContain('selectedModelsFilter={selectedModelsFilter}');
-    });
-
-    it('should have getModelName helper function', () => {
-      expect(source).toContain('const getModelName = useCallback');
-      expect(source).toContain('if (!modelId)');
-      expect(source).toContain("'Unknown Model'");
     });
   });
 
@@ -320,7 +302,7 @@ describe('Gallery Filter Panel - Static Analysis Tests', () => {
   describe('Responsive Design', () => {
     it('should have desktop filter panel', () => {
       expect(source).toContain('hidden sm:flex');
-      expect(source).toContain('sm:w-[360px]');
+      expect(source).toContain('sm:w-[500px]');
     });
 
     it('should have mobile filter panel', () => {
