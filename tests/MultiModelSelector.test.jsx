@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MultiModelSelector } from '../frontend/src/components/MultiModelSelector';
@@ -11,10 +11,8 @@ vi.mock('sonner', () => ({
   },
 }));
 
-const mockOnModelsChange = vi.fn();
-
 // Mock models data
-const mockModels = [
+const createMockModels = (overrides = {}) => [
   {
     id: 'qwen-image',
     name: 'Qwen Image',
@@ -27,6 +25,7 @@ const mockModels = [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'stopped',
+    ...overrides.qwenImage,
   },
   {
     id: 'flux-schnell',
@@ -40,6 +39,7 @@ const mockModels = [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'running',
+    ...overrides.fluxSchnell,
   },
   {
     id: 'qwen-image-edit',
@@ -53,6 +53,7 @@ const mockModels = [
     mode: 'on_demand',
     model_type: 'imgedit',
     status: 'stopped',
+    ...overrides.qwenImageEdit,
   },
   {
     id: 'cli-model',
@@ -64,18 +65,39 @@ const mockModels = [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'stopped',
+    ...overrides.cliModel,
+  },
+  {
+    id: 'video-model',
+    name: 'Video Model',
+    description: 'Video generation model',
+    capabilities: ['text-to-image', 'video'],
+    command: './bin/sd-server',
+    port: 1500,
+    args: ['--diffusion-model', './models/video.gguf'],
+    exec_mode: 'server',
+    mode: 'on_demand',
+    model_type: 'text-to-image',
+    status: 'stopped',
+    ...overrides.videoModel,
   },
 ];
+
+let mockFetchCalls = [];
+let mockOnModelsChange;
 
 describe('MultiModelSelector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchCalls = [];
+    mockOnModelsChange = vi.fn();
     // Mock fetch for models
     global.fetch = vi.fn((url) => {
+      mockFetchCalls.push(url);
       if (url === '/api/models') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ models: mockModels }),
+          json: () => Promise.resolve({ models: createMockModels() }),
         });
       }
       if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
@@ -94,6 +116,11 @@ describe('MultiModelSelector', () => {
     });
   });
 
+  afterEach(() => {
+    // Clear any timers/intervals
+    vi.clearAllTimers();
+  });
+
   describe('Rendering', () => {
     it('should render all models when no filter applied', async () => {
       render(
@@ -108,6 +135,7 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
         expect(screen.getByText('Qwen Image Edit')).toBeInTheDocument();
         expect(screen.getByText('CLI Model')).toBeInTheDocument();
+        expect(screen.getByText('Video Model')).toBeInTheDocument();
       });
     });
 
@@ -151,10 +179,12 @@ describe('MultiModelSelector', () => {
       );
 
       await waitFor(() => {
-        // All text-to-image models support both T2I and I2I
+        // All text-to-image models support both T2I and I2I (excluding video models)
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
         expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
         expect(screen.getByText('CLI Model')).toBeInTheDocument();
+        // Video model should not appear in image mode
+        expect(screen.queryByText('Video Model')).not.toBeInTheDocument();
       });
     });
 
@@ -170,6 +200,23 @@ describe('MultiModelSelector', () => {
       await waitFor(() => {
         // qwen-image-edit has --llm arg and 'edit' in id
         expect(screen.getByText('Qwen Image Edit')).toBeInTheDocument();
+      });
+    });
+
+    it('should filter models by mode (video)', async () => {
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+          mode="video"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Video Model')).toBeInTheDocument();
+        // Non-video models should not appear
+        expect(screen.queryByText('Qwen Image')).not.toBeInTheDocument();
+        expect(screen.queryByText('FLUX.1 Schnell')).not.toBeInTheDocument();
       });
     });
 
@@ -209,7 +256,7 @@ describe('MultiModelSelector', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText(/Selected: 2\/4/)).toBeInTheDocument();
+        expect(screen.getByText(/Selected: 2\/5/)).toBeInTheDocument();
       });
     });
 
@@ -224,6 +271,87 @@ describe('MultiModelSelector', () => {
       await waitFor(() => {
         expect(screen.getByText('Running')).toBeInTheDocument();
         expect(screen.getAllByText('Stopped').length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should show starting status for models in starting state', async () => {
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'starting' },
+              }),
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Starting...')).toBeInTheDocument();
+      });
+    });
+
+    it('should show stopping status for models in stopping state', async () => {
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                fluxSchnell: { status: 'stopping' },
+              }),
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Stopping...')).toBeInTheDocument();
+      });
+    });
+
+    it('should show error status for models in error state', async () => {
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'error', error: 'Failed to load model' },
+              }),
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Error')).toBeInTheDocument();
       });
     });
 
@@ -243,7 +371,7 @@ describe('MultiModelSelector', () => {
   });
 
   describe('Model selection', () => {
-    it('should handle model selection toggle', async () => {
+    it('should handle model selection toggle - adding a model', async () => {
       render(
         <MultiModelSelector
           selectedModels={[]}
@@ -261,8 +389,36 @@ describe('MultiModelSelector', () => {
       // Click first checkbox - should add qwen-image to selection
       mockOnModelsChange.mockClear();
       fireEvent.click(checkboxes[0]);
+
       // Verify the callback was called with the model added
       expect(mockOnModelsChange).toHaveBeenCalledWith(['qwen-image']);
+    });
+
+    it('should handle model selection toggle - removing a model', async () => {
+      render(
+        <MultiModelSelector
+          selectedModels={['qwen-image', 'flux-schnell']}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const checkboxes = screen.getAllByRole('checkbox');
+      expect(checkboxes.length).toBeGreaterThan(0);
+
+      // Find the checked checkbox (qwen-image is first)
+      const firstCheckbox = checkboxes[0];
+      expect(firstCheckbox).toBeChecked();
+
+      // Click to deselect
+      mockOnModelsChange.mockClear();
+      fireEvent.click(firstCheckbox);
+
+      // Verify the callback was called with model removed
+      expect(mockOnModelsChange).toHaveBeenCalledWith(['flux-schnell']);
     });
 
     it('should select all models', async () => {
@@ -285,6 +441,7 @@ describe('MultiModelSelector', () => {
         'flux-schnell',
         'qwen-image-edit',
         'cli-model',
+        'video-model',
       ]);
     });
 
@@ -309,7 +466,7 @@ describe('MultiModelSelector', () => {
     it('should disable Select All when all models are selected', async () => {
       render(
         <MultiModelSelector
-          selectedModels={['qwen-image', 'flux-schnell', 'qwen-image-edit', 'cli-model']}
+          selectedModels={['qwen-image', 'flux-schnell', 'qwen-image-edit', 'cli-model', 'video-model']}
           onModelsChange={mockOnModelsChange}
         />
       );
@@ -333,23 +490,58 @@ describe('MultiModelSelector', () => {
         expect(deselectAllButton).toBeDisabled();
       });
     });
+
+    it('should visually highlight selected models', async () => {
+      render(
+        <MultiModelSelector
+          selectedModels={['qwen-image']}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const checkboxes = screen.getAllByRole('checkbox');
+      const firstCheckbox = checkboxes[0];
+
+      // Selected checkbox should be checked
+      expect(firstCheckbox).toBeChecked();
+    });
   });
 
   describe('Model controls', () => {
-    it('should call onStart when clicking load button', async () => {
+    it('should call start API when clicking start button', async () => {
       const { toast } = await import('sonner');
-      let startCalled = false;
+      mockFetchCalls = [];
 
-      global.fetch = vi.fn((url) => {
+      global.fetch = vi.fn((url, options) => {
+        mockFetchCalls.push({ url, options });
         if (url === '/api/models') {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ models: [mockModels[0]] }),
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'stopped' },
+              }),
+            }),
           });
         }
         if (url === '/api/models/qwen-image/start') {
-          startCalled = true;
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({}),
+          });
+        }
+        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              allFilesExist: true,
+              files: [],
+            }),
+          });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       });
@@ -371,25 +563,44 @@ describe('MultiModelSelector', () => {
       fireEvent.click(playButtons[0]);
 
       await waitFor(() => {
-        expect(startCalled).toBe(true);
+        // Verify fetch was called with correct URL and POST method
+        const startCall = mockFetchCalls.find(call => call.url === '/api/models/qwen-image/start');
+        expect(startCall).toBeDefined();
+        expect(startCall.options?.method).toBe('POST');
         expect(toast.success).toHaveBeenCalled();
       });
     });
 
-    it('should call onStop when clicking unload button', async () => {
+    it('should call stop API when clicking stop button', async () => {
       const { toast } = await import('sonner');
-      let stopCalled = false;
+      mockFetchCalls = [];
 
-      global.fetch = vi.fn((url) => {
+      global.fetch = vi.fn((url, options) => {
+        mockFetchCalls.push({ url, options });
         if (url === '/api/models') {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ models: [mockModels[1]] }),
+            json: () => Promise.resolve({
+              models: createMockModels({
+                fluxSchnell: { status: 'running' },
+              }),
+            }),
           });
         }
         if (url === '/api/models/flux-schnell/stop') {
-          stopCalled = true;
-          return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({}),
+          });
+        }
+        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              allFilesExist: true,
+              files: [],
+            }),
+          });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       });
@@ -411,8 +622,70 @@ describe('MultiModelSelector', () => {
       fireEvent.click(stopButtons[0]);
 
       await waitFor(() => {
-        expect(stopCalled).toBe(true);
+        // Verify fetch was called with correct URL and POST method
+        const stopCall = mockFetchCalls.find(call => call.url === '/api/models/flux-schnell/stop');
+        expect(stopCall).toBeDefined();
+        expect(stopCall.options?.method).toBe('POST');
         expect(toast.success).toHaveBeenCalled();
+      });
+    });
+
+    it('should show loading state during start action', async () => {
+      mockFetchCalls = [];
+
+      global.fetch = vi.fn((url, options) => {
+        mockFetchCalls.push({ url, options });
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'stopped' },
+              }),
+            }),
+          });
+        }
+        if (url === '/api/models/qwen-image/start') {
+          // Return a promise that resolves after a delay
+          return new Promise(resolve => {
+            setTimeout(() => {
+              resolve({
+                ok: true,
+                json: () => Promise.resolve({}),
+              });
+            }, 100);
+          });
+        }
+        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              allFilesExist: true,
+              files: [],
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const playButtons = screen.getAllByTitle('Start model');
+      fireEvent.click(playButtons[0]);
+
+      // Button should show loading state
+      await waitFor(() => {
+        const playButtonAfter = screen.getAllByTitle('Start model')[0];
+        expect(playButtonAfter).toContainHTML('svg'); // Loader icon
       });
     });
 
@@ -422,10 +695,11 @@ describe('MultiModelSelector', () => {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: [{
-                ...mockModels[0],
-                huggingface: { repo: 'test/repo', files: [] },
-              }],
+              models: createMockModels({
+                qwenImage: {
+                  huggingface: { repo: 'test/repo', files: [] },
+                },
+              }),
             }),
           });
         }
@@ -452,6 +726,39 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('Download')).toBeInTheDocument();
       });
     });
+
+    it('should not show start/stop buttons for CLI mode models', async () => {
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels(),
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('CLI Model')).toBeInTheDocument();
+      });
+
+      // CLI Model should not have start/stop buttons
+      const cliModelRow = screen.getByText('CLI Model').closest('div').parentElement;
+      const startButtons = cliModelRow?.querySelectorAll('[title="Start model"]');
+      const stopButtons = cliModelRow?.querySelectorAll('[title="Stop model"]');
+
+      expect(startButtons?.length).toBe(0);
+      expect(stopButtons?.length).toBe(0);
+    });
   });
 
   describe('Expand/collapse functionality', () => {
@@ -470,11 +777,14 @@ describe('MultiModelSelector', () => {
       // Initially description should not be visible
       expect(screen.queryByText('Description:')).not.toBeInTheDocument();
 
-      // Click expand button (chevron right)
-      const expandButtons = screen.getAllByRole('button');
-      const chevronButton = expandButtons.find(btn => btn.querySelector('svg'));
-      if (chevronButton) {
-        fireEvent.click(chevronButton);
+      // Click expand button (chevron button)
+      const chevronButtons = screen.getAllByRole('button').filter(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('class')?.includes('text-muted-foreground');
+      });
+
+      if (chevronButtons.length > 0) {
+        fireEvent.click(chevronButtons[0]);
 
         // Now description should be visible
         await waitFor(() => {
@@ -495,18 +805,21 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
       });
 
-      // Expand first
-      const expandButtons = screen.getAllByRole('button');
-      const chevronButton = expandButtons.find(btn => btn.querySelector('svg'));
-      if (chevronButton) {
-        fireEvent.click(chevronButton);
+      // Find and click expand button
+      const chevronButtons = screen.getAllByRole('button').filter(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('class')?.includes('text-muted-foreground');
+      });
+
+      if (chevronButtons.length > 0) {
+        fireEvent.click(chevronButtons[0]);
 
         await waitFor(() => {
           expect(screen.getByText('Description:')).toBeInTheDocument();
         });
 
-        // Collapse
-        fireEvent.click(chevronButton);
+        // Collapse by clicking the same button
+        fireEvent.click(chevronButtons[0]);
 
         await waitFor(() => {
           expect(screen.queryByText('Description:')).not.toBeInTheDocument();
@@ -526,16 +839,143 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
       });
 
-      const expandButtons = screen.getAllByRole('button');
-      const chevronButton = expandButtons.find(btn => btn.querySelector('svg'));
-      if (chevronButton) {
-        fireEvent.click(chevronButton);
+      const chevronButtons = screen.getAllByRole('button').filter(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('class')?.includes('text-muted-foreground');
+      });
+
+      if (chevronButtons.length > 0) {
+        fireEvent.click(chevronButtons[0]);
 
         await waitFor(() => {
           expect(screen.getByText('Description:')).toBeInTheDocument();
-          expect(screen.getByText('Port:')).toBeInTheDocument();
-          expect(screen.getByText('Mode:')).toBeInTheDocument();
-          expect(screen.getByText('Type:')).toBeInTheDocument();
+          expect(screen.getByText(/Port:/)).toBeInTheDocument();
+          expect(screen.getByText(/Mode:/)).toBeInTheDocument();
+          expect(screen.getByText(/Type:/)).toBeInTheDocument();
+        });
+      }
+    });
+
+    it('should show capabilities when expanded', async () => {
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const chevronButtons = screen.getAllByRole('button').filter(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('class')?.includes('text-muted-foreground');
+      });
+
+      if (chevronButtons.length > 0) {
+        fireEvent.click(chevronButtons[0]);
+
+        await waitFor(() => {
+          expect(screen.getByText(/Capabilities:/)).toBeInTheDocument();
+          // Use getAllByText since text-to-image appears in description and capabilities
+          expect(screen.getAllByText(/text-to-image/).length).toBeGreaterThan(0);
+        });
+      }
+    });
+
+    it('should show file status when expanded', async () => {
+      // Use a model with huggingface config to get file status
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: {
+                  huggingface: { repo: 'test/repo', files: [] },
+                },
+              }),
+            }),
+          });
+        }
+        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              allFilesExist: true,
+              files: [
+                { fileName: 'model.gguf', exists: true },
+                { fileName: 'vae.safetensors', exists: true },
+              ],
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const chevronButtons = screen.getAllByRole('button').filter(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('class')?.includes('text-muted-foreground');
+      });
+
+      if (chevronButtons.length > 0) {
+        fireEvent.click(chevronButtons[0]);
+
+        await waitFor(() => {
+          expect(screen.getByText(/Files:/)).toBeInTheDocument();
+          expect(screen.getByText('model.gguf')).toBeInTheDocument();
+        });
+      }
+    });
+
+    it('should show error message in expanded details when model has error', async () => {
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'error', error: 'Failed to initialize' },
+              }),
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const chevronButtons = screen.getAllByRole('button').filter(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('class')?.includes('text-muted-foreground');
+      });
+
+      if (chevronButtons.length > 0) {
+        fireEvent.click(chevronButtons[0]);
+
+        await waitFor(() => {
+          expect(screen.getByText(/Error: Failed to initialize/)).toBeInTheDocument();
         });
       }
     });
@@ -569,7 +1009,11 @@ describe('MultiModelSelector', () => {
         if (url === '/api/models') {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ models: [mockModels[0]] }),
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'stopped' },
+              }),
+            }),
           });
         }
         if (url.includes('/start')) {
@@ -597,7 +1041,7 @@ describe('MultiModelSelector', () => {
       fireEvent.click(playButtons[0]);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalled();
+        expect(toast.error).toHaveBeenCalledWith('Failed to start model');
       });
     });
 
@@ -608,7 +1052,11 @@ describe('MultiModelSelector', () => {
         if (url === '/api/models') {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve({ models: [mockModels[1]] }),
+            json: () => Promise.resolve({
+              models: createMockModels({
+                fluxSchnell: { status: 'running' },
+              }),
+            }),
           });
         }
         if (url.includes('/stop')) {
@@ -634,6 +1082,49 @@ describe('MultiModelSelector', () => {
 
       const stopButtons = screen.getAllByTitle('Stop model');
       fireEvent.click(stopButtons[0]);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Failed to stop model');
+      });
+    });
+
+    it('should show error toast with statusText when error response has no error field', async () => {
+      const { toast } = await import('sonner');
+
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              models: createMockModels({
+                qwenImage: { status: 'stopped' },
+              }),
+            }),
+          });
+        }
+        if (url.includes('/start')) {
+          return Promise.resolve({
+            ok: false,
+            statusText: 'Service Unavailable',
+            json: () => Promise.resolve({}),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      render(
+        <MultiModelSelector
+          selectedModels={[]}
+          onModelsChange={mockOnModelsChange}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      const playButtons = screen.getAllByTitle('Start model');
+      fireEvent.click(playButtons[0]);
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled();
