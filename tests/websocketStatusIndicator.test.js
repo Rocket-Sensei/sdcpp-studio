@@ -46,12 +46,12 @@ describe('WebSocketStatusIndicator Component', () => {
     vi.clearAllMocks();
   });
 
-  it('should render Live status when connected', () => {
+  it('should render Online status when connected', () => {
     useWebSocket.mockReturnValue({ isConnected: true, isConnecting: false });
 
     render(React.createElement(WebSocketStatusIndicator));
 
-    expect(screen.getByText('Live')).toBeTruthy();
+    expect(screen.getByText('Online')).toBeTruthy();
   });
 
   it('should render Offline status when disconnected', () => {
@@ -76,7 +76,7 @@ describe('WebSocketStatusIndicator Component', () => {
     render(React.createElement(WebSocketStatusIndicator));
 
     // The indicator should be clickable
-    const indicator = screen.getByText('Live').closest('div');
+    const indicator = screen.getByText('Online').closest('div');
     expect(indicator).toBeTruthy();
     expect(indicator.className).toContain('cursor-pointer');
 
@@ -94,7 +94,7 @@ describe('WebSocketStatusIndicator Component', () => {
 
     const { container } = render(React.createElement(WebSocketStatusIndicator));
 
-    const indicator = screen.getByText('Live').closest('div');
+    const indicator = screen.getByText('Online').closest('div');
     expect(indicator.className).toContain('hover:opacity-80');
   });
 
@@ -103,7 +103,7 @@ describe('WebSocketStatusIndicator Component', () => {
 
     render(React.createElement(WebSocketStatusIndicator));
 
-    const indicator = screen.getByText('Live').closest('div');
+    const indicator = screen.getByText('Online').closest('div');
     expect(indicator.title).toContain('connected');
     expect(indicator.title).toContain('Click to view logs');
   });
@@ -114,7 +114,7 @@ describe('WebSocketStatusIndicator Component', () => {
     render(React.createElement(WebSocketStatusIndicator));
 
     // Click to open modal
-    const indicator = screen.getByText('Live').closest('div');
+    const indicator = screen.getByText('Online').closest('div');
     fireEvent.click(indicator);
 
     // Wait for modal to open

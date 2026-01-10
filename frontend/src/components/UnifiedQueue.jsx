@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
 import { Checkbox } from "./ui/checkbox";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { LogViewer } from "./LogViewer";
 import { LightboxWithImage, LightboxGalleryWithImages } from "@didik-mulyadi/react-modal-images";
 import { useGenerations } from "../hooks/useImageGeneration";
@@ -676,64 +677,262 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
   return (
     <>
-      {/* Toolbar with Filter, Delete All, and Cancel All buttons */}
-      <div className="space-y-2 mb-4">
-        {/* First row: Total count and Filter button */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {pagination.total} total generation{pagination.total !== 1 ? 's' : ''}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-            className={isFilterPanelOpen ? "bg-accent" : ""}
-          >
-            <Filter className="h-4 w-4 mr-1" />
-            Filters
-            <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
-          </Button>
-        </div>
+      {/* Toolbar with Filter button */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-muted-foreground">
+          {pagination.total} total generation{pagination.total !== 1 ? 's' : ''}
+        </span>
 
-        {/* Second row: Action buttons - stack on mobile, row on larger screens */}
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setIsCancelAllOpen(true)}
-            disabled={!hasPendingOrProcessing}
-          >
-            <X className="h-4 w-4 mr-1" />
-            Cancel All
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsClearFailedOpen(true)}
-            disabled={!hasFailed}
-            className="border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700"
-          >
-            <XCircle className="h-4 w-4 mr-1" />
-            Clear Failed
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsDeleteAllOpen(true)}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete All
-          </Button>
-        </div>
+        {/* Filter Sheet */}
+        <Sheet open={isFilterPanelOpen} onOpenChange={setIsFilterPanelOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              Filters
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-full sm:w-[360px] overflow-y-auto">
+            <div className="mt-8 space-y-6">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-lg">Filters</h3>
+              </div>
+
+              {/* Search by prompt */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Search Prompts</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search prompts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {/* Status filter */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Status</label>
+                  {selectedStatuses.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setSelectedStatuses([])}
+                    >
+                      Clear all
+                    </Button>
+                  )}
+                </div>
+
+                {/* Selected status badges */}
+                {selectedStatuses.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedStatuses.map(status => {
+                      const option = STATUS_FILTER_OPTIONS.find(o => o.value === status);
+                      return (
+                        <Badge
+                          key={status}
+                          variant="secondary"
+                          className="gap-1 pl-2 pr-1.5 py-0.5"
+                        >
+                          {option?.label || status}
+                          <button
+                            onClick={() => setSelectedStatuses(prev => prev.filter(s => s !== status))}
+                            className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Status checkboxes */}
+                <div className="space-y-2">
+                  {STATUS_FILTER_OPTIONS.map(option => {
+                    const config = STATUS_CONFIG[option.value];
+                    const StatusIcon = config?.icon;
+                    const isSelected = selectedStatuses.includes(option.value);
+
+                    return (
+                      <label
+                        key={option.value}
+                        className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
+                          isSelected ? 'bg-accent' : 'hover:bg-accent/50'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => {
+                            setSelectedStatuses(prev => {
+                              if (prev.includes(option.value)) {
+                                return prev.filter(s => s !== option.value);
+                              } else {
+                                return [...prev, option.value];
+                              }
+                            });
+                          }}
+                        />
+                        {StatusIcon && (
+                          <StatusIcon className={`h-3.5 w-3.5 text-muted-foreground ${
+                            config?.animate ? 'animate-spin' : ''
+                          }`} />
+                        )}
+                        <span className="text-sm">{option.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Model filter */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Models</label>
+                  {selectedModels.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setSelectedModels([])}
+                    >
+                      Clear all
+                    </Button>
+                  )}
+                </div>
+
+                {/* Selected model badges */}
+                {selectedModels.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedModels.map(modelId => (
+                      <Badge
+                        key={modelId}
+                        variant="secondary"
+                        className="gap-1 pl-2 pr-1.5 py-0.5"
+                      >
+                        {getModelName(modelId)}
+                        <button
+                          onClick={() => setSelectedModels(prev => prev.filter(m => m !== modelId))}
+                          className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {/* Model checkboxes - show only models that have generations */}
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {Object.keys(models).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Loading models...</p>
+                  ) : (
+                    // Get unique models from generations and filter those that exist in our models map
+                    generations
+                      .map(g => g.model)
+                      .filter((modelId, index, self) => modelId && self.indexOf(modelId) === index)
+                      .sort((a, b) => (models[a] || a).localeCompare(models[b] || b))
+                      .map(modelId => {
+                        const isSelected = selectedModels.includes(modelId);
+                        const modelName = models[modelId] || modelId;
+
+                        return (
+                          <label
+                            key={modelId}
+                            className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
+                              isSelected ? 'bg-accent' : 'hover:bg-accent/50'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => {
+                                setSelectedModels(prev => {
+                                  if (prev.includes(modelId)) {
+                                    return prev.filter(m => m !== modelId);
+                                  } else {
+                                    return [...prev, modelId];
+                                  }
+                                });
+                              }}
+                            />
+                            <span className="text-sm truncate">{modelName}</span>
+                          </label>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+
+              {/* Filter results count */}
+              {(searchQuery || selectedStatuses.length > 0 || selectedModels.length > 0) && filteredGenerations.length !== generations.length && (
+                <div className="pt-3 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filteredGenerations.length} of {generations.length} generations
+                  </p>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="pt-4 border-t border-border space-y-2">
+                <h4 className="text-sm font-medium">Actions</h4>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setIsCancelAllOpen(true);
+                      setIsFilterPanelOpen(false);
+                    }}
+                    disabled={!hasPendingOrProcessing}
+                    className="w-full"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancel All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsClearFailedOpen(true);
+                      setIsFilterPanelOpen(false);
+                    }}
+                    disabled={!hasFailed}
+                    className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700"
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Clear Failed
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsDeleteAllOpen(true);
+                      setIsFilterPanelOpen(false);
+                    }}
+                    className="w-full"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete All
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <TooltipProvider>
-        {/* Main layout with optional filter panel */}
-        <div className={`grid gap-4 transition-all duration-300 ${
-          isFilterPanelOpen
-            ? 'grid-cols-1 xl:grid-cols-[1fr_300px]'
-            : 'grid-cols-1'
-        }`}>
+        {/* Main layout - gallery grid only */}
+        <div className="grid gap-4 grid-cols-1">
           {/* Gallery Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredGenerations.map((generation) => {
@@ -926,203 +1125,6 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
             );
           })}
           </div>
-
-          {/* Filter Panel */}
-          {isFilterPanelOpen && (
-            <Card className="hidden xl:block h-fit sticky top-4">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Filters</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsFilterPanelOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                {/* Search by prompt */}
-                <div className="space-y-2 mb-4">
-                  <label className="text-sm font-medium">Search Prompts</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search prompts..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-
-                {/* Status filter */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Status</label>
-                    {selectedStatuses.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setSelectedStatuses([])}
-                      >
-                        Clear all
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Selected status badges */}
-                  {selectedStatuses.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedStatuses.map(status => {
-                        const option = STATUS_FILTER_OPTIONS.find(o => o.value === status);
-                        return (
-                          <Badge
-                            key={status}
-                            variant="secondary"
-                            className="gap-1 pl-2 pr-1.5 py-0.5"
-                          >
-                            {option?.label || status}
-                            <button
-                              onClick={() => setSelectedStatuses(prev => prev.filter(s => s !== status))}
-                              className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Status checkboxes */}
-                  <div className="space-y-2">
-                    {STATUS_FILTER_OPTIONS.map(option => {
-                      const config = STATUS_CONFIG[option.value];
-                      const StatusIcon = config?.icon;
-                      const isSelected = selectedStatuses.includes(option.value);
-
-                      return (
-                        <label
-                          key={option.value}
-                          className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
-                            isSelected ? 'bg-accent' : 'hover:bg-accent/50'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={() => {
-                              setSelectedStatuses(prev => {
-                                if (prev.includes(option.value)) {
-                                  return prev.filter(s => s !== option.value);
-                                } else {
-                                  return [...prev, option.value];
-                                }
-                              });
-                            }}
-                          />
-                          {StatusIcon && (
-                            <StatusIcon className={`h-3.5 w-3.5 text-muted-foreground ${
-                              config?.animate ? 'animate-spin' : ''
-                            }`} />
-                          )}
-                          <span className="text-sm">{option.label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Model filter */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Models</label>
-                    {selectedModels.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setSelectedModels([])}
-                      >
-                        Clear all
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Selected model badges */}
-                  {selectedModels.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedModels.map(modelId => (
-                        <Badge
-                          key={modelId}
-                          variant="secondary"
-                          className="gap-1 pl-2 pr-1.5 py-0.5"
-                        >
-                          {getModelName(modelId)}
-                          <button
-                            onClick={() => setSelectedModels(prev => prev.filter(m => m !== modelId))}
-                            className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Model checkboxes - show only models that have generations */}
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {Object.keys(models).length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Loading models...</p>
-                    ) : (
-                      // Get unique models from generations and filter those that exist in our models map
-                      generations
-                        .map(g => g.model)
-                        .filter((modelId, index, self) => modelId && self.indexOf(modelId) === index)
-                        .sort((a, b) => (models[a] || a).localeCompare(models[b] || b))
-                        .map(modelId => {
-                          const isSelected = selectedModels.includes(modelId);
-                          const modelName = models[modelId] || modelId;
-
-                          return (
-                            <label
-                              key={modelId}
-                              className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
-                                isSelected ? 'bg-accent' : 'hover:bg-accent/50'
-                              }`}
-                            >
-                              <Checkbox
-                                checked={isSelected}
-                                onChange={() => {
-                                  setSelectedModels(prev => {
-                                    if (prev.includes(modelId)) {
-                                      return prev.filter(m => m !== modelId);
-                                    } else {
-                                      return [...prev, modelId];
-                                    }
-                                  });
-                                }}
-                              />
-                              <span className="text-sm truncate">{modelName}</span>
-                            </label>
-                          );
-                        })
-                    )}
-                  </div>
-                </div>
-
-                {/* Filter results count */}
-                {(searchQuery || selectedStatuses.length > 0 || selectedModels.length > 0) && filteredGenerations.length !== generations.length && (
-                  <div className="mt-4 pt-3 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground">
-                      Showing {filteredGenerations.length} of {generations.length} generations
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </div>
       </TooltipProvider>
 

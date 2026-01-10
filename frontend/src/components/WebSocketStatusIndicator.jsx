@@ -2,7 +2,7 @@
  * WebSocket Status Indicator
  *
  * Displays a visual indicator of the WebSocket connection status.
- * Shows "Live" when connected, "Offline" when disconnected.
+ * Shows "Online" when connected, "Offline" when disconnected.
  * Click to open the system log viewer modal.
  */
 
@@ -35,7 +35,7 @@ export function WebSocketStatusIndicator() {
         ) : isConnected ? (
           <>
             <Wifi className="h-3.5 w-3.5 text-green-500" />
-            <span className="text-green-600 dark:text-green-400 font-medium hidden sm:inline">Live</span>
+            <span className="text-green-600 dark:text-green-400 font-medium hidden sm:inline">Online</span>
           </>
         ) : (
           <>
