@@ -26,8 +26,8 @@ SheetOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const sheetVariants = {
   side: "fixed z-50 gap-4 bg-background p-6 shadow-lg",
   variants: {
-    left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm data-[state=open]:animate-slide-in-left data-[state=closed]:animate-slide-out-left",
-    right: "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm data-[state=open]:animate-slide-in-right data-[state=closed]:animate-slide-out-right",
+    left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=open]:animate-slide-in-left data-[state=closed]:animate-slide-out-left",
+    right: "inset-y-0 right-0 h-full w-3/4 border-l data-[state=open]:animate-slide-in-right data-[state=closed]:animate-slide-out-right",
   },
 };
 
