@@ -19,18 +19,11 @@ import {
   Edit3,
   AlertTriangle,
   Info,
-  Filter,
-  ChevronDown,
-  Search,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
-import { Badge } from "./ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
-import { Checkbox } from "./ui/checkbox";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { LogViewer } from "./LogViewer";
 import { LightboxWithImage, LightboxGalleryWithImages } from "@didik-mulyadi/react-modal-images";
 import { useGenerations } from "../hooks/useImageGeneration";
@@ -83,9 +76,6 @@ const STATUS_CONFIG = {
     color: "secondary",
   },
 };
-
-// localStorage key for filter panel persistence
-const FILTER_PANEL_KEY = "sd-cpp-studio-filter-panel-open";
 
 // Helper functions - defined outside component to avoid recreation on each render
 const getStatusConfig = (status) => {
@@ -195,7 +185,7 @@ const Thumbnail = memo(function Thumbnail({ generation, onViewLogs }) {
   );
 });
 
-export function UnifiedQueue({ onCreateMore, onEditImage }) {
+export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
   const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
   const [selectedImage, setSelectedImage] = useState(null);
   const [galleryImages, setGalleryImages] = useState(null);
@@ -209,41 +199,6 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   const [deleteFiles, setDeleteFiles] = useState(false);
   const [mobileInfoGeneration, setMobileInfoGeneration] = useState(null);
   const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
-
-  // Filter panel state with localStorage persistence
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(FILTER_PANEL_KEY);
-      return saved === "true";
-    }
-    return false;
-  });
-
-  // Search query state
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Status filter options
-  const STATUS_FILTER_OPTIONS = [
-    { value: GENERATION_STATUS.PENDING, label: "Pending" },
-    { value: GENERATION_STATUS.MODEL_LOADING, label: "Loading Model" },
-    { value: GENERATION_STATUS.PROCESSING, label: "Processing" },
-    { value: GENERATION_STATUS.COMPLETED, label: "Completed" },
-    { value: GENERATION_STATUS.FAILED, label: "Failed" },
-    { value: GENERATION_STATUS.CANCELLED, label: "Cancelled" },
-  ];
-
-  // Status filter state (array of selected status values)
-  const [selectedStatuses, setSelectedStatuses] = useState([]);
-
-  // Model filter state (array of selected model IDs)
-  const [selectedModels, setSelectedModels] = useState([]);
-
-  // Persist filter panel state to localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(FILTER_PANEL_KEY, String(isFilterPanelOpen));
-    }
-  }, [isFilterPanelOpen]);
 
   // Use a ref to track fetchGenerations so the WebSocket onMessage callback doesn't change
   const fetchGenerationsRef = useRef(() => fetchGenerations(currentPage));
@@ -634,30 +589,30 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
   // Compute if there are any failed generations
   const hasFailed = generations.some(g => g.status === GENERATION_STATUS.FAILED);
 
-  // Filter generations by search query and status
+  // Filter generations by search query and status (use external filter props if provided)
   const filteredGenerations = useMemo(() => {
     let filtered = generations;
 
     // Apply search filter (case-insensitive prompt search)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (externalSearchQuery && externalSearchQuery.trim()) {
+      const query = externalSearchQuery.toLowerCase();
       filtered = filtered.filter(g =>
         g.prompt && g.prompt.toLowerCase().includes(query)
       );
     }
 
     // Apply status filter
-    if (selectedStatuses.length > 0) {
-      filtered = filtered.filter(g => selectedStatuses.includes(g.status));
+    if (externalSelectedStatuses && externalSelectedStatuses.length > 0) {
+      filtered = filtered.filter(g => externalSelectedStatuses.includes(g.status));
     }
 
     // Apply model filter
-    if (selectedModels.length > 0) {
-      filtered = filtered.filter(g => selectedModels.includes(g.model));
+    if (externalSelectedModelsFilter && externalSelectedModelsFilter.length > 0) {
+      filtered = filtered.filter(g => externalSelectedModelsFilter.includes(g.model));
     }
 
     return filtered;
-  }, [generations, searchQuery, selectedStatuses, selectedModels]);
+  }, [generations, externalSearchQuery, externalSelectedStatuses, externalSelectedModelsFilter]);
 
   if (generations.length === 0 && !isLoading) {
     return (
@@ -677,259 +632,6 @@ export function UnifiedQueue({ onCreateMore, onEditImage }) {
 
   return (
     <>
-      {/* Toolbar with Filter button */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-muted-foreground">
-          {pagination.total} total generation{pagination.total !== 1 ? 's' : ''}
-        </span>
-
-        {/* Filter Sheet */}
-        <Sheet open={isFilterPanelOpen} onOpenChange={setIsFilterPanelOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              Filters
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:w-[360px] overflow-y-auto">
-            <div className="mt-8 space-y-6">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">Filters</h3>
-              </div>
-
-              {/* Search by prompt */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Search Prompts</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search prompts..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-
-              {/* Status filter */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Status</label>
-                  {selectedStatuses.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setSelectedStatuses([])}
-                    >
-                      Clear all
-                    </Button>
-                  )}
-                </div>
-
-                {/* Selected status badges */}
-                {selectedStatuses.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedStatuses.map(status => {
-                      const option = STATUS_FILTER_OPTIONS.find(o => o.value === status);
-                      return (
-                        <Badge
-                          key={status}
-                          variant="secondary"
-                          className="gap-1 pl-2 pr-1.5 py-0.5"
-                        >
-                          {option?.label || status}
-                          <button
-                            onClick={() => setSelectedStatuses(prev => prev.filter(s => s !== status))}
-                            className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Status checkboxes */}
-                <div className="space-y-2">
-                  {STATUS_FILTER_OPTIONS.map(option => {
-                    const config = STATUS_CONFIG[option.value];
-                    const StatusIcon = config?.icon;
-                    const isSelected = selectedStatuses.includes(option.value);
-
-                    return (
-                      <label
-                        key={option.value}
-                        className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
-                          isSelected ? 'bg-accent' : 'hover:bg-accent/50'
-                        }`}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => {
-                            setSelectedStatuses(prev => {
-                              if (prev.includes(option.value)) {
-                                return prev.filter(s => s !== option.value);
-                              } else {
-                                return [...prev, option.value];
-                              }
-                            });
-                          }}
-                        />
-                        {StatusIcon && (
-                          <StatusIcon className={`h-3.5 w-3.5 text-muted-foreground ${
-                            config?.animate ? 'animate-spin' : ''
-                          }`} />
-                        )}
-                        <span className="text-sm">{option.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Model filter */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Models</label>
-                  {selectedModels.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setSelectedModels([])}
-                    >
-                      Clear all
-                    </Button>
-                  )}
-                </div>
-
-                {/* Selected model badges */}
-                {selectedModels.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedModels.map(modelId => (
-                      <Badge
-                        key={modelId}
-                        variant="secondary"
-                        className="gap-1 pl-2 pr-1.5 py-0.5"
-                      >
-                        {getModelName(modelId)}
-                        <button
-                          onClick={() => setSelectedModels(prev => prev.filter(m => m !== modelId))}
-                          className="ml-0.5 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-
-                {/* Model checkboxes - show only models that have generations */}
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {Object.keys(models).length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Loading models...</p>
-                  ) : (
-                    // Get unique models from generations and filter those that exist in our models map
-                    generations
-                      .map(g => g.model)
-                      .filter((modelId, index, self) => modelId && self.indexOf(modelId) === index)
-                      .sort((a, b) => (models[a] || a).localeCompare(models[b] || b))
-                      .map(modelId => {
-                        const isSelected = selectedModels.includes(modelId);
-                        const modelName = models[modelId] || modelId;
-
-                        return (
-                          <label
-                            key={modelId}
-                            className={`flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 transition-colors ${
-                              isSelected ? 'bg-accent' : 'hover:bg-accent/50'
-                            }`}
-                          >
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => {
-                                setSelectedModels(prev => {
-                                  if (prev.includes(modelId)) {
-                                    return prev.filter(m => m !== modelId);
-                                  } else {
-                                    return [...prev, modelId];
-                                  }
-                                });
-                              }}
-                            />
-                            <span className="text-sm truncate">{modelName}</span>
-                          </label>
-                        );
-                      })
-                  )}
-                </div>
-              </div>
-
-              {/* Filter results count */}
-              {(searchQuery || selectedStatuses.length > 0 || selectedModels.length > 0) && filteredGenerations.length !== generations.length && (
-                <div className="pt-3 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground">
-                    Showing {filteredGenerations.length} of {generations.length} generations
-                  </p>
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div className="pt-4 border-t border-border space-y-2">
-                <h4 className="text-sm font-medium">Actions</h4>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      setIsCancelAllOpen(true);
-                      setIsFilterPanelOpen(false);
-                    }}
-                    disabled={!hasPendingOrProcessing}
-                    className="w-full"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel All
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setIsClearFailedOpen(true);
-                      setIsFilterPanelOpen(false);
-                    }}
-                    disabled={!hasFailed}
-                    className="w-full border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 hover:text-orange-700"
-                  >
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Clear Failed
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setIsDeleteAllOpen(true);
-                      setIsFilterPanelOpen(false);
-                    }}
-                    className="w-full"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete All
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
       <TooltipProvider>
         {/* Main layout - gallery grid only */}
         <div className="grid gap-4 grid-cols-1">

@@ -24,8 +24,11 @@ const STORAGE_KEY = "studio-form-collapsed";
  * @param {boolean} props.isFormCollapsed - External control of form collapse state
  * @param {Function} props.onToggleForm - Callback when form toggle is requested
  * @param {Function} props.onCollapseChange - Callback when collapse state changes (for parent to track state)
+ * @param {string} props.searchQuery - Search query for filtering generations
+ * @param {Array} props.selectedStatuses - Array of selected status values for filtering
+ * @param {Array} props.selectedModelsFilter - Array of selected model IDs for filtering
  */
-export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onCollapseChange }) {
+export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onCollapseChange, searchQuery, selectedStatuses, selectedModelsFilter }) {
   // State for selected models (array of model IDs)
   const [selectedModels, setSelectedModels] = useState([]);
 
@@ -163,7 +166,13 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
 
         {/* Right area - UnifiedQueue Gallery */}
         <div className={isFormCollapsed ? "lg:col-span-3" : "lg:col-span-2"}>
-          <UnifiedQueue onCreateMore={handleCreateMore} onEditImage={handleEditImage} />
+          <UnifiedQueue
+            onCreateMore={handleCreateMore}
+            onEditImage={handleEditImage}
+            searchQuery={searchQuery}
+            selectedStatuses={selectedStatuses}
+            selectedModelsFilter={selectedModelsFilter}
+          />
         </div>
       </div>
 
