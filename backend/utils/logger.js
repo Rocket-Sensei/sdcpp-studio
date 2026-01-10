@@ -171,9 +171,13 @@ function createHttpLogger() {
  * Create SD.cpp-specific logger (writes to sdcpp.log and optionally stdout)
  */
 function createSdCppLogger() {
+  // Create file destination for SD.cpp logs
+  // We keep a reference to it for direct flushing
+  const sdcppFileDestination = createFileSyncDestination('sdcpp.log');
+
   const streams = [
     // All SD.cpp logs go to sdcpp.log (sync writes to ensure logs are captured)
-    { level: 'trace', stream: createFileSyncDestination('sdcpp.log') },
+    { level: 'trace', stream: sdcppFileDestination },
   ];
 
   // Also output to console if LOG_TO_STDOUT is enabled (default: true)
@@ -195,7 +199,7 @@ function createSdCppLogger() {
     });
   }
 
-  return pino({
+  const logger = pino({
     level: LOG_LEVEL,
     formatters: {
       level: (label, number) => ({ level: label, levelNum: number }),
@@ -205,6 +209,13 @@ function createSdCppLogger() {
     },
     base: { type: 'sdcpp' }
   }, pino.multistream(streams));
+
+  // Store the file destination reference on the logger for direct access
+  // This allows us to flush the file directly since logger.flush() doesn't
+  // properly flush all streams in a multistream
+  logger._fileDestination = sdcppFileDestination;
+
+  return logger;
 }
 
 // Base logger instance
@@ -256,6 +267,17 @@ export function getSdCppLogger(generationId = null) {
     return sdCppLogger.child({ generation_id: generationId });
   }
   return sdCppLogger;
+}
+
+/**
+ * Flush the SD.cpp logger's file destination
+ * This ensures logs are written to disk immediately.
+ * Uses flushSync() for synchronous writes to guarantee data is persisted.
+ */
+export function flushSdCppLogger() {
+  if (sdCppLogger._fileDestination && typeof sdCppLogger._fileDestination.flushSync === 'function') {
+    sdCppLogger._fileDestination.flushSync();
+  }
 }
 
 /**
@@ -400,7 +422,7 @@ export function logCliCommand(command, args = [], options = {}, generationId = n
   }, `CLI: ${command}`);
 
   // Flush immediately to ensure logs are written
-  logger.flush();
+  flushSdCppLogger();
 }
 
 /**
@@ -424,7 +446,7 @@ export function logCliOutput(stdout, stderr, exitCode, generationId = null) {
   }, `CLI exit code: ${exitCode}`);
 
   // Flush immediately to ensure logs are written
-  logger.flush();
+  flushSdCppLogger();
 }
 
 /**
@@ -443,7 +465,7 @@ export function logCliError(error, generationId = null) {
   }, `CLI Error: ${error.message}`);
 
   // Flush immediately to ensure logs are written
-  logger.flush();
+  flushSdCppLogger();
 }
 
 /**

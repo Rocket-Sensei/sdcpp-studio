@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import { spawn } from 'child_process';
 import { broadcastModelStatus } from './websocket.js';
-import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger } from '../utils/logger.js';
+import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger, flushSdCppLogger } from '../utils/logger.js';
 
 const logger = createLogger('modelManager');
 
@@ -540,7 +540,7 @@ export class ModelManager {
         if (model.exec_mode === ExecMode.SERVER) {
           const sdcppLogger = getSdCppLogger();
           sdcppLogger.info({ modelId, stdout: output.trim() }, 'Server output');
-          sdcppLogger.flush();
+          flushSdCppLogger();
         }
 
         // Detect when server is ready (looks for common patterns)
@@ -567,7 +567,7 @@ export class ModelManager {
         if (model.exec_mode === ExecMode.SERVER) {
           const sdcppLogger = getSdCppLogger();
           sdcppLogger.warn({ modelId, stderr: error.trim() }, 'Server error');
-          sdcppLogger.flush();
+          flushSdCppLogger();
         }
       });
 
