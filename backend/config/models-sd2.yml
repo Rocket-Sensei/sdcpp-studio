@@ -1,4 +1,5 @@
 # Stable Diffusion 2.x Models
+# Note: SD2.x models have VAE built-in, no separate VAE file needed
 models:
   # ==================== SD 2.1 Models ====================
   sd-2-1-768:
@@ -10,17 +11,8 @@ models:
     args:
       - "--diffusion-model"
       - "./models/v2-1_768-ema-pruned.safetensors"
-      - "--clip_l"
-      - "./models/clip_l.safetensors"
-      - "--clip_g"
-      - "./models/clip_g.safetensors"
-      - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
-      - "--vae"
-      - "./models/sd35-vae.safetensors"
       - "-v"
       - "--offload-to-cpu"
-      - "--clip-on-cpu"
       - "--steps"
       - "25"
     mode: "on_demand"
