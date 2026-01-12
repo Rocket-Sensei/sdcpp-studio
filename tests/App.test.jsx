@@ -64,7 +64,7 @@ vi.mock('../frontend/src/utils/api', () => ({
 }));
 
 // Import App after mocks are set up
-const { default: App } = await import('../frontend/src/App');
+const { default: App, AppWithProviders } = await import('../frontend/src/App');
 
 // Helper to render App with a specific route
 const renderAppWithRoute = (initialEntries) => {
@@ -72,7 +72,7 @@ const renderAppWithRoute = (initialEntries) => {
     React.createElement(
       MemoryRouter,
       { initialEntries },
-      React.createElement(App)
+      React.createElement(AppWithProviders)
     )
   );
 };

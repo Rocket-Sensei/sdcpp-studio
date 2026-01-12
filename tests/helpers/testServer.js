@@ -109,17 +109,19 @@ async function startServer(force = false) {
   console.log(`Server path: ${serverPath}`);
 
   // Spawn the server process
+  // Create test environment without API_KEY (tests run without authentication)
+  const testEnv = { ...process.env };
+  testEnv.PORT = SERVER_PORT;
+  testEnv.HOST = SERVER_HOST;
+  testEnv.NODE_ENV = 'test';
+  testEnv.DB_PATH = process.env.DB_PATH;
+  testEnv.IMAGES_DIR = process.env.IMAGES_DIR;
+  // Remove API_KEY from environment so tests run without authentication
+  delete testEnv.API_KEY;
+
   serverProcess = spawn('node', [serverPath], {
     stdio: 'pipe',
-    env: {
-      ...process.env,
-      PORT: SERVER_PORT,
-      HOST: SERVER_HOST,
-      NODE_ENV: 'test',
-      // Ensure DB_PATH is passed through to the server process
-      DB_PATH: process.env.DB_PATH,
-      IMAGES_DIR: process.env.IMAGES_DIR
-    }
+    env: testEnv
   });
 
   // Handle server output (optional logging)

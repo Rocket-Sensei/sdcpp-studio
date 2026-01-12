@@ -8,9 +8,12 @@ import { config } from 'dotenv';
 import http from 'http';
 
 // Load environment variables from .env file BEFORE importing database module
-const envResult = config({
-  path: path.join(dirname(fileURLToPath(import.meta.url)), '.env')
-});
+// Skip .env loading in test mode - tests use environment variables set by test runner
+const envResult = process.env.NODE_ENV === 'test'
+  ? { error: new Error('Skipping .env in test mode') }
+  : config({
+      path: path.join(dirname(fileURLToPath(import.meta.url)), '.env')
+    });
 
 import { initializeDatabase, closeDatabase, getImagesDir, getInputImagesDir } from './db/database.js';
 import { runMigrations } from './db/migrations.js';

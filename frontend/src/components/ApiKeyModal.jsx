@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Key, Check, AlertCircle } from 'lucide-react';
 import { saveApiKey, validateApiKey, isAuthRequired } from '../utils/api';
+import { useApiKeyContext } from '../contexts/ApiKeyContext';
 
 /**
  * ApiKeyModal - Modal for prompting user to enter API key when authentication is required
@@ -14,6 +15,7 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const { notifyApiKeyChanged } = useApiKeyContext();
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -36,6 +38,7 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
 
       if (isValid) {
         saveApiKey(apiKey);
+        notifyApiKeyChanged(); // Notify listeners that API key changed
         setSuccess(true);
         setTimeout(() => {
           onSuccess?.();

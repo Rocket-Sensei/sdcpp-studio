@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Sparkles, ChevronDown, Menu, Filter, Search, X, Clock, XCircle, CheckCircle2, Cpu, Trash2 } from "lucide-react";
+import { Sparkles, ChevronDown, Menu, Filter, Search, X, Clock, XCircle, CheckCircle2, Cpu, Trash2, Settings } from "lucide-react";
 import { Toaster } from "./components/ui/sonner";
 import { Studio } from "./components/Studio";
 import { WebSocketStatusIndicator } from "./components/WebSocketStatusIndicator";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
-import { useGenerations } from "./hooks/useImageGeneration";
 import { ApiKeyProvider } from "./components/ApiKeyModal";
+import { ApiKeyProvider as ApiKeyContextProvider, useApiKeyContext } from "./contexts/ApiKeyContext";
+import { SettingsModal } from "./components/SettingsModal";
+import { useGenerations } from "./hooks/useImageGeneration";
 import { Button } from "./components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./components/ui/sheet";
 import { Input } from "./components/ui/input";
@@ -76,6 +78,7 @@ const STATUS_FILTER_OPTIONS = [
 
 function App() {
   const { fetchGenerations, generations, pagination } = useGenerations();
+  const { version: apiKeyVersion } = useApiKeyContext();
 
   // Form collapse state shared with Studio component
   const [isFormCollapsed, setIsFormCollapsed] = useState(() => {
@@ -104,9 +107,13 @@ function App() {
   // Model filter state (array of selected model IDs)
   const [selectedModelsFilter, setSelectedModelsFilter] = useState([]);
 
+  // Settings modal state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Fetch generations on mount and when API key version changes
   useEffect(() => {
     fetchGenerations();
-  }, [fetchGenerations]);
+  }, [fetchGenerations, apiKeyVersion]);
 
   // Persist filter panel state to localStorage
   useEffect(() => {
@@ -222,9 +229,7 @@ function App() {
   }, []);
 
   return (
-    <ApiKeyProvider>
-      <WebSocketProvider>
-        <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
           {/* Header */}
           <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
             <div className="container mx-auto px-4 py-3">
@@ -595,6 +600,16 @@ function App() {
                   </Sheet>
                 </div>
 
+                {/* Settings Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+
                 {/* WebSocket Status Indicator */}
                 <WebSocketStatusIndicator />
               </div>
@@ -635,10 +650,27 @@ function App() {
 
           {/* Toast notifications */}
           <Toaster />
+
+          {/* Settings Modal */}
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
         </div>
-      </WebSocketProvider>
-    </ApiKeyProvider>
   );
 }
 
 export default App;
+
+// Wrapper component that provides both API key providers
+export function AppWithProviders() {
+  return (
+    <ApiKeyProvider>
+      <ApiKeyContextProvider>
+        <WebSocketProvider>
+          <App />
+        </WebSocketProvider>
+      </ApiKeyContextProvider>
+    </ApiKeyProvider>
+  );
+}
