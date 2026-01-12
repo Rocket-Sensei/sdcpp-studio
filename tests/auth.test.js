@@ -72,7 +72,7 @@ describe('Backend Auth Middleware', () => {
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
-    it('should reject requests with missing Authorization header when API_KEY is set', () => {
+    it('should reject requests with missing API key when API_KEY is set', () => {
       process.env.API_KEY = 'test-api-key';
       authenticateRequest(mockReq, mockRes, mockNext);
 
@@ -80,7 +80,7 @@ describe('Backend Auth Middleware', () => {
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
         error: 'Unauthorized',
-        message: expect.stringContaining('Missing or invalid Authorization header')
+        message: expect.stringContaining('Missing API key')
       });
     });
 
@@ -111,6 +111,27 @@ describe('Backend Auth Middleware', () => {
     it('should accept requests with correct Bearer token', () => {
       process.env.API_KEY = 'correct-api-key';
       mockReq.headers.authorization = 'Bearer correct-api-key';
+
+      authenticateRequest(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it('should accept requests with correct X-Api-Key header', () => {
+      process.env.API_KEY = 'correct-api-key';
+      mockReq.headers['x-api-key'] = 'correct-api-key';
+
+      authenticateRequest(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it('should prioritize Authorization header over X-Api-Key header', () => {
+      process.env.API_KEY = 'correct-api-key';
+      mockReq.headers.authorization = 'Bearer correct-api-key';
+      mockReq.headers['x-api-key'] = 'wrong-api-key';
 
       authenticateRequest(mockReq, mockRes, mockNext);
 

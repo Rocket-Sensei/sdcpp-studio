@@ -195,8 +195,8 @@ app.post('/api/variation', authenticateRequest, upload.single('image'), async (r
   }
 });
 
-// Get all generations
-app.get('/api/generations', async (req, res) => {
+// Get all generations (authenticated - sensitive data)
+app.get('/api/generations', authenticateRequest, async (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : null;
     const offset = req.query.offset ? parseInt(req.query.offset) : null;
@@ -219,8 +219,8 @@ app.get('/api/generations', async (req, res) => {
   }
 });
 
-// Get single generation
-app.get('/api/generations/:id', async (req, res) => {
+// Get single generation (authenticated - sensitive data)
+app.get('/api/generations/:id', authenticateRequest, async (req, res) => {
   try {
     const generation = await getGenerationById(req.params.id);
     if (!generation) {
@@ -233,9 +233,9 @@ app.get('/api/generations/:id', async (req, res) => {
   }
 });
 
-// Get image file by image ID (serves original full-resolution image)
+// Get image file by image ID (serves original full-resolution image) - authenticated
 // Supports optional ?size=thumbnail query param for future thumbnail support
-app.get('/api/images/:imageId', async (req, res) => {
+app.get('/api/images/:imageId', authenticateRequest, async (req, res) => {
   try {
     const image = getImageById(req.params.imageId);
     if (!image) {
@@ -262,8 +262,8 @@ app.get('/api/images/:imageId', async (req, res) => {
   }
 });
 
-// Get first image for a generation (for backwards compatibility)
-app.get('/api/generations/:id/image', async (req, res) => {
+// Get first image for a generation (for backwards compatibility) - authenticated
+app.get('/api/generations/:id/image', authenticateRequest, async (req, res) => {
   try {
     const generation = await getGenerationById(req.params.id);
     if (!generation || !generation.images || generation.images.length === 0) {
@@ -291,8 +291,8 @@ app.get('/api/generations/:id/image', async (req, res) => {
   }
 });
 
-// Get all images for a generation
-app.get('/api/generations/:id/images', async (req, res) => {
+// Get all images for a generation (authenticated - sensitive data)
+app.get('/api/generations/:id/images', authenticateRequest, async (req, res) => {
   try {
     const images = await getImagesByGenerationId(req.params.id);
     res.json(images);
@@ -489,8 +489,8 @@ app.post('/api/queue/variation', authenticateRequest, upload.single('image'), as
   }
 });
 
-// Get all jobs in queue (now returns generations with status)
-app.get('/api/queue', async (req, res) => {
+// Get all jobs in queue (authenticated - sensitive data)
+app.get('/api/queue', authenticateRequest, async (req, res) => {
   try {
     const status = req.query.status || null;
     // Return all generations, filtered by status if provided
@@ -507,8 +507,8 @@ app.get('/api/queue', async (req, res) => {
   }
 });
 
-// Get queue statistics (must be before /:id route)
-app.get('/api/queue/stats', async (req, res) => {
+// Get queue statistics (must be before /:id route) - authenticated
+app.get('/api/queue/stats', authenticateRequest, async (req, res) => {
   try {
     const stats = getGenerationStats();
     res.json(stats);
@@ -518,8 +518,8 @@ app.get('/api/queue/stats', async (req, res) => {
   }
 });
 
-// Get single job
-app.get('/api/queue/:id', async (req, res) => {
+// Get single job (authenticated - sensitive data)
+app.get('/api/queue/:id', authenticateRequest, async (req, res) => {
   try {
     const job = getGenerationById(req.params.id);
     if (!job) {
@@ -719,10 +719,10 @@ app.get('/api/models', async (req, res) => {
 
 /**
  * GET /api/models/running
- * Get list of currently running models
+ * Get list of currently running models (authenticated - sensitive operational data)
  * NOTE: This route must be defined BEFORE /api/models/:id to avoid "running" being treated as a model ID
  */
-app.get('/api/models/running', async (req, res) => {
+app.get('/api/models/running', authenticateRequest, async (req, res) => {
   try {
     const runningModels = modelManager.getRunningModels();
     const processes = processTracker.getAllProcesses();
@@ -754,10 +754,10 @@ app.get('/api/models/running', async (req, res) => {
 
 /**
  * GET /api/models/downloaded
- * Get list of downloaded models
+ * Get list of downloaded models (authenticated - sensitive operational data)
  * NOTE: This route must be defined BEFORE /api/models/:id to avoid "downloaded" being treated as a model ID
  */
-app.get('/api/models/downloaded', async (req, res) => {
+app.get('/api/models/downloaded', authenticateRequest, async (req, res) => {
   try {
     const downloadedModels = modelDownloader.getDownloadedModels();
     const allModels = modelManager.getAllModels();
@@ -787,9 +787,9 @@ app.get('/api/models/downloaded', async (req, res) => {
 
 /**
  * GET /api/models/:id
- * Get details for a specific model
+ * Get details for a specific model (authenticated - sensitive operational data)
  */
-app.get('/api/models/:id', async (req, res) => {
+app.get('/api/models/:id', authenticateRequest, async (req, res) => {
   try {
     const modelId = req.params.id;
     const model = modelManager.getModel(modelId);
@@ -820,9 +820,9 @@ app.get('/api/models/:id', async (req, res) => {
 
 /**
  * GET /api/models/:id/status
- * Get the running status of a specific model
+ * Get the running status of a specific model (authenticated - sensitive operational data)
  */
-app.get('/api/models/:id/status', async (req, res) => {
+app.get('/api/models/:id/status', authenticateRequest, async (req, res) => {
   try {
     const modelId = req.params.id;
     const model = modelManager.getModel(modelId);
@@ -912,40 +912,6 @@ app.post('/api/models/:id/stop', authenticateRequest, async (req, res) => {
   }
 });
 
-/**
- * GET /api/models/running
- * Get list of currently running models
- */
-app.get('/api/models/running', async (req, res) => {
-  try {
-    const runningModels = modelManager.getRunningModels();
-    const processes = processTracker.getAllProcesses();
-
-    const result = runningModels.map(modelId => {
-      const model = modelManager.getModel(modelId);
-      const processInfo = processes.find(p => p.modelId === modelId);
-
-      return {
-        id: modelId,
-        name: model?.name || modelId,
-        pid: processInfo?.pid,
-        port: processInfo?.port,
-        execMode: processInfo?.execMode,
-        startedAt: processInfo?.startedAt,
-        api: model?.api || null
-      };
-    });
-
-    res.json({
-      count: result.length,
-      models: result
-    });
-  } catch (error) {
-    logger.error({ error }, 'Error fetching running models');
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ========== Model Download API Endpoints ==========
 
 /**
@@ -989,9 +955,9 @@ app.post('/api/models/download', authenticateRequest, async (req, res) => {
 
 /**
  * GET /api/models/download/:id
- * Get the status of a model download
+ * Get the status of a model download (authenticated - sensitive operational data)
  */
-app.get('/api/models/download/:id', async (req, res) => {
+app.get('/api/models/download/:id', authenticateRequest, async (req, res) => {
   try {
     const downloadId = req.params.id;
     const status = modelDownloader.getDownloadStatus(downloadId);
@@ -1042,9 +1008,9 @@ app.delete('/api/models/download/:id', authenticateRequest, async (req, res) => 
 
 /**
  * GET /api/models/:id/files/status
- * Check if model files exist on disk
+ * Check if model files exist on disk (authenticated - sensitive operational data)
  */
-app.get('/api/models/:id/files/status', async (req, res) => {
+app.get('/api/models/:id/files/status', authenticateRequest, async (req, res) => {
   try {
     const { existsSync } = await import('fs');
     const { join, dirname, basename, resolve } = await import('path');

@@ -13,9 +13,35 @@ function getApiKey() {
 }
 
 /**
+ * Extract API token from request headers
+ * Supports both Authorization: Bearer <token> and X-Api-Key: <token> headers
+ * @param {import('express').Request} req - Express request object
+ * @returns {string|null} The token or null if invalid
+ */
+function extractApiToken(req) {
+  // First try Authorization header with Bearer prefix
+  const authHeader = req.headers.authorization;
+  if (authHeader && typeof authHeader === 'string') {
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      return parts[1];
+    }
+  }
+
+  // Fallback to X-Api-Key header (compatibility with various clients)
+  const apiKeyHeader = req.headers['x-api-key'];
+  if (apiKeyHeader && typeof apiKeyHeader === 'string') {
+    return apiKeyHeader;
+  }
+
+  return null;
+}
+
+/**
  * Extract Bearer token from Authorization header
  * @param {string} authHeader - The Authorization header value
  * @returns {string|null} The token or null if invalid
+ * @deprecated Use extractApiToken(req) instead for broader compatibility
  */
 function extractBearerToken(authHeader) {
   if (!authHeader || typeof authHeader !== 'string') {
@@ -32,7 +58,7 @@ function extractBearerToken(authHeader) {
 }
 
 /**
- * Middleware to authenticate requests using Bearer token
+ * Middleware to authenticate requests using Bearer token or X-Api-Key header
  * If API_KEY is not set, authentication is skipped (open access)
  *
  * @param {import('express').Request} req - Express request object
@@ -46,14 +72,13 @@ export function authenticateRequest(req, res, next) {
     return next();
   }
 
-  // Extract token from Authorization header
-  const authHeader = req.headers.authorization;
-  const token = extractBearerToken(authHeader);
+  // Extract token from Authorization header or X-Api-Key header
+  const token = extractApiToken(req);
 
   if (!token) {
     return res.status(401).json({
       error: 'Unauthorized',
-      message: 'Missing or invalid Authorization header. Expected format: "Bearer <API_KEY>"'
+      message: 'Missing API key. Use Authorization: Bearer <API_KEY> or X-Api-Key: <API_KEY> header'
     });
   }
 
@@ -87,9 +112,8 @@ export function optionalAuth(req, res, next) {
     return next();
   }
 
-  // Extract token from Authorization header
-  const authHeader = req.headers.authorization;
-  const token = extractBearerToken(authHeader);
+  // Extract token from Authorization header or X-Api-Key header
+  const token = extractApiToken(req);
 
   if (!token) {
     req.authenticated = false;
