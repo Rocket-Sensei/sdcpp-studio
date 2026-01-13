@@ -25,6 +25,11 @@ const createMockModels = (overrides = {}) => [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'stopped',
+    fileStatus: {
+      hasHuggingFace: false,
+      allFilesExist: true,
+      files: [],
+    },
     ...overrides.qwenImage,
   },
   {
@@ -39,6 +44,11 @@ const createMockModels = (overrides = {}) => [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'running',
+    fileStatus: {
+      hasHuggingFace: false,
+      allFilesExist: true,
+      files: [],
+    },
     ...overrides.fluxSchnell,
   },
   {
@@ -53,6 +63,11 @@ const createMockModels = (overrides = {}) => [
     mode: 'on_demand',
     model_type: 'imgedit',
     status: 'stopped',
+    fileStatus: {
+      hasHuggingFace: false,
+      allFilesExist: true,
+      files: [],
+    },
     ...overrides.qwenImageEdit,
   },
   {
@@ -65,6 +80,11 @@ const createMockModels = (overrides = {}) => [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'stopped',
+    fileStatus: {
+      hasHuggingFace: false,
+      allFilesExist: true,
+      files: [],
+    },
     ...overrides.cliModel,
   },
   {
@@ -79,6 +99,11 @@ const createMockModels = (overrides = {}) => [
     mode: 'on_demand',
     model_type: 'text-to-image',
     status: 'stopped',
+    fileStatus: {
+      hasHuggingFace: false,
+      allFilesExist: true,
+      files: [],
+    },
     ...overrides.videoModel,
   },
 ];
@@ -92,24 +117,13 @@ describe('MultiModelSelector', () => {
     mockFetchCalls = [];
     mockOnModelsChange = vi.fn();
     // Mock fetch for models
+    // Note: fileStatus is now inline in the models response, no separate /files/status endpoint needed
     global.fetch = vi.fn((url) => {
       mockFetchCalls.push(url);
       if (url === '/api/models') {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ models: createMockModels() }),
-        });
-      }
-      if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            allFilesExist: true,
-            files: [
-              { fileName: 'model.gguf', exists: true },
-              { fileName: 'vae.safetensors', exists: true },
-            ],
-          }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -534,15 +548,6 @@ describe('MultiModelSelector', () => {
             json: () => Promise.resolve({}),
           });
         }
-        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              allFilesExist: true,
-              files: [],
-            }),
-          });
-        }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       });
 
@@ -591,15 +596,6 @@ describe('MultiModelSelector', () => {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({}),
-          });
-        }
-        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              allFilesExist: true,
-              files: [],
-            }),
           });
         }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -656,15 +652,6 @@ describe('MultiModelSelector', () => {
             }, 100);
           });
         }
-        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              allFilesExist: true,
-              files: [],
-            }),
-          });
-        }
         return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
       });
 
@@ -698,17 +685,13 @@ describe('MultiModelSelector', () => {
               models: createMockModels({
                 qwenImage: {
                   huggingface: { repo: 'test/repo', files: [] },
+                  fileStatus: {
+                    hasHuggingFace: true,
+                    allFilesExist: false,
+                    files: [{ fileName: 'model.gguf', exists: false }],
+                  },
                 },
               }),
-            }),
-          });
-        }
-        if (url.includes('/files/status')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              allFilesExist: false,
-              files: [{ fileName: 'model.gguf', exists: false }],
             }),
           });
         }
@@ -894,20 +877,16 @@ describe('MultiModelSelector', () => {
               models: createMockModels({
                 qwenImage: {
                   huggingface: { repo: 'test/repo', files: [] },
+                  fileStatus: {
+                    hasHuggingFace: true,
+                    allFilesExist: true,
+                    files: [
+                      { fileName: 'model.gguf', exists: true },
+                      { fileName: 'vae.safetensors', exists: true },
+                    ],
+                  },
                 },
               }),
-            }),
-          });
-        }
-        if (url.startsWith('/api/models/') && url.endsWith('/files/status')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({
-              allFilesExist: true,
-              files: [
-                { fileName: 'model.gguf', exists: true },
-                { fileName: 'vae.safetensors', exists: true },
-              ],
             }),
           });
         }

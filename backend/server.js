@@ -699,18 +699,79 @@ function getModelTypeFromFilename(filename) {
   return typeMap[ext] || null;
 }
 
+/**
+ * Helper function to get file status for a model with HuggingFace config
+ * @param {Object} model - The model object
+ * @returns {Object|null} File status object with { hasHuggingFace, allFilesExist, files[] }
+ */
+async function getModelFileStatus(model) {
+  if (!model.huggingface || !model.huggingface.files) {
+    return {
+      hasHuggingFace: false,
+      files: []
+    };
+  }
+
+  const { existsSync } = await import('fs');
+  const { join, basename, resolve, dirname } = await import('path');
+  const { fileURLToPath } = await import('url');
+
+  // Get project root path (backend/..)
+  const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+  // Check each file
+  const fileStatus = model.huggingface.files.map(file => {
+    // Use the dest from config, or fall back to MODELS_DIR env, or ./models
+    const destDir = file.dest || process.env.MODELS_DIR || './models';
+
+    // Resolve the path from the project root
+    const resolvedDestDir = resolve(projectRoot, destDir);
+    const fileName = basename(file.path);
+    const filePath = join(resolvedDestDir, fileName);
+    const exists = existsSync(filePath);
+
+    return {
+      path: file.path,
+      dest: file.dest,
+      filePath,
+      resolvedDestDir,
+      exists,
+      fileName
+    };
+  });
+
+  return {
+    hasHuggingFace: true,
+    allFilesExist: fileStatus.every(f => f.exists),
+    files: fileStatus
+  };
+}
+
 // ========== Model Management API Endpoints ==========
 
 /**
  * GET /api/models
  * List all available models (authenticated - sensitive configuration data)
+ * Now includes file status for each model to avoid separate API calls
  */
 app.get('/api/models', authenticateRequest, async (req, res) => {
   try {
     const models = modelManager.getAllModels();
-    // getAllModels() returns an array, so we need to handle it properly
+
+    // Add file status to each model with HuggingFace config
+    // This avoids the need for separate /api/models/:id/files/status requests
+    const modelsWithFileStatus = await Promise.all(
+      models.map(async (model) => {
+        const fileStatus = await getModelFileStatus(model);
+        return {
+          ...model,
+          fileStatus // Add inline file status: { hasHuggingFace, allFilesExist, files[] }
+        };
+      })
+    );
+
     res.json({
-      models: models,
+      models: modelsWithFileStatus,
       default: modelManager.getDefaultModel(),
       default_models: modelManager.defaultModels
     });
@@ -791,6 +852,7 @@ app.get('/api/models/downloaded', authenticateRequest, async (req, res) => {
 /**
  * GET /api/models/:id
  * Get details for a specific model (authenticated - sensitive operational data)
+ * Now includes file status to avoid separate API call
  */
 app.get('/api/models/:id', authenticateRequest, async (req, res) => {
   try {
@@ -803,10 +865,12 @@ app.get('/api/models/:id', authenticateRequest, async (req, res) => {
 
     const isRunning = modelManager.isModelRunning(modelId);
     const processInfo = isRunning ? processTracker.getProcess(modelId) : null;
+    const fileStatus = await getModelFileStatus(model);
 
     res.json({
       id: modelId,
       ...model,
+      fileStatus, // Add inline file status: { hasHuggingFace, allFilesExist, files[] }
       running: isRunning,
       process: processInfo ? {
         pid: processInfo.pid,

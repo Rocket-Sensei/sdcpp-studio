@@ -16,6 +16,7 @@ import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
+import { authenticatedFetch } from "../utils/api";
 
 const API_BASE = "/api/models";
 
@@ -97,7 +98,7 @@ export function MultiModelSelector({
   // Fetch all models
   const fetchModels = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}`);
+      const response = await authenticatedFetch(`${API_BASE}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
@@ -119,12 +120,15 @@ export function MultiModelSelector({
 
       setModels(filteredModels);
 
-      // Fetch file status for models with HuggingFace config
+      // Extract file status from each model (now included in the API response)
+      // No separate API calls needed - fileStatus is inline in the model object
+      const fileStatusMap = {};
       for (const model of filteredModels) {
-        if (model.huggingface) {
-          fetchModelFilesStatus(model.id);
+        if (model.fileStatus) {
+          fileStatusMap[model.id] = model.fileStatus;
         }
       }
+      setModelFilesStatus(fileStatusMap);
 
       return data;
     } catch (err) {
@@ -134,27 +138,11 @@ export function MultiModelSelector({
     }
   }, [filterCapabilities, mode]);
 
-  // Fetch model files status
-  const fetchModelFilesStatus = useCallback(async (modelId) => {
-    try {
-      const response = await fetch(`${API_BASE}/${modelId}/files/status`);
-      if (response.ok) {
-        const data = await response.json();
-        setModelFilesStatus((prev) => ({
-          ...prev,
-          [modelId]: data,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching model files status:", error);
-    }
-  }, []);
-
   // Poll download progress
   const pollDownloadProgress = useCallback((jobId, modelId) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`${API_BASE}/download/${jobId}`);
+        const response = await authenticatedFetch(`${API_BASE}/download/${jobId}`);
         if (response.ok) {
           const data = await response.json();
           setDownloadProgress({
@@ -176,8 +164,7 @@ export function MultiModelSelector({
             clearInterval(interval);
             if (data.status === DOWNLOAD_STATUS.COMPLETED) {
               toast.success("Model downloaded successfully");
-              fetchModelFilesStatus(modelId);
-              await fetchModels();
+              await fetchModels(); // This refreshes both models and file status
             }
           }
         }
@@ -186,7 +173,7 @@ export function MultiModelSelector({
         clearInterval(interval);
       }
     }, 1000);
-  }, [fetchModelFilesStatus, fetchModels]);
+  }, [fetchModels]);
 
   // Initial data load
   useEffect(() => {
@@ -216,7 +203,7 @@ export function MultiModelSelector({
   const startModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "starting" }));
     try {
-      const response = await fetch(`${API_BASE}/${modelId}/start`, {
+      const response = await authenticatedFetch(`${API_BASE}/${modelId}/start`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -237,7 +224,7 @@ export function MultiModelSelector({
   const stopModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "stopping" }));
     try {
-      const response = await fetch(`${API_BASE}/${modelId}/stop`, {
+      const response = await authenticatedFetch(`${API_BASE}/${modelId}/stop`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -259,7 +246,7 @@ export function MultiModelSelector({
     try {
       setDownloadProgress({ status: DOWNLOAD_STATUS.PENDING, progress: 0, modelId });
 
-      const response = await fetch(`${API_BASE}/${modelId}/download`, {
+      const response = await authenticatedFetch(`${API_BASE}/${modelId}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
