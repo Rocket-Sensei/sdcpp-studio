@@ -14,7 +14,10 @@ function getApiKey() {
 
 /**
  * Extract API token from request headers
- * Supports both Authorization: Bearer <token> and X-Api-Key: <token> headers
+ * Supports:
+ * - Authorization: Bearer <token>
+ * - Authorization: Basic <base64_encoded_token> (for SillyTavern compatibility)
+ * - X-Api-Key: <token>
  * @param {import('express').Request} req - Express request object
  * @returns {string|null} The token or null if invalid
  */
@@ -23,8 +26,30 @@ function extractApiToken(req) {
   const authHeader = req.headers.authorization;
   if (authHeader && typeof authHeader === 'string') {
     const parts = authHeader.split(' ');
-    if (parts.length === 2 && parts[0] === 'Bearer') {
-      return parts[1];
+    if (parts.length === 2) {
+      // Bearer token
+      if (parts[0] === 'Bearer') {
+        return parts[1];
+      }
+      // Basic auth - for SillyTavern compatibility
+      // SillyTavern uses Basic auth with just the API key encoded (no username)
+      // Standard Basic Auth format is base64(username:password), but SillyTavern
+      // just base64 encodes whatever is in the auth field
+      if (parts[0] === 'Basic') {
+        try {
+          const decoded = Buffer.from(parts[1], 'base64').toString('utf-8');
+          // If decoded contains ':', it's standard username:password format
+          // Use the password part as the API key
+          if (decoded.includes(':')) {
+            const [, password] = decoded.split(':');
+            return password;
+          }
+          // Otherwise, treat the entire decoded value as the API key (SillyTavern format)
+          return decoded;
+        } catch {
+          // Invalid base64, ignore
+        }
+      }
     }
   }
 

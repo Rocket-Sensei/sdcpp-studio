@@ -19,7 +19,6 @@ import { initializeDatabase, closeDatabase, getImagesDir, getInputImagesDir } fr
 import { runMigrations } from './db/migrations.js';
 import { randomUUID } from 'crypto';
 import { writeFile } from 'fs/promises';
-import { generateImage } from './services/imageService.js';
 import { authenticateRequest, isAuthEnabled } from './middleware/auth.js';
 import {
   getAllGenerations,
@@ -159,39 +158,327 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-// Generate image (text-to-image)
+// Generate image (text-to-image) - queues job and waits for completion
+// This provides a synchronous API that internally uses the queue system
 app.post('/api/generate', authenticateRequest, async (req, res) => {
   try {
-    const result = await generateImage(req.body);
-    res.json(result);
+    const {
+      prompt,
+      negative_prompt,
+      size,
+      n,
+      quality,
+      style,
+      seed,
+      model,
+      // SD.cpp Advanced Settings
+      cfg_scale,
+      sampling_method,
+      sample_steps,
+      clip_skip,
+    } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'Missing required field: prompt' });
+    }
+
+    if (!model) {
+      return res.status(400).json({ error: 'Missing required field: model' });
+    }
+
+    // Validate the model exists
+    const modelConfig = modelManager.getModel(model);
+    if (!modelConfig) {
+      return res.status(400).json({
+        error: `Invalid model: ${model}`,
+        detail: `Model '${model}' not found in configuration. Available models: ${modelManager.getAllModels().map(m => m.id).join(', ')}`
+      });
+    }
+
+    // Get model-specific default parameters
+    const modelParams = modelManager.getModelGenerationParams(model);
+
+    // Create generation job in queue
+    const jobId = randomUUID();
+    const job = {
+      id: jobId,
+      type: 'generate',
+      model: model,
+      prompt: prompt || '',
+      negative_prompt: negative_prompt || '',
+      size: size || '1024x1024',
+      seed: seed || -1,
+      n: n || 1,
+      quality: quality || null,
+      style: style || null,
+      status: GenerationStatus.PENDING,
+      created_at: new Date().toISOString(),
+      // SD.cpp Advanced Settings
+      cfg_scale: cfg_scale ?? modelParams?.cfg_scale ?? undefined,
+      sampling_method: sampling_method ?? modelParams?.sampling_method ?? undefined,
+      sample_steps: sample_steps ?? modelParams?.sample_steps ?? undefined,
+      clip_skip: clip_skip ?? modelParams?.clip_skip ?? undefined,
+    };
+
+    await createGeneration(job);
+
+    // Wait for completion (simple polling)
+    const MAX_WAIT = 300; // 5 minutes
+    const POLL_INTERVAL = 500;
+    let attempts = 0;
+
+    while (attempts < MAX_WAIT) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      const generation = await getGenerationById(jobId);
+
+      if (generation && generation.status === 'completed') {
+        const images = await getImagesByGenerationId(jobId);
+        if (images && images.length > 0) {
+          // Return OpenAI-compatible format
+          return res.json({
+            id: jobId,
+            created: Math.floor(new Date(generation.created_at).getTime() / 1000),
+            data: images.map(img => ({
+              id: img.id,
+              index: img.index_in_batch,
+              revised_prompt: img.revised_prompt || null
+            }))
+          });
+        }
+      }
+
+      if (generation && generation.status === 'failed') {
+        return res.status(500).json({ error: generation.error || 'Generation failed' });
+      }
+
+      attempts++;
+    }
+
+    res.status(500).json({ error: 'Generation timeout' });
   } catch (error) {
     logger.error({ error }, 'Error generating image');
     res.status(500).json({ error: error.message });
   }
 });
 
-// Generate image edit (image-to-image)
+// Generate image edit (image-to-image) - queues job and waits for completion
+// This provides a synchronous API that internally uses the queue system
 app.post('/api/edit', authenticateRequest, upload.single('image'), async (req, res) => {
   try {
-    const result = await generateImage({
-      ...req.body,
-      image: req.file
-    }, 'edit');
-    res.json(result);
+    const {
+      prompt,
+      negative_prompt,
+      size,
+      n,
+      model,
+      seed,
+      // SD.cpp Advanced Settings
+      cfg_scale,
+      sampling_method,
+      sample_steps,
+      clip_skip,
+    } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file is required' });
+    }
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'Missing required field: prompt' });
+    }
+
+    if (!model) {
+      return res.status(400).json({ error: 'Missing required field: model' });
+    }
+
+    // Validate the model exists
+    const modelConfig = modelManager.getModel(model);
+    if (!modelConfig) {
+      return res.status(400).json({
+        error: `Invalid model: ${model}`,
+        detail: `Model '${model}' not found in configuration. Available models: ${modelManager.getAllModels().map(m => m.id).join(', ')}`
+      });
+    }
+
+    // Get model-specific default parameters
+    const modelParams = modelManager.getModelGenerationParams(model);
+
+    // Save uploaded image to disk
+    const inputImagesDir = getInputImagesDir();
+    const imageFilename = `${randomUUID()}.png`;
+    const imagePath = path.join(inputImagesDir, imageFilename);
+    const pngBuffer = await ensurePngFormat(req.file.buffer, req.file.mimetype);
+    await writeFile(imagePath, pngBuffer);
+
+    // Create generation job in queue
+    const jobId = randomUUID();
+    const job = {
+      id: jobId,
+      type: 'edit',
+      model: model,
+      prompt: prompt || '',
+      negative_prompt: negative_prompt || '',
+      size: size || '1024x1024',
+      seed: seed || -1,
+      n: n || 1,
+      status: GenerationStatus.PENDING,
+      created_at: new Date().toISOString(),
+      input_image_path: imagePath,
+      input_image_mime_type: 'image/png',
+      // SD.cpp Advanced Settings
+      cfg_scale: cfg_scale ?? modelParams?.cfg_scale ?? undefined,
+      sampling_method: sampling_method ?? modelParams?.sampling_method ?? undefined,
+      sample_steps: sample_steps ?? modelParams?.sample_steps ?? undefined,
+      clip_skip: clip_skip ?? modelParams?.clip_skip ?? undefined,
+    };
+
+    await createGeneration(job);
+
+    // Wait for completion (simple polling)
+    const MAX_WAIT = 300; // 5 minutes
+    const POLL_INTERVAL = 500;
+    let attempts = 0;
+
+    while (attempts < MAX_WAIT) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      const generation = await getGenerationById(jobId);
+
+      if (generation && generation.status === 'completed') {
+        const images = await getImagesByGenerationId(jobId);
+        if (images && images.length > 0) {
+          // Return OpenAI-compatible format
+          return res.json({
+            id: jobId,
+            created: Math.floor(new Date(generation.created_at).getTime() / 1000),
+            data: images.map(img => ({
+              id: img.id,
+              index: img.index_in_batch,
+              revised_prompt: img.revised_prompt || null
+            }))
+          });
+        }
+      }
+
+      if (generation && generation.status === 'failed') {
+        return res.status(500).json({ error: generation.error || 'Generation failed' });
+      }
+
+      attempts++;
+    }
+
+    res.status(500).json({ error: 'Generation timeout' });
   } catch (error) {
     logger.error({ error }, 'Error editing image');
     res.status(500).json({ error: error.message });
   }
 });
 
-// Generate image variation
+// Generate image variation - queues job and waits for completion
+// This provides a synchronous API that internally uses the queue system
 app.post('/api/variation', authenticateRequest, upload.single('image'), async (req, res) => {
   try {
-    const result = await generateImage({
-      ...req.body,
-      image: req.file
-    }, 'variation');
-    res.json(result);
+    const {
+      prompt,
+      negative_prompt,
+      size,
+      n,
+      model,
+      seed,
+      strength,
+      // SD.cpp Advanced Settings
+      cfg_scale,
+      sampling_method,
+      sample_steps,
+      clip_skip,
+    } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file is required' });
+    }
+
+    if (!model) {
+      return res.status(400).json({ error: 'Missing required field: model' });
+    }
+
+    // Validate the model exists
+    const modelConfig = modelManager.getModel(model);
+    if (!modelConfig) {
+      return res.status(400).json({
+        error: `Invalid model: ${model}`,
+        detail: `Model '${model}' not found in configuration. Available models: ${modelManager.getAllModels().map(m => m.id).join(', ')}`
+      });
+    }
+
+    // Get model-specific default parameters
+    const modelParams = modelManager.getModelGenerationParams(model);
+
+    // Save uploaded image to disk
+    const inputImagesDir = getInputImagesDir();
+    const imageFilename = `${randomUUID()}.png`;
+    const imagePath = path.join(inputImagesDir, imageFilename);
+    const pngBuffer = await ensurePngFormat(req.file.buffer, req.file.mimetype);
+    await writeFile(imagePath, pngBuffer);
+
+    // Create generation job in queue
+    const jobId = randomUUID();
+    const job = {
+      id: jobId,
+      type: 'variation',
+      model: model,
+      prompt: prompt || '',
+      negative_prompt: negative_prompt || '',
+      size: size || '1024x1024',
+      seed: seed || -1,
+      n: n || 1,
+      status: GenerationStatus.PENDING,
+      created_at: new Date().toISOString(),
+      input_image_path: imagePath,
+      input_image_mime_type: 'image/png',
+      // Strength parameter for img2img (variation) - controls how much the original image is preserved
+      // Default: 0.75 (balanced variation)
+      strength: parseFloat(strength) || 0.75,
+      // SD.cpp Advanced Settings
+      cfg_scale: cfg_scale ?? modelParams?.cfg_scale ?? undefined,
+      sampling_method: sampling_method ?? modelParams?.sampling_method ?? undefined,
+      sample_steps: sample_steps ?? modelParams?.sample_steps ?? undefined,
+      clip_skip: clip_skip ?? modelParams?.clip_skip ?? undefined,
+    };
+
+    await createGeneration(job);
+
+    // Wait for completion (simple polling)
+    const MAX_WAIT = 300; // 5 minutes
+    const POLL_INTERVAL = 500;
+    let attempts = 0;
+
+    while (attempts < MAX_WAIT) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      const generation = await getGenerationById(jobId);
+
+      if (generation && generation.status === 'completed') {
+        const images = await getImagesByGenerationId(jobId);
+        if (images && images.length > 0) {
+          // Return OpenAI-compatible format
+          return res.json({
+            id: jobId,
+            created: Math.floor(new Date(generation.created_at).getTime() / 1000),
+            data: images.map(img => ({
+              id: img.id,
+              index: img.index_in_batch,
+              revised_prompt: img.revised_prompt || null
+            }))
+          });
+        }
+      }
+
+      if (generation && generation.status === 'failed') {
+        return res.status(500).json({ error: generation.error || 'Generation failed' });
+      }
+
+      attempts++;
+    }
+
+    res.status(500).json({ error: 'Generation timeout' });
   } catch (error) {
     logger.error({ error }, 'Error creating variation');
     res.status(500).json({ error: error.message });

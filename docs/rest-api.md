@@ -38,7 +38,9 @@ Get API configuration including SD API endpoint and default model.
 
 ## Image Generation (Synchronous)
 
-These endpoints wait for generation to complete before returning.
+These endpoints provide a synchronous API that internally uses the queue system. The job is queued, the model is automatically started if needed, and the endpoint waits for completion before returning the result.
+
+**Note:** These endpoints keep the HTTP connection open while the generation is in progress (up to 5 minutes). For long-running operations, consider using the Queue Management API instead.
 
 ### POST /generate
 

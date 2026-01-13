@@ -3,7 +3,6 @@ import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import React from 'react';
 
 // Set test database path BEFORE importing any backend modules
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -26,11 +25,12 @@ afterEach(() => {
 });
 
 // Mock ResizeObserver for Radix UI components
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = ResizeObserverMock;
 
 // Mock ApiKeyContext for all tests (App component uses it)
 vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
