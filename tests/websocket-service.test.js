@@ -10,37 +10,55 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EventEmitter } from 'events';
-import { WebSocketServer } from 'ws';
 import http from 'http';
 
-// Mock ws module
-let mockWebSocketServerInstance = null;
+// Use vi.hoisted to set up state that can be accessed in mocks
+const { MockWSSImpl, resetWSS } = vi.hoisted(() => {
+  let instance = null;
+
+  return {
+    MockWSSImpl: class {
+      constructor() {
+        this.clients = new Set();
+        this.handleUpgrade = () => {};
+        instance = this;
+        // Add EventEmitter methods manually
+        this._listeners = {};
+      }
+
+      on(event, callback) {
+        if (!this._listeners) this._listeners = {};
+        if (!this._listeners[event]) this._listeners[event] = [];
+        this._listeners[event].push(callback);
+      }
+
+      emit(event, ...args) {
+        if (!this._listeners) this._listeners = {};
+        const listeners = this._listeners[event] || [];
+        listeners.forEach(cb => cb(...args));
+      }
+
+      close() {}
+    },
+    resetWSS: () => { instance = null; },
+    getInstance: () => instance
+  };
+});
 
 vi.mock('ws', () => ({
-  WebSocketServer: vi.fn().mockImplementation(() => {
-    if (!mockWebSocketServerInstance) {
-      const MockWSS = class extends EventEmitter {
-        constructor() {
-          super();
-          this.clients = new Set();
-          this.handleUpgrade = vi.fn();
-        }
-      };
-      mockWebSocketServerInstance = new MockWSS();
-    }
-    return mockWebSocketServerInstance;
+  WebSocketServer: vi.fn(function() {
+    return new MockWSSImpl();
   }),
 }));
 
 // Mock logger
 vi.mock('../backend/utils/logger.js', () => ({
-  createLogger: vi.fn(() => ({
-    info: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  })),
+  createLogger: () => ({
+    info: () => {},
+    debug: () => {},
+    warn: () => {},
+    error: () => {},
+  }),
 }));
 
 import {
@@ -53,9 +71,6 @@ import {
   getStats,
   CHANNELS,
 } from '../backend/services/websocket.js';
-import { createLogger } from '../backend/utils/logger.js';
-
-const logger = createLogger();
 
 describe('WebSocket Service - Initialization', () => {
   let mockServer;
