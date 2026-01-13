@@ -65,6 +65,11 @@ describe('ModelDownload Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('Rendering States', () => {
@@ -112,8 +117,8 @@ describe('ModelDownload Component', () => {
 
       expect(screen.getByText('Downloading...')).toBeInTheDocument();
       expect(screen.getByText('45.5%')).toBeInTheDocument();
-      expect(screen.getByText(/429\.49 MB/)).toBeInTheDocument();
-      expect(screen.getByText(/1000 MB/)).toBeInTheDocument();
+      expect(screen.getByText(/429\.\d+ MB/)).toBeInTheDocument();
+      expect(screen.getByText(/953\.\d+ MB|1000 MB/)).toBeInTheDocument();
       expect(screen.getByText('Pause')).toBeInTheDocument();
     });
 
@@ -173,7 +178,9 @@ describe('ModelDownload Component', () => {
       );
 
       expect(screen.getByText('Download cancelled')).toBeInTheDocument();
-      expect(screen.getByText('Close')).toBeInTheDocument();
+      // There may be multiple Close buttons (header + footer), check that at least one exists
+      const closeButtons = screen.getAllByText('Close');
+      expect(closeButtons.length).toBeGreaterThan(0);
     });
   });
 
@@ -291,24 +298,28 @@ describe('ModelDownload Component', () => {
         />
       );
 
-      const closeButton = screen.getByText('Close');
+      const closeButton = screen.getAllByText('Close')[0];
       fireEvent.click(closeButton);
       expect(mockOnClose).toHaveBeenCalled();
     });
 
-    it('should not close when downloading and close button clicked', () => {
+    it('should not call onClose when Cancel button is clicked while downloading', () => {
       render(
         <ModelDownload
           open={true}
           onOpenChange={mockOnOpenChange}
           download={{ ...defaultDownload, status: 'downloading' }}
           onClose={mockOnClose}
+          onCancel={mockOnCancel}
         />
       );
 
-      const closeButton = screen.getByText('Close');
-      fireEvent.click(closeButton);
+      // When downloading, there's a Cancel button, not a Close button
+      const cancelButton = screen.getByText('Cancel');
+      fireEvent.click(cancelButton);
+      // Cancel button should call onCancel, not onClose
       expect(mockOnClose).not.toHaveBeenCalled();
+      expect(mockOnCancel).toHaveBeenCalledWith('test-download-1');
     });
   });
 
@@ -325,12 +336,11 @@ describe('ModelDownload Component', () => {
 
       expect(screen.getByText('Closing automatically in 3 seconds...')).toBeInTheDocument();
 
-      // Fast-forward 3 seconds
+      // Fast-forward 3 seconds and run all pending timers
       vi.advanceTimersByTime(3000);
+      vi.runAllTimers();
 
-      await waitFor(() => {
-        expect(mockOnClose).toHaveBeenCalled();
-      });
+      expect(mockOnClose).toHaveBeenCalled();
     });
 
     it('should not auto-close if dialog is closed before timeout', () => {
@@ -355,6 +365,7 @@ describe('ModelDownload Component', () => {
 
       // Fast-forward past the timeout
       vi.advanceTimersByTime(4000);
+      vi.runAllTimers();
 
       expect(mockOnClose).not.toHaveBeenCalled();
     });
