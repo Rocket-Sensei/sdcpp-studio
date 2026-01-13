@@ -663,14 +663,16 @@ function App() {
 export default App;
 
 // Wrapper component that provides both API key providers
+// IMPORTANT: ApiKeyContextProvider must be outside ApiKeyProvider because
+// ApiKeyProvider renders ApiKeyModal which uses useApiKeyContext
 export function AppWithProviders() {
   return (
-    <ApiKeyProvider>
-      <ApiKeyContextProvider>
+    <ApiKeyContextProvider>
+      <ApiKeyProvider>
         <WebSocketProvider>
           <App />
         </WebSocketProvider>
-      </ApiKeyContextProvider>
-    </ApiKeyProvider>
+      </ApiKeyProvider>
+    </ApiKeyContextProvider>
   );
 }

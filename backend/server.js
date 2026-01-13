@@ -703,9 +703,9 @@ function getModelTypeFromFilename(filename) {
 
 /**
  * GET /api/models
- * List all available models
+ * List all available models (authenticated - sensitive configuration data)
  */
-app.get('/api/models', async (req, res) => {
+app.get('/api/models', authenticateRequest, async (req, res) => {
   try {
     const models = modelManager.getAllModels();
     // getAllModels() returns an array, so we need to handle it properly
@@ -1141,18 +1141,18 @@ const SD_SAMPLERS = [
 // ==================== SD.next/Automatic1111 Compatible API Endpoints ====================
 // These use the standard /sdapi/v1/ path that SillyTavern expects
 
-// GET /sdapi/v1/samplers - List available samplers
-app.get('/sdapi/v1/samplers', (req, res) => {
+// GET /sdapi/v1/samplers - List available samplers (authenticated)
+app.get('/sdapi/v1/samplers', authenticateRequest, (req, res) => {
   res.json(SD_SAMPLERS);
 });
 
-// GET /sdapi/v1/schedulers - List available schedulers (same as samplers for SD.cpp)
-app.get('/sdapi/v1/schedulers', (req, res) => {
+// GET /sdapi/v1/schedulers - List available schedulers (same as samplers for SD.cpp) (authenticated)
+app.get('/sdapi/v1/schedulers', authenticateRequest, (req, res) => {
   res.json(SD_SAMPLERS);
 });
 
-// GET /sdapi/v1/sd-models - List all available models
-app.get('/sdapi/v1/sd-models', (req, res) => {
+// GET /sdapi/v1/sd-models - List all available models (authenticated)
+app.get('/sdapi/v1/sd-models', authenticateRequest, (req, res) => {
   try {
     const models = modelManager.getAllModels();
     const result = models.map(model => {
@@ -1187,8 +1187,8 @@ app.get('/sdapi/v1/sd-models', (req, res) => {
   }
 });
 
-// GET /sdapi/v1/options - Get current options (including model checkpoint)
-app.get('/sdapi/v1/options', (req, res) => {
+// GET /sdapi/v1/options - Get current options (including model checkpoint) (authenticated)
+app.get('/sdapi/v1/options', authenticateRequest, (req, res) => {
   try {
     const runningModels = modelManager.getRunningModels();
     const defaultModel = modelManager.getDefaultModel();
@@ -1272,8 +1272,8 @@ app.post('/sdapi/v1/options', authenticateRequest, async (req, res) => {
   }
 });
 
-// GET /sdapi/v1/progress - Get generation progress
-app.get('/sdapi/v1/progress', (req, res) => {
+// GET /sdapi/v1/progress - Get generation progress (authenticated)
+app.get('/sdapi/v1/progress', authenticateRequest, (req, res) => {
   try {
     const stats = getGenerationStats();
     const jobs = getAllGenerations();
@@ -1497,10 +1497,10 @@ app.post('/sdapi/v1/txt2img', authenticateRequest, async (req, res) => {
 
 /**
  * GET /sdapi/v1/upscalers
- * Get list of available upscalers
+ * Get list of available upscalers (authenticated)
  * Compatible with SD.next / Automatic1111 API
  */
-app.get('/sdapi/v1/upscalers', async (req, res) => {
+app.get('/sdapi/v1/upscalers', authenticateRequest, async (req, res) => {
   try {
     const { getAvailableUpscalers } = await import('./services/upscalerService.js');
     const upscalers = getAvailableUpscalers();
