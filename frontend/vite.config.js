@@ -10,6 +10,9 @@ export default defineConfig({
   server: {
     port: 5173,
     host: process.env.HOST || '0.0.0.0',
+    allowedHosts: process.env.ALLOWED_HOSTS === 'all'
+      ? 'all'
+      : (process.env.ALLOWED_HOSTS || 'localhost,.localhost').split(','),
     proxy: {
       '/api': {
         target: backendUrl,
