@@ -1,19 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Key, Check, AlertCircle } from 'lucide-react';
-import { saveApiKey, validateApiKey, isAuthRequired } from '../utils/api';
+import { Key, Check, AlertCircle } from 'lucide-react';
+import { saveApiKey, validateApiKey } from '../utils/api';
 import { useApiKeyContext } from '../contexts/ApiKeyContext';
 
 /**
  * ApiKeyModal - Modal for prompting user to enter API key when authentication is required
+ *
  * @param {Object} props
  * @param {boolean} props.isOpen - Whether the modal is open
  * @param {Function} props.onClose - Callback when modal is closed
  * @param {Function} props.onSuccess - Callback when API key is successfully validated
+ * @param {Function} props.onSubmit - Optional callback that receives the API key for external validation
+ * @param {string} props.error - Optional error message to display
  */
-export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
+export function ApiKeyModal({ isOpen, onClose, onSuccess, onSubmit, error: externalError }) {
   const [apiKey, setApiKey] = useState('');
   const [isValidating, setIsValidating] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(externalError || null);
   const [success, setSuccess] = useState(false);
   const apiKeyRef = useRef(apiKey);
   const { notifyApiKeyChanged } = useApiKeyContext();
@@ -22,6 +25,11 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
   useEffect(() => {
     apiKeyRef.current = apiKey;
   }, [apiKey]);
+
+  // Update error when external error changes
+  useEffect(() => {
+    setError(externalError || null);
+  }, [externalError]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -41,6 +49,14 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
       // Read from ref to always get the current value
       const submittedKey = apiKeyRef.current;
 
+      // If onSubmit is provided, use external validation
+      if (onSubmit) {
+        await onSubmit(submittedKey);
+        // External validation succeeded
+        return;
+      }
+
+      // Otherwise, use internal validation
       const isValid = await validateApiKey(submittedKey);
 
       if (isValid) {
@@ -59,7 +75,7 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
     } finally {
       setIsValidating(false);
     }
-  }, [notifyApiKeyChanged, onSuccess, onClose]);
+  }, [notifyApiKeyChanged, onSuccess, onClose, onSubmit]);
 
   if (!isOpen) return null;
 
@@ -150,69 +166,5 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * ApiKeyProvider - Higher-order component that manages API key state
- * Shows modal when authentication is required and key is missing
- */
-export function ApiKeyProvider({ children }) {
-  const [showModal, setShowModal] = useState(false);
-  const [authRequired, setAuthRequired] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if auth is required on mount
-    const checkAuth = async () => {
-      try {
-        const required = await isAuthRequired();
-        setAuthRequired(required);
-
-        // If auth is required and no key is stored, show modal
-        if (required) {
-          const storedKey = localStorage.getItem('sd-cpp-studio-api-key');
-          if (!storedKey) {
-            setShowModal(true);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to check auth requirement:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
-
-  const handleModalSuccess = useCallback(() => {
-    setShowModal(false);
-  }, []);
-
-  const handleModalClose = useCallback(() => {
-    // Prevent closing without valid key - do nothing
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {children}
-      <ApiKeyModal
-        isOpen={showModal && authRequired}
-        onClose={handleModalClose}
-        onSuccess={handleModalSuccess}
-      />
-    </>
   );
 }

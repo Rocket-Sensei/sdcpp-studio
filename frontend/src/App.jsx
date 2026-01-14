@@ -5,7 +5,7 @@ import { Toaster } from "./components/ui/sonner";
 import { Studio } from "./components/Studio";
 import { WebSocketStatusIndicator } from "./components/WebSocketStatusIndicator";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
-import { ApiKeyProvider } from "./components/ApiKeyModal";
+import { AppBoot } from "./components/AppBoot";
 import { ApiKeyProvider as ApiKeyContextProvider, useApiKeyContext } from "./contexts/ApiKeyContext";
 import { SettingsModal } from "./components/SettingsModal";
 import { useGenerations } from "./hooks/useImageGeneration";
@@ -662,17 +662,26 @@ function App() {
 
 export default App;
 
-// Wrapper component that provides both API key providers
-// IMPORTANT: ApiKeyContextProvider must be outside ApiKeyProvider because
-// ApiKeyProvider renders ApiKeyModal which uses useApiKeyContext
+// Wrapper component that provides context and handles app boot sequence
+// Boot sequence: Auth check -> API key collection (if needed) -> Render App
 export function AppWithProviders() {
+  const [bootComplete, setBootComplete] = useState(false);
+
   return (
     <ApiKeyContextProvider>
-      <ApiKeyProvider>
-        <WebSocketProvider>
-          <App />
-        </WebSocketProvider>
-      </ApiKeyProvider>
+      <AppBoot
+        onBootComplete={() => setBootComplete(true)}
+        onApiKeyChange={() => {
+          // Trigger re-fetch when API key changes
+          window.location.reload();
+        }}
+      >
+        {bootComplete && (
+          <WebSocketProvider>
+            <App />
+          </WebSocketProvider>
+        )}
+      </AppBoot>
     </ApiKeyContextProvider>
   );
 }

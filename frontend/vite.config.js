@@ -11,7 +11,7 @@ export default defineConfig({
     port: 5173,
     host: process.env.HOST || '0.0.0.0',
     allowedHosts: process.env.ALLOWED_HOSTS === 'all'
-      ? 'all'
+      ? true  // Use true for all hosts, not the string 'all'
       : (process.env.ALLOWED_HOSTS || 'localhost,.localhost').split(','),
     proxy: {
       '/api': {

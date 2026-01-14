@@ -15,10 +15,15 @@ import { join } from 'path';
 /**
  * Replicate the allowedHosts logic from vite.config.js
  * This function mimics the exact logic used in the configuration
+ *
+ * Note: Vite's allowedHosts accepts:
+ * - true: allows all hosts
+ * - false: disables host checking
+ * - Array<string>: specific allowed host patterns
  */
 function getAllowedHostsFromEnv(allowedHostsEnv) {
   if (allowedHostsEnv === 'all') {
-    return 'all';
+    return true;  // Use true, not the string 'all'
   }
   return (allowedHostsEnv || 'localhost,.localhost').split(',');
 }
@@ -28,7 +33,7 @@ function getAllowedHostsFromEnv(allowedHostsEnv) {
  * Based on Vite's allowedHosts logic
  */
 export function isHostAllowed(host, allowedHosts) {
-  if (allowedHosts === 'all') {
+  if (allowedHosts === true || allowedHosts === 'all') {
     return true;
   }
 
@@ -58,7 +63,7 @@ describe('Vite Config - allowedHosts logic', () => {
   describe('ALLOWED_HOSTS environment variable parsing', () => {
     it('should allow all hosts when ALLOWED_HOSTS is set to "all"', () => {
       const result = getAllowedHostsFromEnv('all');
-      expect(result).toBe('all');
+      expect(result).toBe(true);  // Vite uses true, not 'all'
       expect(isHostAllowed('studio.rscx.ru', result)).toBe(true);
       expect(isHostAllowed('anything.example.com', result)).toBe(true);
     });
@@ -150,6 +155,7 @@ describe('Vite Config - allowedHosts logic', () => {
       // Verify the allowedHosts configuration exists
       expect(configContent).toContain('allowedHosts:');
       expect(configContent).toContain("ALLOWED_HOSTS === 'all'");
+      expect(configContent).toContain('? true');  // Should use true, not 'all'
       expect(configContent).toContain("ALLOWED_HOSTS || 'localhost,.localhost'");
       expect(configContent).toContain('.split(\',\')');
     });
