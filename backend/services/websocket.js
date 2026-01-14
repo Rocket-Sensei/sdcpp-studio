@@ -22,6 +22,7 @@ export const CHANNELS = {
   QUEUE: 'queue',
   GENERATIONS: 'generations',
   MODELS: 'models',
+  DOWNLOAD: 'download',
 };
 
 // Channel subscriptions
@@ -321,6 +322,18 @@ export function broadcastModelStatus(modelId, status, extraData = {}) {
   });
 }
 
+/**
+ * Broadcast download progress update
+ * @param {string} eventType - Event type (progress, complete, failed, cancelled)
+ * @param {Object} downloadData - Download progress data
+ */
+export function broadcastDownloadProgress(eventType, downloadData = {}) {
+  broadcast(CHANNELS.DOWNLOAD, {
+    type: eventType,
+    data: downloadData,
+  });
+}
+
 export default {
   initializeWebSocket,
   getWebSocketServer,
@@ -328,6 +341,7 @@ export default {
   broadcastQueueEvent,
   broadcastGenerationComplete,
   broadcastModelStatus,
+  broadcastDownloadProgress,
   getStats,
   CHANNELS,
 };

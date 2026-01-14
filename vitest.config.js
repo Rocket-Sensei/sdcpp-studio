@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { vi } from 'vitest';
 
 export default defineConfig({
   plugins: [react()],
@@ -15,6 +16,61 @@ export default defineConfig({
     fileParallelism: false,
     // Increase hook timeout for server startup
     hookTimeout: 60000,
+    // Mock configuration for external dependencies
+    mock: {
+      'easy-dl': {
+        default: class MockEasyDl {
+          constructor(url, destPath, options) {
+            this.url = url;
+            this.destPath = destPath;
+            this.options = options;
+            this._progressCallbacks = [];
+            this._shouldFail = false;
+          }
+          on(event, callback) {
+            if (event === 'progress') {
+              this._progressCallbacks.push(callback);
+            }
+            return this;
+          }
+          async wait() {
+            if (this._shouldFail) {
+              throw new Error('Mock download failed');
+            }
+            // Simulate progress
+            for (const cb of this._progressCallbacks) {
+              cb({ percent: 100, downloaded: 1000000, total: 1000000, speed: 1000000, remaining: 0 });
+            }
+            return true;
+          }
+          cancel() {
+            // Cancel download
+          }
+          // Test helper to make the download fail
+          _fail() {
+            this._shouldFail = true;
+          }
+        }
+      },
+      'pino': {
+        default: vi.fn(() => ({
+          info: vi.fn(),
+          error: vi.fn(),
+          warn: vi.fn(),
+          debug: vi.fn(),
+          child: vi.fn(() => ({
+            info: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            debug: vi.fn(),
+          })),
+        })),
+        destination: vi.fn(() => ({
+          flushSync: vi.fn(),
+        })),
+        multistream: vi.fn((streams) => streams),
+      },
+    },
     // Coverage configuration using v8
     coverage: {
       provider: 'v8',

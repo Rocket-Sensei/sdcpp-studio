@@ -1,16 +1,18 @@
 /**
  * Model Downloader Service
  *
- * Downloads models from HuggingFace using Python huggingface_hub first,
- * with easydl (Node.js) as fallback.
+ * Downloads models from HuggingFace using Node.js easydl first,
+ * with Python huggingface_hub as fallback.
  *
  * Features:
- * - Python-first approach using hf_hub_download via wrapper script
- * - Automatic fallback to Node.js easydl if Python unavailable
+ * - Node.js-first approach using easydl
+ * - Automatic fallback to Python if Node.js unavailable
  * - Progress tracking for both methods
  * - Resume support (built into both hf_hub_download and easydl)
  * - Token authentication support
  * - Custom cache directories
+ * - File logging to downloads.log
+ * - WebSocket progress broadcasting
  */
 
 import { randomUUID } from 'crypto';
@@ -20,13 +22,15 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { createLogger } from '../utils/logger.js';
+import { broadcastDownloadProgress } from './websocket.js';
+import pino from 'pino';
 
 const logger = createLogger('modelDownloader');
 
 // Lazy import easydl to avoid issues if not installed
 let EasyDl = null;
 try {
-  const easydlModule = await import('easy-dl');
+  const easydlModule = await import('easydl');
   EasyDl = easydlModule.default || easydlModule;
 } catch (e) {
   // easydl not installed, will use Python only
@@ -51,14 +55,35 @@ if (!existsSync(NODE_HF_CACHE)) {
   mkdirSync(NODE_HF_CACHE, { recursive: true });
 }
 
+// Ensure logs directory exists for download logs
+const LOGS_DIR = join(__dirname, '../../data/logs');
+if (!existsSync(LOGS_DIR)) {
+  mkdirSync(LOGS_DIR, { recursive: true });
+}
+
+// Create file transport for download logs
+const downloadLogger = pino({
+  level: 'info',
+  formatters: {
+    level: (label, number) => ({ level: label, levelNum: number }),
+  },
+  mixin() {
+    return { module: 'download', time: new Date().toISOString() };
+  },
+}, pino.destination({
+  dest: join(LOGS_DIR, 'downloads.log'),
+  sync: false,
+  minLength: 0,
+}));
+
 // HuggingFace authentication token
 const HF_TOKEN = process.env.HF_TOKEN || '';
 
 // Python executable (auto-detected)
 const PYTHON = process.env.PYTHON || 'python3';
 
-// Use Python downloader first
-const USE_PYTHON_DOWNLOADER = process.env.USE_PYTHON_DOWNLOADER !== 'false';
+// Use Python downloader as opt-in (Node.js is now default)
+const USE_PYTHON_DOWNLOADER = process.env.USE_PYTHON_DOWNLOADER === 'true';
 
 // Download status constants
 const DOWNLOAD_STATUS = {
@@ -117,12 +142,10 @@ let hfHubAvailable = null;
 
 /**
  * Get available download method
+ * Now prefers Node.js (easydl) by default, with Python as opt-in
  */
 async function getDownloadMethod() {
-  if (!USE_PYTHON_DOWNLOADER) {
-    return EasyDl ? DOWNLOAD_METHOD.NODE : DOWNLOAD_METHOD.UNKNOWN;
-  }
-
+  // Check Python availability if needed for fallback
   if (pythonAvailable === null) {
     pythonAvailable = await checkPythonAvailable();
   }
@@ -130,12 +153,23 @@ async function getDownloadMethod() {
     hfHubAvailable = await checkHuggingFaceHubAvailable();
   }
 
-  if (pythonAvailable && hfHubAvailable) {
-    return DOWNLOAD_METHOD.PYTHON;
+  // Check explicit Python preference first (opt-in via env var)
+  if (USE_PYTHON_DOWNLOADER) {
+    if (pythonAvailable && hfHubAvailable) {
+      return DOWNLOAD_METHOD.PYTHON;
+    }
+    // If Python requested but unavailable, fall through to Node.js
+    logger.warn('Python downloader requested but unavailable, falling back to Node.js');
   }
 
+  // Prefer Node.js by default
   if (EasyDl) {
     return DOWNLOAD_METHOD.NODE;
+  }
+
+  // Fall back to Python if Node unavailable
+  if (pythonAvailable && hfHubAvailable) {
+    return DOWNLOAD_METHOD.PYTHON;
   }
 
   return DOWNLOAD_METHOD.UNKNOWN;
@@ -175,6 +209,48 @@ function formatTime(seconds) {
  */
 function getHuggingFaceFileUrl(repo, filename, revision = 'main') {
   return `https://huggingface.co/${encodeURIComponent(repo)}/resolve/${encodeURIComponent(revision)}/${encodeURIComponent(filename)}`;
+}
+
+/**
+ * Create a progress callback wrapper that broadcasts to WebSocket
+ * @param {Function} onProgress - Original progress callback
+ * @param {Object} job - Download job object
+ * @returns {Function} Wrapped progress callback
+ */
+function createProgressCallback(onProgress, job) {
+  return (data) => {
+    // Broadcast to WebSocket for real-time UI updates
+    const broadcastData = {
+      jobId: data.jobId,
+      repo: job.repo,
+      method: job.method,
+      fileIndex: data.fileIndex,
+      totalFiles: data.totalFiles,
+      fileName: data.fileName,
+      fileProgress: data.fileProgress || 0,
+      overallProgress: data.overallProgress || 0,
+      bytesDownloaded: data.bytesDownloaded || 0,
+      totalBytes: data.totalBytes || 0,
+      speed: data.speed,
+      eta: data.eta,
+      status: data.status || 'downloading'
+    };
+
+    // Determine event type based on progress data
+    let eventType = 'progress';
+    if (data.fileComplete || data.overallProgress >= 100) {
+      eventType = 'file_complete';
+    } else if (data.status === 'starting') {
+      eventType = 'started';
+    } else if (data.status === 'failed') {
+      eventType = 'failed';
+    }
+
+    broadcastDownloadProgress(eventType, broadcastData);
+
+    // Call original callback
+    if (onProgress) onProgress(data);
+  };
 }
 
 /**
@@ -222,6 +298,15 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
       args.push('--dest', destDir);
     }
 
+    // Log download start
+    downloadLogger.info({
+      repo,
+      file: fileName,
+      jobId,
+      method: 'python',
+      eventType: 'downloadStart'
+    }, `Starting download: ${fileName} from ${repo}`);
+
     await new Promise((resolve, reject) => {
       const python = spawn(PYTHON, args, {
         env: { ...process.env, PYTHONIOENCODING: 'utf-8', HF_TOKEN: HF_TOKEN || '' }
@@ -230,6 +315,7 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
       let outputPath = null;
       let fileSize = 0;
       let lastProgress = { current: 0, total: 0 };
+      let stderrBuffer = [];
 
       // Parse JSON output from Python script
       python.stdout.on('data', (data) => {
@@ -273,6 +359,17 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
                 job.bytesDownloaded = calculateTotalDownloaded(job);
                 job.totalBytes = calculateTotalSize(job);
 
+                // Log progress
+                downloadLogger.debug({
+                  repo,
+                  file: fileName,
+                  jobId,
+                  fileProgress,
+                  overallProgress,
+                  bytesDownloaded: job.bytesDownloaded,
+                  totalBytes: job.totalBytes
+                }, `Download progress: ${fileProgress.toFixed(1)}%`);
+
                 onProgress({
                   jobId,
                   fileIndex: i,
@@ -301,6 +398,16 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
                   size: fileSize,
                   method: DOWNLOAD_METHOD.PYTHON
                 });
+
+                // Log completion
+                downloadLogger.info({
+                  repo,
+                  file: fileName,
+                  jobId,
+                  fileSize,
+                  eventType: 'fileComplete'
+                }, `Download complete: ${fileName}`);
+
                 break;
 
               case 'error':
@@ -313,11 +420,31 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
         }
       });
 
+      // Fixed stderr reporting - capture full content with proper context
       python.stderr.on('data', (data) => {
-        const msg = data.toString().trim();
-        if (msg) {
-          logger.error({ msg }, 'Python stderr');
-        }
+        const content = data.toString();
+        stderrBuffer.push(content);
+
+        // Log stderr with proper context (file being downloaded, repo)
+        logger.error({
+          content: content.trim(),
+          file: fileName,
+          repo,
+          jobId
+        }, 'Python subprocess stderr');
+
+        // Also log to download file
+        downloadLogger.error({
+          content: content.trim(),
+          file: fileName,
+          repo,
+          jobId,
+          eventType: 'stderr'
+        }, `Python stderr: ${content.trim()}`);
+
+        // Store in job for error reporting
+        if (!job.stderr) job.stderr = [];
+        job.stderr.push(content.trim());
       });
 
       python.on('error', (error) => {
@@ -326,7 +453,14 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
 
       python.on('close', (code) => {
         if (code !== 0) {
-          reject(new Error(`Python process exited with code ${code}`));
+          const stderrMsg = stderrBuffer.length > 0 ? stderrBuffer.join('\n') : 'Unknown error';
+          logger.error({
+            code,
+            stderr: stderrMsg,
+            file: fileName,
+            repo
+          }, `Python process exited with code ${code}`);
+          reject(new Error(`Python process exited with code ${code}: ${stderrMsg}`));
         } else {
           resolve();
         }
@@ -344,6 +478,14 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
       job.files.set(fileName, {
         error: error.message
       });
+      // Log error
+      downloadLogger.error({
+        repo,
+        file: fileName,
+        jobId,
+        error: error.message,
+        eventType: 'downloadError'
+      }, `Download failed: ${fileName} - ${error.message}`);
       throw error;
     });
   }
@@ -384,6 +526,17 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
     // Build download URL
     const url = getHuggingFaceFileUrl(repo, file.path);
 
+    // Log download start
+    downloadLogger.info({
+      repo,
+      file: fileName,
+      url,
+      jobId,
+      destPath,
+      method: 'node',
+      eventType: 'downloadStart'
+    }, `Starting download: ${fileName} from ${repo}`);
+
     onProgress({
       jobId,
       fileIndex: i,
@@ -417,6 +570,19 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
         job.bytesDownloaded = calculateTotalDownloaded(job);
         job.totalBytes = calculateTotalSize(job);
 
+        // Log progress
+        downloadLogger.debug({
+          repo,
+          file: fileName,
+          jobId,
+          fileProgress,
+          overallProgress,
+          bytesDownloaded: job.bytesDownloaded,
+          totalBytes: job.totalBytes,
+          speed: stats.speed,
+          eta: stats.remaining
+        }, `Download progress: ${fileProgress.toFixed(1)}%`);
+
         onProgress({
           jobId,
           fileIndex: i,
@@ -449,6 +615,17 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
           size: fileSize,
           method: DOWNLOAD_METHOD.NODE
         });
+
+        // Log completion
+        downloadLogger.info({
+          repo,
+          file: fileName,
+          jobId,
+          fileSize,
+          destPath,
+          eventType: 'fileComplete'
+        }, `Download complete: ${fileName}`);
+
       } else {
         throw new Error('Download incomplete');
       }
@@ -466,6 +643,14 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
       job.files.set(destPath, {
         error: error.message
       });
+      // Log error
+      downloadLogger.error({
+        repo,
+        file: fileName,
+        jobId,
+        error: error.message,
+        eventType: 'downloadError'
+      }, `Download failed: ${fileName} - ${error.message}`);
       throw error;
     }
   }
@@ -543,7 +728,28 @@ class ModelDownloader {
         throw new Error('No download method available. Please install Python with huggingface_hub ("pip install huggingface_hub") or install easydl ("npm install easy-dl").');
       }
 
+      // Log download start
+      downloadLogger.info({
+        repo,
+        jobId,
+        method,
+        fileCount: files.length,
+        eventType: 'jobStart'
+      }, `Starting download: ${repo} (${files.length} files, method: ${method})`);
+
       logger.info({ repo, method }, 'Downloading model');
+
+      // Create wrapped progress callback with WebSocket broadcasting
+      const wrappedProgress = createProgressCallback(onProgress, job);
+
+      // Broadcast initial download started event
+      broadcastDownloadProgress('started', {
+        jobId,
+        repo,
+        method,
+        totalFiles: files.length,
+        status: 'downloading'
+      });
 
       // Prepare destination directory
       const destDir = files[0]?.dest || this.modelsDir;
@@ -551,15 +757,36 @@ class ModelDownloader {
       // Download files
       let results;
       if (method === DOWNLOAD_METHOD.PYTHON) {
-        results = await downloadWithPython(repo, files, destDir, onProgress, jobId);
+        results = await downloadWithPython(repo, files, destDir, wrappedProgress, jobId);
       } else {
-        results = await downloadWithNode(repo, files, destDir, onProgress, jobId);
+        results = await downloadWithNode(repo, files, destDir, wrappedProgress, jobId);
       }
 
       // Update job status to completed
       job.status = DOWNLOAD_STATUS.COMPLETED;
       job.progress = 100;
       job.completedAt = Date.now();
+
+      // Broadcast completion
+      broadcastDownloadProgress('complete', {
+        jobId,
+        repo,
+        method,
+        status: 'completed',
+        progress: 100,
+        totalSize: job.bytesDownloaded,
+        duration: job.completedAt - job.startTime
+      });
+
+      // Log completion
+      downloadLogger.info({
+        repo,
+        jobId,
+        method,
+        totalSize: job.bytesDownloaded,
+        duration: job.completedAt - job.startTime,
+        eventType: 'jobComplete'
+      }, `Download complete: ${repo}`);
 
       return {
         jobId,
@@ -574,13 +801,31 @@ class ModelDownloader {
     } catch (error) {
       const job = downloadJobs.get(jobId);
 
-      if (error.message === 'Download cancelled' || error.name === 'AbortError') {
-        job.status = DOWNLOAD_STATUS.CANCELLED;
-        job.error = 'Download was cancelled';
-      } else {
-        job.status = DOWNLOAD_STATUS.FAILED;
-        job.error = error.message;
-      }
+      const isCancelled = error.message === 'Download cancelled' || error.name === 'AbortError';
+      const finalStatus = isCancelled ? DOWNLOAD_STATUS.CANCELLED : DOWNLOAD_STATUS.FAILED;
+
+      job.status = finalStatus;
+      job.error = error.message;
+      job.completedAt = Date.now();
+
+      // Broadcast failure/cancellation
+      const eventType = isCancelled ? 'cancelled' : 'failed';
+      broadcastDownloadProgress(eventType, {
+        jobId,
+        repo,
+        method: job.method,
+        status: finalStatus,
+        error: error.message
+      });
+
+      // Log error
+      downloadLogger.error({
+        repo,
+        jobId,
+        method: job.method,
+        error: error.message,
+        eventType: 'jobFailed'
+      }, `Download failed: ${repo} - ${error.message}`);
 
       throw error;
     }
@@ -615,6 +860,9 @@ class ModelDownloader {
       totalBytes: totalSize,
       speed: job.speed ? formatBytes(job.speed) + '/s' : '--',
       eta: job.eta ? formatTime(job.eta) : '--',
+      currentFile: job.currentFile,
+      currentFileIndex: job.currentFileIndex,
+      stderr: job.stderr || [],
       files: Array.from(job.files.entries()).map(([path, file]) => ({
         path,
         size: file.size,
@@ -649,6 +897,23 @@ class ModelDownloader {
     }
 
     job.status = DOWNLOAD_STATUS.CANCELLED;
+    job.completedAt = Date.now();
+
+    // Broadcast cancellation
+    broadcastDownloadProgress('cancelled', {
+      jobId,
+      repo: job.repo,
+      method: job.method,
+      status: 'cancelled'
+    });
+
+    // Log cancellation
+    downloadLogger.info({
+      repo: job.repo,
+      jobId,
+      method: job.method,
+      eventType: 'jobCancelled'
+    }, `Download cancelled: ${job.repo}`);
   }
 
   /**

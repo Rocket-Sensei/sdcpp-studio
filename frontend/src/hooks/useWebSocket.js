@@ -43,6 +43,7 @@ export const WS_CHANNELS = {
   QUEUE: 'queue',
   GENERATIONS: 'generations',
   MODELS: 'models',
+  DOWNLOAD: 'download',
 };
 
 // Default reconnect interval (ms)
@@ -201,6 +202,28 @@ export function useModelStatusUpdates(onModelStatusChange) {
     onMessage: (message) => {
       if (message.channel === WS_CHANNELS.MODELS && onModelStatusChange) {
         onModelStatusChange(message);
+      }
+    },
+  });
+
+  return {
+    isConnected,
+    lastMessage,
+  };
+}
+
+/**
+ * Specialized hook for download progress updates
+ *
+ * @param {Function} onDownloadProgress - Callback when download progress changes
+ * @returns {Object} Hook API
+ */
+export function useDownloadProgress(onDownloadProgress) {
+  const { isConnected, lastMessage } = useWebSocket({
+    channels: [WS_CHANNELS.DOWNLOAD],
+    onMessage: (message) => {
+      if (message.channel === WS_CHANNELS.DOWNLOAD && onDownloadProgress) {
+        onDownloadProgress(message);
       }
     },
   });

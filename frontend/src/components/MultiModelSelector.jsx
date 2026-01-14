@@ -10,6 +10,8 @@ import {
   AlertCircle,
   Loader2,
   Cpu,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -17,6 +19,7 @@ import { Checkbox } from "./ui/checkbox";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
+import { useDownloadProgress } from "../hooks/useWebSocket";
 
 const API_BASE = "/api/models";
 
@@ -91,6 +94,7 @@ export function MultiModelSelector({
   const [expandedModels, setExpandedModels] = useState({});
   const [modelFilesStatus, setModelFilesStatus] = useState({});
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [showMissingModels, setShowMissingModels] = useState(false);
 
   // Keep a ref to the latest fetchModels function for polling
   const fetchModelsRef = useRef(null);
@@ -174,6 +178,36 @@ export function MultiModelSelector({
       }
     }, 1000);
   }, [fetchModels]);
+
+  // WebSocket download progress handler
+  useDownloadProgress((message) => {
+    if (message.type === 'progress' || message.type === 'started') {
+      setDownloadProgress({
+        status: message.data.status || DOWNLOAD_STATUS.DOWNLOADING,
+        jobId: message.data.jobId,
+        progress: (message.data.overallProgress || 0) / 100,
+        bytesDownloaded: message.data.bytesDownloaded,
+        totalBytes: message.data.totalBytes,
+        speed: message.data.speed,
+        eta: message.data.eta,
+        fileName: message.data.fileName,
+        fileProgress: message.data.fileProgress,
+        modelName: models.find(m => m.id === message.data.modelId)?.name,
+      });
+    } else if (message.type === 'complete') {
+      setDownloadProgress((prev) => ({ ...prev, status: DOWNLOAD_STATUS.COMPLETED, progress: 1 }));
+      toast.success("Model downloaded successfully");
+      fetchModels(); // Refresh models and file status
+      setTimeout(() => setDownloadProgress(null), 3000);
+    } else if (message.type === 'failed') {
+      setDownloadProgress((prev) => ({ ...prev, status: DOWNLOAD_STATUS.FAILED, error: message.data.error }));
+      toast.error(message.data.error || "Download failed");
+    } else if (message.type === 'cancelled') {
+      setDownloadProgress((prev) => ({ ...prev, status: DOWNLOAD_STATUS.CANCELLED }));
+      toast.info("Download cancelled");
+      setTimeout(() => setDownloadProgress(null), 2000);
+    }
+  });
 
   // Initial data load
   useEffect(() => {
@@ -414,6 +448,15 @@ export function MultiModelSelector({
           <Button size="sm" variant="outline" onClick={deselectAll} disabled={selectedModels.length === 0}>
             Deselect All
           </Button>
+          <Button
+            size="sm"
+            variant={showMissingModels ? "default" : "outline"}
+            onClick={() => setShowMissingModels(!showMissingModels)}
+            className="gap-1.5"
+          >
+            {showMissingModels ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {showMissingModels ? "Hide Missing" : "Show Missing"}
+          </Button>
         </div>
       </div>
 
@@ -446,7 +489,15 @@ export function MultiModelSelector({
 
       {/* Model list */}
       <div className="space-y-2">
-        {models.map((model) => {
+        {models
+          .filter((model) => {
+            const filesStatus = modelFilesStatus[model.id];
+            const hasMissingFiles = filesStatus && !filesStatus.allFilesExist;
+            // If showMissingModels is false, hide models with missing files
+            // If showMissingModels is true, show all models
+            return showMissingModels || !hasMissingFiles;
+          })
+          .map((model) => {
           const isSelected = selectedModels.includes(model.id);
           const isExpanded = expandedModels[model.id];
           const filesStatus = modelFilesStatus[model.id];
