@@ -381,7 +381,7 @@ describe('SettingsModal Component', () => {
     it('should reset state when modal is closed and reopened', async () => {
       vi.mocked(apiUtils.validateApiKey).mockResolvedValue(false);
 
-      render(
+      const { rerender } = render(
         <SettingsModal isOpen={true} onClose={mockOnClose} />
       );
 
@@ -396,9 +396,9 @@ describe('SettingsModal Component', () => {
         expect(screen.getByText('Invalid API key. Please check and try again.')).toBeInTheDocument();
       });
 
-      // Close and reopen
-      render(<SettingsModal isOpen={false} onClose={mockOnClose} />);
-      render(<SettingsModal isOpen={true} onClose={mockOnClose} />);
+      // Close and reopen using rerender
+      rerender(<SettingsModal isOpen={false} onClose={mockOnClose} />);
+      rerender(<SettingsModal isOpen={true} onClose={mockOnClose} />);
 
       // Error should be cleared
       await waitFor(() => {

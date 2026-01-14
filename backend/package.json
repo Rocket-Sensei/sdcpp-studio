@@ -12,14 +12,16 @@
     "models:running": "node scripts/models-cli.js running"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^12.6.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.2.3",
     "easydl": "^1.2.0",
-    "express": "^4.21.2",
-    "form-data": "^4.0.1",
-    "js-yaml": "^4.1.0",
-    "multer": "^1.4.5-lts.1",
+    "express": "^5.2.1",
+    "form-data": "^4.0.5",
+    "js-yaml": "^4.1.1",
+    "multer": "^2.0.2",
+    "node-addon-api": "^8.3.0",
+    "node-gyp": "^11.1.0",
     "sharp": "^0.34.5"
   }
 }

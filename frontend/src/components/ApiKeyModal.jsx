@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Key, Check, AlertCircle } from 'lucide-react';
 import { saveApiKey, validateApiKey, isAuthRequired } from '../utils/api';
 import { useApiKeyContext } from '../contexts/ApiKeyContext';
@@ -15,7 +15,13 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const apiKeyRef = useRef(apiKey);
   const { notifyApiKeyChanged } = useApiKeyContext();
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    apiKeyRef.current = apiKey;
+  }, [apiKey]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -26,18 +32,19 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setError(null);
     setIsValidating(true);
 
     try {
-      const isValid = await validateApiKey(apiKey);
+      // Read from ref to always get the current value
+      const submittedKey = apiKeyRef.current;
+
+      const isValid = await validateApiKey(submittedKey);
 
       if (isValid) {
-        saveApiKey(apiKey);
+        saveApiKey(submittedKey);
         notifyApiKeyChanged(); // Notify listeners that API key changed
         setSuccess(true);
         setTimeout(() => {
@@ -52,7 +59,9 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
     } finally {
       setIsValidating(false);
     }
-  };
+  }, [notifyApiKeyChanged, onSuccess, onClose]);
+
+  if (!isOpen) return null;
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -88,6 +97,7 @@ export function ApiKeyModal({ isOpen, onClose, onSuccess }) {
               </label>
               <input
                 id="api-key"
+                name="api-key"
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
@@ -176,9 +186,13 @@ export function ApiKeyProvider({ children }) {
     checkAuth();
   }, []);
 
-  const handleModalSuccess = () => {
+  const handleModalSuccess = useCallback(() => {
     setShowModal(false);
-  };
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    // Prevent closing without valid key - do nothing
+  }, []);
 
   if (isLoading) {
     return (
@@ -196,7 +210,7 @@ export function ApiKeyProvider({ children }) {
       {children}
       <ApiKeyModal
         isOpen={showModal && authRequired}
-        onClose={() => {}} // Prevent closing without valid key
+        onClose={handleModalClose}
         onSuccess={handleModalSuccess}
       />
     </>

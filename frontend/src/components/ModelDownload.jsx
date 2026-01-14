@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Download, Pause, Play, RotateCcw, AlertCircle, Check, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -49,22 +49,32 @@ export function ModelDownload({
   onRetry,
   onClose,
 }) {
-  const [autoCloseTimer, setAutoCloseTimer] = useState(null);
+  const autoCloseTimerRef = useRef(null);
+  const [showAutoCloseMessage, setShowAutoCloseMessage] = useState(false);
 
   // Auto-close when download completes
   useEffect(() => {
+    // Clear any existing timer
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+    setShowAutoCloseMessage(false);
+
     if (download?.status === "completed" && open) {
-      const timer = setTimeout(() => {
+      setShowAutoCloseMessage(true);
+      autoCloseTimerRef.current = setTimeout(() => {
+        setShowAutoCloseMessage(false);
         handleAutoClose();
       }, 3000); // Auto-close after 3 seconds
-      setAutoCloseTimer(timer);
     }
 
     return () => {
-      if (autoCloseTimer) {
-        clearTimeout(autoCloseTimer);
-        setAutoCloseTimer(null);
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
       }
+      setShowAutoCloseMessage(false);
     };
   }, [download?.status, open]);
 
@@ -329,7 +339,7 @@ export function ModelDownload({
           )}
 
           {/* Auto-close countdown for completed downloads */}
-          {download.status === "completed" && autoCloseTimer && (
+          {download.status === "completed" && showAutoCloseMessage && (
             <div className="text-center text-xs text-muted-foreground">
               Closing automatically in 3 seconds...
             </div>
