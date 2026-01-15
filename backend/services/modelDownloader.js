@@ -1,14 +1,13 @@
 /**
  * Model Downloader Service
  *
- * Downloads models from HuggingFace using Node.js easydl first,
- * with Python huggingface_hub as fallback.
+ * Downloads models from HuggingFace using native fetch with resume support,
+ * with ModelScope and Python huggingface_hub as fallbacks.
  *
  * Features:
- * - Node.js-first approach using easydl
- * - Automatic fallback to Python if Node.js unavailable
- * - Progress tracking for both methods
- * - Resume support (built into both hf_hub_download and easydl)
+ * - Native fetch with HTTP Range headers for resume
+ * - Simple append mode for resuming incomplete downloads
+ * - Progress tracking with speed and ETA
  * - Token authentication support
  * - Custom cache directories
  * - File logging to downloads.log
@@ -16,9 +15,9 @@
  */
 
 import { randomUUID } from 'crypto';
-import { mkdirSync, existsSync, statSync } from 'fs';
+import { mkdirSync, existsSync, statSync, createWriteStream, openSync, closeSync, rmSync, renameSync } from 'fs';
 import { join, dirname, basename, resolve } from 'path';
-import { spawn } from 'child_process';
+import { spawn, exec as childExec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { createLogger } from '../utils/logger.js';
@@ -27,32 +26,24 @@ import pino from 'pino';
 
 const logger = createLogger('modelDownloader');
 
-// Lazy import easydl to avoid issues if not installed
-let EasyDl = null;
-try {
-  const easydlModule = await import('easydl');
-  EasyDl = easydlModule.default || easydlModule;
-} catch (e) {
-  // easydl not installed, will use Python only
-}
+const exec = promisify(childExec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Default directories
-const DEFAULT_MODELS_DIR = process.env.MODELS_DIR || join(__dirname, '../../models');
+// Project root directory (two levels up from backend/services/)
+const PROJECT_ROOT = resolve(__dirname, '../..');
+
+// Default directories - resolved relative to project root
+const DEFAULT_MODELS_DIR = process.env.MODELS_DIR || join(PROJECT_ROOT, 'models');
 const HF_HUB_CACHE = process.env.HF_HUB_CACHE || process.env.HUGGINGFACE_HUB_CACHE || join(__dirname, '../../models/hf_cache/hub');
-const NODE_HF_CACHE = process.env.NODE_HF_CACHE || join(__dirname, '../../models/hf_cache/node');
 
 // Python wrapper script path
 const PYTHON_SCRIPT = join(__dirname, '../scripts/hf_download.py');
 
-// Ensure cache directories exist
+// Ensure cache directory exists
 if (!existsSync(HF_HUB_CACHE)) {
   mkdirSync(HF_HUB_CACHE, { recursive: true });
-}
-if (!existsSync(NODE_HF_CACHE)) {
-  mkdirSync(NODE_HF_CACHE, { recursive: true });
 }
 
 // Ensure logs directory exists for download logs
@@ -136,9 +127,22 @@ async function checkHuggingFaceHubAvailable() {
   });
 }
 
+/**
+ * Check if ModelScope CLI is available
+ */
+async function checkModelScopeAvailable() {
+  return new Promise((resolve) => {
+    const proc = spawn('modelscope', ['--version'], { stdio: 'pipe', shell: true });
+    proc.on('error', () => resolve(false));
+    proc.on('close', (code) => resolve(code === 0));
+    setTimeout(() => resolve(false), 5000);
+  });
+}
+
 // Cache Python availability checks
 let pythonAvailable = null;
 let hfHubAvailable = null;
+let modelScopeAvailable = null;
 
 /**
  * Get available download method
@@ -162,17 +166,8 @@ async function getDownloadMethod() {
     logger.warn('Python downloader requested but unavailable, falling back to Node.js');
   }
 
-  // Prefer Node.js by default
-  if (EasyDl) {
-    return DOWNLOAD_METHOD.NODE;
-  }
-
-  // Fall back to Python if Node unavailable
-  if (pythonAvailable && hfHubAvailable) {
-    return DOWNLOAD_METHOD.PYTHON;
-  }
-
-  return DOWNLOAD_METHOD.UNKNOWN;
+  // Prefer Node.js by default (native fetch with resume support)
+  return DOWNLOAD_METHOD.NODE;
 }
 
 /**
@@ -206,9 +201,14 @@ function formatTime(seconds) {
 
 /**
  * Get HuggingFace file URL
+ * Note: repo contains '/' which should not be encoded, so we don't use encodeURIComponent on it.
+ * The filename might contain special characters that need encoding.
  */
 function getHuggingFaceFileUrl(repo, filename, revision = 'main') {
-  return `https://huggingface.co/${encodeURIComponent(repo)}/resolve/${encodeURIComponent(revision)}/${encodeURIComponent(filename)}`;
+  // Don't encode repo - it contains the owner/repo path structure
+  // Encode revision and filename in case they have special characters
+  const encodedFilename = filename.split('/').map(part => encodeURIComponent(part)).join('/');
+  return `https://huggingface.co/${repo}/resolve/${encodeURIComponent(revision)}/${encodedFilename}`;
 }
 
 /**
@@ -274,14 +274,33 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
       throw new Error('Download cancelled');
     }
 
+    // Use file-specific dest or fall back to destDir, resolving relative paths from project root
+    const fileDestDir = file.dest || destDir || DEFAULT_MODELS_DIR;
+    const resolvedDestDir = fileDestDir.startsWith('/') ? fileDestDir : resolve(PROJECT_ROOT, fileDestDir);
+
+    // Ensure destination directory exists
+    if (!existsSync(resolvedDestDir)) {
+      mkdirSync(resolvedDestDir, { recursive: true });
+    }
+
     // Update job state
     job.currentFile = fileName;
     job.currentFileIndex = i;
 
+    // Use file-specific repo if provided, otherwise use the main repo
+    const fileRepo = file.repo || repo;
+
+    // If file has a direct URL, Python downloader can't handle it - skip to next file
+    // (This shouldn't happen if Node.js downloader is available, which is default)
+    if (file.url) {
+      logger.warn({ file: fileName, url: file.url }, 'Python downloader cannot handle direct URLs, skipping');
+      continue;
+    }
+
     // Build Python command args
     const args = [
       PYTHON_SCRIPT,
-      '--repo-id', repo,
+      '--repo-id', fileRepo,
       '--filename', file.path,
       '--revision', 'main'
     ];
@@ -294,18 +313,17 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
       args.push('--cache-dir', cacheDir);
     }
 
-    if (destDir) {
-      args.push('--dest', destDir);
-    }
+    // Always pass resolved destination directory
+    args.push('--dest', resolvedDestDir);
 
     // Log download start
     downloadLogger.info({
-      repo,
+      repo: fileRepo,
       file: fileName,
       jobId,
       method: 'python',
       eventType: 'downloadStart'
-    }, `Starting download: ${fileName} from ${repo}`);
+    }, `Starting download: ${fileName} from ${fileRepo}`);
 
     await new Promise((resolve, reject) => {
       const python = spawn(PYTHON, args, {
@@ -494,48 +512,125 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
 }
 
 /**
- * Download using Node.js easydl
+ * Download a single file using ModelScope CLI
+ * @param {string} modelId - ModelScope model ID (e.g., "AI-ModelScope/FLUX.1-schnell")
+ * @param {string} fileName - File name to download
+ * @param {string} destDir - Destination directory
+ * @param {Object} job - Download job object
+ * @param {Function} onProgress - Progress callback
+ * @returns {Promise<{path: string, size: number}>}
  */
-async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
-  if (!EasyDl) {
-    throw new Error('easydl is not installed. Run: npm install easy-dl');
+async function downloadWithModelScope(modelId, fileName, destDir, job, onProgress) {
+  // Check ModelScope availability
+  if (modelScopeAvailable === null) {
+    modelScopeAvailable = await checkModelScopeAvailable();
   }
 
+  if (!modelScopeAvailable) {
+    throw new Error('ModelScope CLI is not available. Install it with: pip install modelscope');
+  }
+
+  return new Promise((resolve, reject) => {
+    // Build ModelScope command args
+    // modelscope download --model AI-ModelScope/FLUX.1-schnell ae.safetensors --local_dir ./models
+    const args = [
+      'download',
+      '--model', modelId,
+      fileName,
+      '--local_dir', destDir
+    ];
+
+    downloadLogger.info({
+      modelscope: modelId,
+      file: fileName,
+      destDir,
+      jobId: job.id,
+      method: 'modelscope',
+      eventType: 'downloadStart'
+    }, `Starting ModelScope download: ${fileName} from ${modelId}`);
+
+    const proc = spawn('modelscope', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true
+    });
+
+    let stderrBuffer = [];
+
+    proc.stdout.on('data', (data) => {
+      const output = data.toString();
+      // ModelScope shows progress like "Downloading: 100%|..."
+      // We can parse this if needed, but for now just log it
+      logger.debug({ output: output.trim() }, 'ModelScope stdout');
+    });
+
+    proc.stderr.on('data', (data) => {
+      const content = data.toString();
+      stderrBuffer.push(content);
+      // ModelScope often outputs progress to stderr
+      logger.debug({ content: content.trim() }, 'ModelScope stderr');
+    });
+
+    proc.on('error', (error) => {
+      reject(new Error(`ModelScope spawn error: ${error.message}`));
+    });
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        const stderrMsg = stderrBuffer.join('\n');
+        logger.error({ code, stderr: stderrMsg, file: fileName, modelscope: modelId }, `ModelScope process exited with code ${code}`);
+        reject(new Error(`ModelScope download failed with code ${code}: ${stderrMsg}`));
+      } else {
+        // Verify file exists
+        const filePath = join(destDir, fileName);
+        if (existsSync(filePath)) {
+          const fileSize = statSync(filePath).size;
+          downloadLogger.info({
+            modelscope: modelId,
+            file: fileName,
+            fileSize,
+            eventType: 'fileComplete'
+          }, `ModelScope download complete: ${fileName}`);
+          resolve({ path: filePath, size: fileSize });
+        } else {
+          reject(new Error(`ModelScope download completed but file not found: ${filePath}`));
+        }
+      }
+    });
+  });
+}
+
+/**
+ * Download using native fetch with resume support
+ *
+ * Resume logic:
+ * 1. Check if destination file exists and get its size
+ * 2. If file exists, use HTTP Range header: "Range: bytes=${currentSize}-"
+ * 3. Open file in append mode ('a') to continue writing
+ * 4. Server returns 206 Partial Content with remaining bytes
+ */
+async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
   const job = downloadJobs.get(jobId);
   if (!job) {
     throw new Error('Download job not found');
   }
 
   const results = [];
-  const cacheDir = NODE_HF_CACHE;
-
-  // Ensure cache directory exists
-  if (!existsSync(cacheDir)) {
-    mkdirSync(cacheDir, { recursive: true });
-  }
+  const maxRetries = parseInt(process.env.DOWNLOAD_MAX_RETRIES) || 3;
+  const retryDelay = parseInt(process.env.DOWNLOAD_RETRY_DELAY) || 2000;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const fileName = basename(file.path);
-    const destPath = join(destDir || DEFAULT_MODELS_DIR, fileName);
+    const fileDestDir = file.dest || destDir || DEFAULT_MODELS_DIR;
+    const resolvedDestDir = fileDestDir.startsWith('/') ? fileDestDir : resolve(PROJECT_ROOT, fileDestDir);
+    const destPath = join(resolvedDestDir, fileName);
 
-    // Update job state
+    if (!existsSync(resolvedDestDir)) {
+      mkdirSync(resolvedDestDir, { recursive: true });
+    }
+
     job.currentFile = fileName;
     job.currentFileIndex = i;
-
-    // Build download URL
-    const url = getHuggingFaceFileUrl(repo, file.path);
-
-    // Log download start
-    downloadLogger.info({
-      repo,
-      file: fileName,
-      url,
-      jobId,
-      destPath,
-      method: 'node',
-      eventType: 'downloadStart'
-    }, `Starting download: ${fileName} from ${repo}`);
 
     onProgress({
       jobId,
@@ -548,86 +643,267 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
     });
 
     try {
-      const dl = new EasyDl(url, destPath, {
-        chunkSize: parseInt(process.env.DOWNLOAD_CHUNK_SIZE) || 10485760, // 10MB default
-        maxRetry: parseInt(process.env.DOWNLOAD_MAX_RETRIES) || 3,
-        connections: 1, // Single connection for HuggingFace
-        headers: HF_TOKEN ? { 'Authorization': `Bearer ${HF_TOKEN}` } : {}
-      });
+      // Check if file should be downloaded from ModelScope
+      if (file.modelscope) {
+        logger.info({ modelscope: file.modelscope, file: fileName }, 'Using ModelScope for download');
 
-      // Track progress
-      dl.on('progress', (stats) => {
-        const fileProgress = stats.percent || 0;
-        const overallProgress = ((i + fileProgress / 100) / files.length) * 100;
+        const result = await downloadWithModelScope(file.modelscope, fileName, resolvedDestDir, job, onProgress);
 
         job.files.set(destPath, {
-          size: stats.total,
-          downloaded: stats.downloaded,
-          progress: fileProgress
+          size: result.size,
+          downloaded: result.size,
+          progress: 100,
+          complete: true
         });
 
-        job.progress = overallProgress;
-        job.bytesDownloaded = calculateTotalDownloaded(job);
-        job.totalBytes = calculateTotalSize(job);
-
-        // Log progress
-        downloadLogger.debug({
-          repo,
-          file: fileName,
-          jobId,
-          fileProgress,
-          overallProgress,
-          bytesDownloaded: job.bytesDownloaded,
-          totalBytes: job.totalBytes,
-          speed: stats.speed,
-          eta: stats.remaining
-        }, `Download progress: ${fileProgress.toFixed(1)}%`);
+        results.push({
+          path: result.path,
+          size: result.size,
+          method: 'modelscope'
+        });
 
         onProgress({
           jobId,
           fileIndex: i,
           totalFiles: files.length,
           fileName,
-          fileProgress,
-          overallProgress,
-          bytesDownloaded: job.bytesDownloaded,
-          totalBytes: job.totalBytes,
-          speed: formatBytes(stats.speed || 0) + '/s',
-          eta: formatTime(stats.remaining || 0)
+          fileComplete: true,
+          message: `Completed ${fileName} (ModelScope)`
         });
-      });
 
-      // Wait for download
-      const downloaded = await dl.wait();
+        continue;
+      }
 
-      if (downloaded) {
-        const fileSize = statSync(destPath).size;
+      const fileRepo = file.repo || repo;
+      const url = file.url || getHuggingFaceFileUrl(fileRepo, file.path);
+
+      // Use .part extension for incomplete downloads
+      const partPath = `${destPath}.part`;
+
+      // Check for existing .part file for resume
+      let currentSize = 0;
+      let isResume = false;
+
+      if (existsSync(partPath)) {
+        currentSize = statSync(partPath).size;
+        if (currentSize > 0) {
+          isResume = true;
+          downloadLogger.info({
+            file: fileName,
+            currentSize,
+            partPath
+          }, `Resuming download: ${fileName} (${formatBytes(currentSize)} already downloaded)`);
+        }
+      }
+
+      // First, make a HEAD request to get the total file size
+      const totalSizeResponse = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      const serverTotalSize = parseInt(totalSizeResponse.headers.get('content-length') || '0');
+
+      // If final file exists and is complete, skip it
+      if (existsSync(destPath) && statSync(destPath).size >= serverTotalSize) {
+        downloadLogger.info({
+          file: fileName,
+          currentSize: statSync(destPath).size,
+          serverTotalSize,
+          destPath
+        }, `File already complete: ${fileName}`);
 
         job.files.set(destPath, {
-          size: fileSize,
-          downloaded: fileSize,
+          size: statSync(destPath).size,
+          downloaded: statSync(destPath).size,
           progress: 100,
           complete: true
         });
 
         results.push({
           path: destPath,
-          size: fileSize,
+          size: statSync(destPath).size,
           method: DOWNLOAD_METHOD.NODE
         });
 
-        // Log completion
-        downloadLogger.info({
-          repo,
-          file: fileName,
+        onProgress({
           jobId,
-          fileSize,
-          destPath,
-          eventType: 'fileComplete'
-        }, `Download complete: ${fileName}`);
+          fileIndex: i,
+          totalFiles: files.length,
+          fileName,
+          fileComplete: true,
+          message: `Skipped ${fileName} (already complete)`
+        });
 
-      } else {
-        throw new Error('Download incomplete');
+        continue;
+      }
+
+      // If .part file is already complete, rename it and skip
+      if (currentSize > 0 && currentSize >= serverTotalSize) {
+        downloadLogger.info({
+          file: fileName,
+          currentSize,
+          serverTotalSize,
+          partPath,
+          destPath
+        }, `Partial file already complete, renaming: ${fileName}`);
+
+        // Rename .part to final destination
+        if (existsSync(destPath)) {
+          // Remove incomplete final file if it exists
+          rmSync(destPath);
+        }
+        renameSync(partPath, destPath);
+
+        job.files.set(destPath, {
+          size: currentSize,
+          downloaded: currentSize,
+          progress: 100,
+          complete: true
+        });
+
+        results.push({
+          path: destPath,
+          size: currentSize,
+          method: DOWNLOAD_METHOD.NODE
+        });
+
+        onProgress({
+          jobId,
+          fileIndex: i,
+          totalFiles: files.length,
+          fileName,
+          fileComplete: true,
+          message: `Completed ${fileName} (from partial file)`
+        });
+
+        continue;
+      }
+
+      downloadLogger.info({
+        repo: fileRepo,
+        file: fileName,
+        url,
+        jobId,
+        partPath,
+        method: 'node',
+        isResume,
+        currentSize,
+        serverTotalSize,
+        eventType: 'downloadStart'
+      }, `${isResume ? 'Resuming' : 'Starting'} download: ${fileName}`);
+
+      // Download with retry logic
+      let attempt = 0;
+      let success = false;
+      let lastError = null;
+
+      while (attempt < maxRetries && !success) {
+        attempt++;
+        try {
+          const result = await downloadFileWithFetch(
+            url,
+            partPath,  // Download to .part file
+            currentSize,
+            {
+              authorization: HF_TOKEN ? `Bearer ${HF_TOKEN}` : null,
+              onProgress: (downloaded, total, speed) => {
+                const fileProgress = total > 0 ? ((currentSize + downloaded) / total) * 100 : 0;
+                const overallProgress = ((i + fileProgress / 100) / files.length) * 100;
+
+                job.files.set(partPath, {
+                  size: total,
+                  downloaded: currentSize + downloaded,
+                  progress: fileProgress
+                });
+
+                job.progress = overallProgress;
+                job.bytesDownloaded = calculateTotalDownloaded(job);
+                job.totalBytes = calculateTotalSize(job);
+
+                const remainingBytes = total - (currentSize + downloaded);
+                const etaSeconds = speed > 0 ? remainingBytes / speed : 0;
+
+                downloadLogger.debug({
+                  repo,
+                  file: fileName,
+                  jobId,
+                  fileProgress,
+                  overallProgress,
+                  bytesDownloaded: job.bytesDownloaded,
+                  totalBytes: job.totalBytes,
+                  speed,
+                  eta: etaSeconds,
+                  attempt
+                }, `Download progress: ${fileProgress.toFixed(1)}% (attempt ${attempt}/${maxRetries})`);
+
+                onProgress({
+                  jobId,
+                  fileIndex: i,
+                  totalFiles: files.length,
+                  fileName,
+                  fileProgress,
+                  overallProgress,
+                  bytesDownloaded: job.bytesDownloaded,
+                  totalBytes: job.totalBytes,
+                  speed: formatBytes(speed) + '/s',
+                  eta: formatTime(etaSeconds),
+                  isResume,
+                  attempt
+                });
+              }
+            }
+          );
+
+          // Download successful - rename .part to final destination
+          if (existsSync(destPath)) {
+            rmSync(destPath);
+          }
+          renameSync(partPath, destPath);
+
+          const fileSize = statSync(destPath).size;
+
+          job.files.set(destPath, {
+            size: fileSize,
+            downloaded: fileSize,
+            progress: 100,
+            complete: true
+          });
+
+          results.push({
+            path: destPath,
+            size: fileSize,
+            method: DOWNLOAD_METHOD.NODE
+          });
+
+          downloadLogger.info({
+            repo,
+            file: fileName,
+            jobId,
+            fileSize,
+            destPath,
+            eventType: 'fileComplete'
+          }, `Download complete: ${fileName}`);
+
+          success = true;
+
+        } catch (error) {
+          lastError = error;
+          downloadLogger.warn({
+            file: fileName,
+            attempt,
+            maxRetries,
+            error: error.message
+          }, `Download attempt ${attempt} failed: ${error.message}`);
+
+          if (attempt < maxRetries) {
+            // Update current size for resume on retry
+            if (existsSync(partPath)) {
+              currentSize = statSync(partPath).size;
+            }
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        }
+      }
+
+      if (!success) {
+        throw lastError || new Error('Download failed after all retries');
       }
 
       onProgress({
@@ -643,7 +919,6 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
       job.files.set(destPath, {
         error: error.message
       });
-      // Log error
       downloadLogger.error({
         repo,
         file: fileName,
@@ -656,6 +931,131 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
   }
 
   return results;
+}
+
+/**
+ * Download a single file using native fetch with resume support
+ *
+ * @param {string} url - The URL to download from
+ * @param {string} destPath - Destination file path
+ * @param {number} startOffset - Number of bytes already downloaded (for resume)
+ * @param {object} options - Options including authorization header and progress callback
+ * @returns {Promise<{totalSize: number, downloaded: number}>}
+ */
+async function downloadFileWithFetch(url, destPath, startOffset = 0, options = {}) {
+  const { authorization, onProgress } = options;
+
+  // Build headers
+  const headers = {};
+  if (authorization) {
+    headers['Authorization'] = authorization;
+  }
+  if (startOffset > 0) {
+    headers['Range'] = `bytes=${startOffset}-`;
+  }
+
+  // Initiate fetch with timeout support
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 300000); // 5 minute timeout per request
+
+  try {
+    const response = await fetch(url, {
+      headers,
+      signal: controller.signal,
+      redirect: 'follow'  // Explicitly follow redirects
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok && response.status !== 206) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Get total file size from Content-Range or Content-Length
+    let totalSize = 0;
+    const contentRange = response.headers.get('Content-Range');
+    const contentLength = response.headers.get('Content-Length');
+
+    if (contentRange) {
+      // Content-Range: bytes 0-1023/2048
+      const match = contentRange.match(/\/(\d+)$/);
+      if (match) {
+        totalSize = parseInt(match[1]);
+      }
+    } else if (contentLength) {
+      totalSize = startOffset + parseInt(contentLength);
+    }
+
+    downloadLogger.debug({
+      url,
+      startOffset,
+      totalSize,
+      status: response.status,
+      contentRange,
+      contentLength
+    }, `Fetch response: ${response.status}`);
+
+    // Open file in append mode if resuming, write mode otherwise
+    const fileFlags = startOffset > 0 ? 'a' : 'w';
+    const writeStream = createWriteStream(destPath, {
+      flags: fileFlags,
+      autoClose: true
+    });
+
+    // Get reader for the response body
+    const reader = response.body.getReader();
+    let downloaded = 0;
+    let progressUpdateTime = Date.now();
+    let progressUpdateBytes = 0;
+    let speed = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      downloaded += value.length;
+      progressUpdateBytes += value.length;
+
+      // Write to file using pipeline to handle backpressure
+      const writeResult = writeStream.write(value);
+      if (!writeResult) {
+        // Buffer is full, wait for 'drain' event
+        await new Promise((resolve) => writeStream.once('drain', resolve));
+      }
+
+      // Update progress every 1 second
+      const now = Date.now();
+      const elapsed = now - progressUpdateTime;
+
+      if (elapsed >= 1000 && onProgress) {
+        speed = (progressUpdateBytes * 1000) / elapsed;
+        onProgress(downloaded, totalSize, speed);
+        progressUpdateTime = now;
+        progressUpdateBytes = 0;
+      }
+    }
+
+    // Final progress update
+    if (onProgress && downloaded > 0) {
+      speed = progressUpdateBytes > 0 ? (progressUpdateBytes * 1000) / (Date.now() - progressUpdateTime) : speed;
+      onProgress(downloaded, totalSize, speed);
+    }
+
+    // Close write stream
+    writeStream.end();
+
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    return { totalSize, downloaded };
+
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
+  }
 }
 
 /**

@@ -39,7 +39,8 @@ models:
           dest: "./models/"
         - path: "ae.safetensors"
           dest: "./models/"
-          repo: "black-forest-labs/FLUX.1-schnell"
+          # repo: "black-forest-labs/FLUX.1-schnell"  # Gated on HuggingFace, requires token
+          modelscope: "AI-ModelScope/FLUX.1-schnell"
         - path: "Qwen3-4B-Instruct-2507-Q8_0.gguf"
           dest: "./models/"
           repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF"
