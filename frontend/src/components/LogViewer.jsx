@@ -95,9 +95,12 @@ export function LogViewer({ generationId, onClose }) {
   });
 
   const formatLogMessage = (log) => {
-    const msg = log.msg || "";
-    // Add module prefix
-    const module = log.module ? `[${log.module}] ` : "";
+    // For SD.cpp logs, use stdout/stderr for actual output content
+    // Falls back to msg field for regular logs
+    let msg = log.stdout || log.stderr || log.msg || "";
+
+    // Add module prefix (but skip for sdcpp since the output already contains context)
+    const module = log.module && log.module !== "sdcpp" ? `[${log.module}] ` : "";
     return `${module}${msg}`;
   };
 

@@ -2,11 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-// Note: We cannot directly render UnifiedQueue in tests because the
-// @didik-mulyadi/react-modal-images package bundles an older version of React
-// which causes "React Element from an older version" errors in tests.
-// In production, this should work fine, but in the test environment with jsdom,
-// the version conflict causes issues.
+// Note: We now use @hanakla/react-lightbox which is a headless library
+// that doesn't have React version conflicts. This allows proper testing.
 
 // Instead, we test the component structure and verify the imports are correct.
 
@@ -82,12 +79,13 @@ const mockModels = {
 
 describe('UnifiedQueue - Modal Image Integration', () => {
   describe('Package Installation and Imports', () => {
-    it('should have the modal images package installed', () => {
+    it('should have the lightbox package installed', () => {
       const fs = require('fs');
       const packageJsonPath = 'frontend/package.json';
       const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
-      expect(packageJson.dependencies).toHaveProperty('@didik-mulyadi/react-modal-images');
+      // Now using @hanakla/react-lightbox (headless, no React version conflicts)
+      expect(packageJson.dependencies).toHaveProperty('@hanakla/react-lightbox');
     });
 
     it('should import LightboxWithImage and LightboxGalleryWithImages components', () => {
@@ -95,8 +93,8 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify the package is imported
-      expect(componentContent).toContain('@didik-mulyadi/react-modal-images');
+      // Verify the local Lightbox wrapper is imported
+      expect(componentContent).toContain('from "./Lightbox"');
       expect(componentContent).toContain('LightboxWithImage');
       expect(componentContent).toContain('LightboxGalleryWithImages');
     });

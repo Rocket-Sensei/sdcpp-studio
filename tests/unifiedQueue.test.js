@@ -75,7 +75,8 @@ describe('UnifiedQueue - Thumbnail Remount Prevention', () => {
     // Verify LightboxWithImage component is used for modal image viewing
     expect(source).toContain('LightboxWithImage');
     expect(source).toContain('LightboxGalleryWithImages');
-    expect(source).toContain('@didik-mulyadi/react-modal-images');
+    // Now using local Lightbox component wrapper around @hanakla/react-lightbox
+    expect(source).toContain('from "./Lightbox"');
   });
 
   it('should have helper functions defined outside component', () => {

@@ -238,12 +238,44 @@ async function processQueue() {
         throw new Error(`Unknown job type: ${job.type}`);
     }
 
-    // Update status to completed (generation_id is now the same as job.id)
+    // Validate that images were actually generated before marking as completed
+    const imageCount = result?.imageCount || 0;
     const endTime = Date.now();
     const totalTimeMs = endTime - startTime;
     const generationTimeMs = totalTimeMs - modelLoadingTimeMs;
     const generationTimeSec = (generationTimeMs / 1000).toFixed(2);
 
+    if (imageCount === 0) {
+      // No images were generated - mark as failed
+      const errorMsg = 'Generation completed but no images were produced';
+      logger.error({
+        jobId: job.id,
+        imageCount,
+        modelLoadingTimeMs,
+        generationTimeSec,
+        generationTimeMs,
+        totalTimeMs,
+      }, 'Job failed: no images generated');
+      genLogger.error({
+        error: errorMsg,
+        imageCount,
+        modelLoadingTimeMs,
+        generationTimeSec,
+        generationTimeMs,
+        totalTimeMs,
+        result: 'failed',
+      }, 'Generation failed: no images produced');
+
+      updateGenerationStatus(job.id, GenerationStatus.FAILED, {
+        error: errorMsg,
+        model_loading_time_ms: modelLoadingTimeMs,
+        generation_time_ms: generationTimeMs,
+      });
+      broadcastQueueEvent({ ...job, status: GenerationStatus.FAILED, error: errorMsg }, 'job_failed');
+      return;
+    }
+
+    // Update status to completed (generation_id is now the same as job.id)
     updateGenerationStatus(job.id, GenerationStatus.COMPLETED, {
       model_loading_time_ms: modelLoadingTimeMs,
       generation_time_ms: generationTimeMs,
@@ -259,19 +291,19 @@ async function processQueue() {
       type: job.type,
       prompt: job.prompt,
       created_at: job.created_at,
-      imageCount: result?.imageCount || 0,
+      imageCount,
     });
 
     logger.info({
       jobId: job.id,
-      imageCount: result?.imageCount || 0,
+      imageCount,
       modelLoadingTimeMs,
       generationTimeSec,
       generationTimeMs,
       totalTimeMs,
     }, 'Job completed successfully');
     genLogger.info({
-      imageCount: result?.imageCount || 0,
+      imageCount,
       modelLoadingTimeMs,
       generationTimeSec,
       generationTimeMs,

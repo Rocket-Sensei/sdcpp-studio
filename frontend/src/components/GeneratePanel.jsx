@@ -215,14 +215,19 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
         })
         .filter(s => s !== null);
 
-      // If all server models have the same steps value, show it
+      // If all server models have the same steps value, show it AND update sampleSteps
       if (stepsList.length > 0 && stepsList.every(s => s === stepsList[0])) {
-        setServerModeSteps(stepsList[0]);
+        const stepsValue = stepsList[0];
+        setServerModeSteps(stepsValue);
+        // Update the actual sampleSteps state to match server mode steps
+        setSampleSteps(stepsValue);
       } else {
         setServerModeSteps(null);
       }
     } else {
       setServerModeSteps(null);
+      // Reset to default when no server mode model selected
+      setSampleSteps(20);
     }
   }, [selectedModels, modelsData]);
 

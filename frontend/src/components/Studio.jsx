@@ -41,12 +41,17 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
 
   // Form collapse state with localStorage persistence
   // Use external state if provided, otherwise use internal state
+  // Default to collapsed when localStorage is empty (first visit)
   const [internalIsCollapsed, setIsFormCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved === null) {
+        // First visit - default to collapsed (form closed)
+        return true;
+      }
       return saved === "true";
     }
-    return false;
+    return true; // Default to collapsed on server-side
   });
 
   // Determine whether to use external or internal state

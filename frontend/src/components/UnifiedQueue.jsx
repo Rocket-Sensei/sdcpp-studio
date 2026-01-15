@@ -25,7 +25,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
 import { LogViewer } from "./LogViewer";
-import { LightboxWithImage, LightboxGalleryWithImages } from "@didik-mulyadi/react-modal-images";
+import { LightboxWithImage, LightboxGalleryWithImages } from "./Lightbox";
 import { useGenerations } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { useWebSocket, WS_CHANNELS } from "../contexts/WebSocketContext";
@@ -184,6 +184,9 @@ const Thumbnail = memo(function Thumbnail({ generation, onViewLogs }) {
     prevProps.generation.first_image_url === nextProps.generation.first_image_url
   );
 });
+
+// Export Thumbnail for testing
+export { Thumbnail };
 
 export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
   const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
