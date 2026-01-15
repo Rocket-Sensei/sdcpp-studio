@@ -69,6 +69,7 @@ function ImageLightbox({ items, defaultIndex }) {
         <Lightbox.Item
           $index={index}
           className="flex items-center justify-center flex-1 p-5"
+          data-lightbox-image-container="true"
         >
           <Lightbox.Pinchable onRequestClose={lbContext.close}>
             <img
@@ -84,8 +85,23 @@ function ImageLightbox({ items, defaultIndex }) {
     return null;
   };
 
+  const handleBackdropClick = (e) => {
+    // Close if click is outside the image container
+    const imageContainer = e.currentTarget.querySelector('[data-lightbox-image-container="true"]');
+    if (imageContainer && !imageContainer.contains(e.target)) {
+      // Check if click is not on header buttons either
+      const header = e.currentTarget.querySelector('header');
+      if (!header || !header.contains(e.target)) {
+        lbContext.close();
+      }
+    }
+  };
+
   return (
-    <Lightbox.Root className="fixed inset-0 isolate flex flex-col bg-black/80 z-50">
+    <Lightbox.Root
+      className="fixed inset-0 isolate flex flex-col bg-black/80 z-50"
+      onClick={handleBackdropClick}
+    >
       {/* Header */}
       <Lightbox.Header className="flex items-center justify-between w-full py-2 px-4 bg-black/70 text-white">
         <span className="text-sm truncate mr-4">{currentItem?.alt || ""}</span>
