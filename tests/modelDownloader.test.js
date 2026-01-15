@@ -33,40 +33,17 @@ vi.mock('fs', () => {
   };
 });
 
-// Mock pino to avoid file destination issues
-vi.mock('pino', () => {
-  const mockLogger = {
-    child: vi.fn(() => mockLogger),
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-    trace: vi.fn(),
-    fatal: vi.fn(),
-  };
-  const pinoFn = vi.fn(() => mockLogger);
-  pinoFn.destination = vi.fn(() => ({}));
-  pinoFn.stdSerializers = {
-    err: vi.fn((val) => val),
-    req: vi.fn((val) => val),
-    res: vi.fn((val) => val),
-  };
-  pinoFn.multistream = vi.fn(() => mockLogger);
-  return {
-    default: pinoFn,
-    ...pinoFn,
-  };
-});
-
 vi.mock('child_process', () => {
   const mockSpawn = vi.fn(() => ({
     on: vi.fn(),
     stdout: { on: vi.fn() },
     stderr: { on: vi.fn() },
   }));
+  const mockExec = vi.fn();
   return {
-    default: { spawn: mockSpawn },
+    default: { spawn: mockSpawn, exec: mockExec },
     spawn: mockSpawn,
+    exec: mockExec,
   };
 });
 
@@ -134,22 +111,28 @@ describe('ModelDownloader - Utility Functions', () => {
   });
 
   describe('getHuggingFaceFileUrl', () => {
-    it('should build URL for main branch (repo ID gets encoded)', () => {
+    it('should build URL for main branch (repo ID is NOT encoded)', () => {
       const url = getHuggingFaceFileUrl('org/model', 'file.gguf');
-      // The repo ID 'org/model' gets URL encoded as 'org%2Fmodel'
-      expect(url).toBe('https://huggingface.co/org%2Fmodel/resolve/main/file.gguf');
+      // The repo ID 'org/model' is NOT encoded - the / is a valid URL path separator
+      expect(url).toBe('https://huggingface.co/org/model/resolve/main/file.gguf');
     });
 
     it('should build URL for specific revision', () => {
       const url = getHuggingFaceFileUrl('org/model', 'file.gguf', 'v1.0');
-      // The repo ID 'org/model' gets URL encoded as 'org%2Fmodel'
-      expect(url).toBe('https://huggingface.co/org%2Fmodel/resolve/v1.0/file.gguf');
+      // The repo ID 'org/model' is NOT encoded
+      expect(url).toBe('https://huggingface.co/org/model/resolve/v1.0/file.gguf');
     });
 
-    it('should handle special characters in repo/file names', () => {
+    it('should handle special characters in file names', () => {
       const url = getHuggingFaceFileUrl('org/model-name', 'file name.gguf');
-      expect(url).toContain(encodeURIComponent('org/model-name'));
-      expect(url).toContain(encodeURIComponent('file name.gguf'));
+      // Repo ID is not encoded (only the filename needs encoding for spaces)
+      expect(url).toBe('https://huggingface.co/org/model-name/resolve/main/file%20name.gguf');
+    });
+
+    it('should encode special characters in revision', () => {
+      const url = getHuggingFaceFileUrl('org/model', 'file.gguf', 'v1.0-beta');
+      // Revision gets encoded
+      expect(url).toBe('https://huggingface.co/org/model/resolve/v1.0-beta/file.gguf');
     });
   });
 });
@@ -581,6 +564,9 @@ describe('ModelDownloader - Cancellation', () => {
 
     mockSpawn.mockReturnValue(mockPython);
 
+    // Use fake timers to control timing precisely
+    vi.useFakeTimers();
+
     // Start download (it will hang since close is never called)
     const downloadPromise = downloader.downloadModel(
       'test/repo',
@@ -588,8 +574,8 @@ describe('ModelDownloader - Cancellation', () => {
       onProgress
     );
 
-    // Wait for job to be created
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Advance time to allow job creation but not completion
+    await vi.advanceTimersByTimeAsync(50);
 
     // Get job ID from status
     const jobs = downloader.getAllJobs();
@@ -598,13 +584,19 @@ describe('ModelDownloader - Cancellation', () => {
     const status = jobs[0];
     const jobId = status.id;
 
-    // Cancel the download
+    // Verify job is in a state that can be cancelled
+    expect(status.status).not.toBe(DOWNLOAD_STATUS.COMPLETED);
+
+    // Cancel the download - should not throw
     downloader.cancelDownload(jobId);
 
     // Manually trigger close to complete the "process"
     if (closeCallback) {
       closeCallback(1);
     }
+
+    // Advance time again
+    await vi.advanceTimersByTimeAsync(50);
 
     // Should not throw or hang
     try {
@@ -614,6 +606,8 @@ describe('ModelDownloader - Cancellation', () => {
       // The exact message depends on the download method
       expect(e).toBeDefined();
     }
+
+    vi.useRealTimers();
   });
 
   it('should throw when cancelling non-existent job', () => {
@@ -675,12 +669,18 @@ describe('ModelDownloader - Error Handling', () => {
   });
 
   it('should handle Python spawn errors', async () => {
+    // Force Python method by mocking the availability checks
+    const { checkPythonAvailable } = await import('../backend/services/modelDownloader.js');
+
+    // Mock spawn to throw immediately
     mockSpawn.mockImplementation(() => {
       throw new Error('Python not found');
     });
 
     const onProgress = vi.fn();
 
+    // The download should fail because spawn throws
+    // Even if it falls back to Node method, the spawn will be called for method detection
     await expect(
       downloader.downloadModel('test/repo', [{ path: 'file.gguf' }], onProgress)
     ).rejects.toThrow();

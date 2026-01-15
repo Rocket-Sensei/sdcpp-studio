@@ -14,7 +14,7 @@
  * - NODE_ENV: 'development' enables pretty printing to console
  */
 
-import pino from 'pino';
+import pino, { destination, stdSerializers, multistream } from 'pino';
 import { build } from 'pino-pretty';
 import fs from 'fs';
 import path from 'path';
@@ -60,7 +60,7 @@ function isCliLoggingEnabled() {
  */
 function createFileDestination(filename, options = {}) {
   const filePath = path.join(logsDir, filename);
-  return pino.destination({
+  return destination({
     dest: filePath,
     sync: false, // Asynchronous for better performance
     minLength: 0, // No buffering - write immediately
@@ -74,7 +74,7 @@ function createFileDestination(filename, options = {}) {
  */
 function createFileSyncDestination(filename, options = {}) {
   const filePath = path.join(logsDir, filename);
-  return pino.destination({
+  return destination({
     dest: filePath,
     sync: true, // Synchronous for immediate writes
     ...options
@@ -121,9 +121,9 @@ function createBaseLogger() {
       return { time: new Date().toISOString() };
     },
     serializers: {
-      error: pino.stdSerializers.err,
-      req: pino.stdSerializers.req,
-      res: pino.stdSerializers.res,
+      error: stdSerializers.err,
+      req: stdSerializers.req,
+      res: stdSerializers.res,
     },
     // Redact sensitive data - array of paths
     redact: [
@@ -133,7 +133,7 @@ function createBaseLogger() {
       'api_key',
       'password'
     ]
-  }, pino.multistream(streams));
+  }, multistream(streams));
 }
 
 /**
@@ -149,9 +149,9 @@ function createHttpLogger() {
       return { module: 'http', time: new Date().toISOString() };
     },
     serializers: {
-      req: pino.stdSerializers.req,
-      res: pino.stdSerializers.res,
-      err: pino.stdSerializers.err,
+      req: stdSerializers.req,
+      res: stdSerializers.res,
+      err: stdSerializers.err,
     },
     // Redact sensitive data - array of paths
     redact: [
@@ -208,7 +208,7 @@ function createSdCppLogger() {
       return { module: 'sdcpp', time: new Date().toISOString() };
     },
     base: { type: 'sdcpp' }
-  }, pino.multistream(streams));
+  }, multistream(streams));
 
   // Store the file destination reference on the logger for direct access
   // This allows us to flush the file directly since logger.flush() doesn't
@@ -460,7 +460,7 @@ export function logCliError(error, generationId = null) {
   const logger = getSdCppLogger(generationId);
 
   logger.error({
-    error: pino.stdSerializers.err(error),
+    error: stdSerializers.err(error),
     eventType: 'cliError'
   }, `CLI Error: ${error.message}`);
 

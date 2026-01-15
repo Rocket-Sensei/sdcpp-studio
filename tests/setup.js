@@ -68,26 +68,6 @@ vi.mock('easy-dl', () => ({
   }
 }));
 
-// Mock pino globally for all backend tests
-vi.mock('pino', () => ({
-  default: vi.fn(() => ({
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-    child: vi.fn(() => ({
-      info: vi.fn(),
-      error: vi.fn(),
-      warn: vi.fn(),
-      debug: vi.fn(),
-    })),
-  })),
-  destination: vi.fn(() => ({
-    flushSync: vi.fn(),
-  })),
-  multistream: vi.fn((streams) => streams),
-}));
-
 // Mock ApiKeyContext for all tests (App component uses it)
 vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
   ApiKeyProvider: ({ children }) => children,

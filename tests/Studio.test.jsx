@@ -81,7 +81,9 @@ describe('Studio Component', () => {
   });
 
   it('should render without crashing', () => {
-    const { container } = render(React.createElement(Studio));
+    const { container } = render(React.createElement(Studio, {
+      isFormCollapsed: false // Expand the form so GeneratePanel is visible
+    }));
 
     expect(container).toBeTruthy();
     expect(screen.getByTestId('generate-panel')).toBeTruthy();
@@ -89,7 +91,9 @@ describe('Studio Component', () => {
   });
 
   it('should render both Generate and UnifiedQueue components by default', () => {
-    render(React.createElement(Studio));
+    render(React.createElement(Studio, {
+      isFormCollapsed: false // Expand the form so GeneratePanel is visible
+    }));
 
     expect(screen.getByTestId('generate-panel')).toBeTruthy();
     expect(screen.getByTestId('unified-queue')).toBeTruthy();
@@ -149,17 +153,21 @@ describe('Studio Component', () => {
     const onCollapseChange = vi.fn();
 
     // Render without external control (null) so it uses internal state
+    // When localStorage is empty, it defaults to collapsed (true)
     render(React.createElement(Studio, {
       isFormCollapsed: null,
       onToggleForm,
       onCollapseChange
     }));
 
-    // Initially expanded
-    expect(screen.getByTestId('generate-panel')).toBeTruthy();
+    // Initially collapsed (default when localStorage is empty)
+    // GeneratePanel should not be visible
+    expect(screen.queryByTestId('generate-panel')).toBeNull();
 
-    // The component should read from localStorage on initial render
-    // When localStorage is empty, it should default to expanded (false = not collapsed)
+    // onCollapseChange is NOT called during initial render
+    // It's only called when setFormCollapsed is invoked
+    // The useEffect persists to localStorage but doesn't call onCollapseChange
+    expect(onCollapseChange).not.toHaveBeenCalled();
   });
 
   it('should persist collapse state to localStorage when internally controlled', async () => {
@@ -167,11 +175,11 @@ describe('Studio Component', () => {
       isFormCollapsed: null, // No external control
     }));
 
-    // Initially expanded (localStorage is empty)
-    expect(screen.getByTestId('generate-panel')).toBeTruthy();
+    // Initially collapsed (localStorage is empty, defaults to collapsed)
+    expect(screen.queryByTestId('generate-panel')).toBeNull();
 
-    // The component should read from localStorage on initial render
-    // When localStorage is empty, it defaults to expanded
+    // The component should persist the default collapsed state to localStorage
+    expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
   });
 
   it('should handle create more callback and expand form', async () => {
@@ -181,14 +189,14 @@ describe('Studio Component', () => {
       isFormCollapsed: null, // Use internal state management
     }));
 
-    // Form should be visible initially
-    expect(screen.getByTestId('generate-panel')).toBeTruthy();
+    // Form should be collapsed initially (default when localStorage is empty)
+    expect(screen.queryByTestId('generate-panel')).toBeNull();
 
-    // Click the "Create More" button - it should still work
+    // Click the "Create More" button - it should expand the form
     const createMoreButton = screen.getByTestId('create-more-button');
     fireEvent.click(createMoreButton);
 
-    // Check if settings are passed to Generate
+    // Check if settings are passed to Generate (form should now be expanded)
     await waitFor(() => {
       const settingsElement = screen.queryByTestId('create-more-settings');
       expect(settingsElement).toBeTruthy();
@@ -196,7 +204,9 @@ describe('Studio Component', () => {
   });
 
   it('should pass settings to Generate when create more is clicked', async () => {
-    render(React.createElement(Studio));
+    render(React.createElement(Studio, {
+      isFormCollapsed: false // Start with form expanded
+    }));
 
     // Initially no settings
     expect(screen.queryByTestId('create-more-settings')).toBeNull();
@@ -284,7 +294,9 @@ describe('Studio Component', () => {
   });
 
   it('should clear settings after generation is complete', async () => {
-    render(React.createElement(Studio));
+    render(React.createElement(Studio, {
+      isFormCollapsed: false // Start with form expanded
+    }));
 
     // First trigger create more
     const createMoreButton = screen.getByTestId('create-more-button');
@@ -310,7 +322,8 @@ describe('Studio Component', () => {
 
     render(React.createElement(Studio));
 
-    // Should still work with no props
+    // Should still work with no props, reading from localStorage
+    // localStorage is set to 'false' (expanded), so GeneratePanel should be visible
     expect(screen.getByTestId('generate-panel')).toBeTruthy();
     expect(screen.getByTestId('unified-queue')).toBeTruthy();
   });
@@ -396,8 +409,8 @@ describe('Studio Component', () => {
         isFormCollapsed: null // Use internal state
       }));
 
-      // Initially should be expanded (default)
-      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('false');
+      // Initially should be collapsed (default when localStorage is empty)
+      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
     });
 
     it('should read initial collapse state from localStorage', () => {
@@ -585,8 +598,12 @@ describe('Studio Component', () => {
       }));
 
       // Internal state changes should notify parent
-      // Check localStorage was set (which happens on render)
-      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('false');
+      // onCollapseChange is NOT called during initial render
+      // It's only called when setFormCollapsed is invoked (e.g., via user interaction)
+      expect(onCollapseChange).not.toHaveBeenCalled();
+
+      // Check localStorage was set (which happens on render via useEffect)
+      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
     });
 
     it('should prioritize external state over localStorage', () => {

@@ -705,6 +705,10 @@ describe('MultiModelSelector', () => {
         />
       );
 
+      // Click "Show Missing" button to reveal models with missing files
+      const showMissingButton = await screen.findByText('Show Missing');
+      fireEvent.click(showMissingButton);
+
       await waitFor(() => {
         expect(screen.getByText('Download')).toBeInTheDocument();
       });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Key, Check, AlertCircle } from 'lucide-react';
-import { saveApiKey, validateApiKey } from '../utils/api';
+import { saveApiKey, validateApiKey, isAuthRequired } from '../utils/api';
 import { useApiKeyContext } from '../contexts/ApiKeyContext';
 
 /**

@@ -7,18 +7,12 @@ import React from 'react';
 // We need to import the UnifiedQueue to test the Thumbnail component
 // But we'll mock the dependencies
 
+// Create a reference to the mock function that we can use in tests
+export const mockUseGenerationsImpl = vi.fn();
+
 // Mock the useGenerations hook
-vi.mock('../../hooks/useGenerations', () => ({
-  useGenerations: () => ({
-    fetchGenerations: vi.fn(),
-    goToPage: vi.fn(),
-    nextPage: vi.fn(),
-    prevPage: vi.fn(),
-    isLoading: false,
-    generations: [],
-    pagination: { total: 0, limit: 20, offset: 0, hasMore: false },
-    currentPage: 1,
-  }),
+vi.mock('../../hooks/useImageGeneration', () => ({
+  useGenerations: () => mockUseGenerationsImpl(),
 }));
 
 // Mock the useWebSocket hook
@@ -131,8 +125,7 @@ describe('UnifiedQueue Thumbnail Component - Edge Cases', () => {
       ];
 
       // Mock the fetchGenerations to return our test data
-      const { useGenerations } = await import('../../hooks/useGenerations');
-      vi.mocked(useGenerations).mockReturnValue({
+      mockUseGenerations({
         fetchGenerations: vi.fn(),
         goToPage: vi.fn(),
         nextPage: vi.fn(),
@@ -166,8 +159,7 @@ describe('UnifiedQueue Thumbnail Component - Edge Cases', () => {
         },
       ];
 
-      const { useGenerations } = await import('../../hooks/useGenerations');
-      vi.mocked(useGenerations).mockReturnValue({
+      mockUseGenerations({
         fetchGenerations: vi.fn(),
         goToPage: vi.fn(),
         nextPage: vi.fn(),
@@ -202,8 +194,7 @@ describe('UnifiedQueue Thumbnail Component - Edge Cases', () => {
         },
       ];
 
-      const { useGenerations } = await import('../../hooks/useGenerations');
-      vi.mocked(useGenerations).mockReturnValue({
+      mockUseGenerations({
         fetchGenerations: vi.fn(),
         goToPage: vi.fn(),
         nextPage: vi.fn(),
@@ -239,8 +230,7 @@ describe('UnifiedQueue Thumbnail Component - Edge Cases', () => {
         },
       ];
 
-      const { useGenerations } = await import('../../hooks/useGenerations');
-      vi.mocked(useGenerations).mockReturnValue({
+      mockUseGenerations({
         fetchGenerations: vi.fn(),
         goToPage: vi.fn(),
         nextPage: vi.fn(),

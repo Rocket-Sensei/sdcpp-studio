@@ -29,8 +29,42 @@ vi.mock('../backend/db/queries.js', () => ({
   }
 }));
 
-vi.mock('../backend/services/modelManager.js', () => ({
-  getModelManager: vi.fn(() => mockModelManager),
+vi.mock('../backend/services/modelManager.js', () => {
+  let mockConfigLoaded = true;
+  return {
+    getModelManager: vi.fn(() => ({
+      get configLoaded() { return mockConfigLoaded; },
+      set configLoaded(val) { mockConfigLoaded = val; },
+      defaultModelId: 'default-model',
+      loadConfig: vi.fn(),
+      getModel: vi.fn((id) => ({
+        id: id || 'test-model',
+        name: 'Test Model',
+        exec_mode: 'server',
+        api: 'http://localhost:1234/v1',
+        args: ['--steps', '20']
+      })),
+      getDefaultModelForType: vi.fn((type) => ({
+        id: 'default-model',
+        name: 'Default Model',
+        exec_mode: 'server',
+        api: 'http://localhost:1234/v1'
+      })),
+      isModelRunning: vi.fn(() => false),
+      getRunningModels: vi.fn(() => []),
+      startModel: vi.fn(async () => ({
+        port: 1234,
+        pid: 12345,
+        status: 'running'
+      })),
+      stopModel: vi.fn(async () => true),
+      getModelGenerationParams: vi.fn(() => ({
+        cfg_scale: 7.0,
+        sampling_method: 'euler',
+        sample_steps: 20
+      })),
+      getModelStepsFromArgs: vi.fn(() => 20)
+    })),
   ExecMode: {
     SERVER: 'server',
     CLI: 'cli',
@@ -90,39 +124,8 @@ import { cliHandler } from '../backend/services/cliHandler.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from '../backend/services/websocket.js';
 import { startQueueProcessor, stopQueueProcessor, getCurrentJob } from '../backend/services/queueProcessor.js';
 
-// Mock model manager instance
-const mockModelManager = {
-  configLoaded: true,
-  defaultModelId: 'default-model',
-  loadConfig: vi.fn(),
-  getModel: vi.fn((id) => ({
-    id: id || 'test-model',
-    name: 'Test Model',
-    exec_mode: 'server',
-    api: 'http://localhost:1234/v1',
-    args: ['--steps', '20']
-  })),
-  getDefaultModelForType: vi.fn((type) => ({
-    id: 'default-model',
-    name: 'Default Model',
-    exec_mode: 'server',
-    api: 'http://localhost:1234/v1'
-  })),
-  isModelRunning: vi.fn(() => false),
-  getRunningModels: vi.fn(() => []),
-  startModel: vi.fn(async () => ({
-    port: 1234,
-    pid: 12345,
-    status: ModelStatus.RUNNING
-  })),
-  stopModel: vi.fn(async () => true),
-  getModelGenerationParams: vi.fn(() => ({
-    cfg_scale: 7.0,
-    sampling_method: 'euler',
-    sample_steps: 20
-  })),
-  getModelStepsFromArgs: vi.fn(() => 20)
-};
+// Helper to get the mocked model manager instance
+const getMockModelManager = () => getModelManager();
 
 describe('Queue Processor - Initialization', () => {
   beforeEach(() => {
@@ -157,15 +160,16 @@ describe('Queue Processor - Initialization', () => {
   });
 
   it('should load model config if not loaded', () => {
-    mockModelManager.configLoaded = false;
+    getMockModelManager().configLoaded = false;
 
     startQueueProcessor(1000);
 
-    expect(mockModelManager.loadConfig).toHaveBeenCalled();
+    expect(getMockModelManager().loadConfig).toHaveBeenCalled();
   });
 
   it('should continue even if model config fails to load', () => {
-    mockModelManager.loadConfig.mockImplementationOnce(() => {
+    getMockModelManager().configLoaded = false;
+    getMockModelManager().loadConfig.mockImplementationOnce(() => {
       throw new Error('Config load failed');
     });
 
@@ -225,7 +229,7 @@ describe('Queue Processor - Job Processing', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getModel.mockReturnValue({
+    getMockModelManager().getModel.mockReturnValue({
       id: 'specific-model',
       name: 'Specific Model',
       exec_mode: 'server',
@@ -242,7 +246,7 @@ describe('Queue Processor - Job Processing', () => {
 
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(mockModelManager.getModel).toHaveBeenCalledWith('specific-model');
+    expect(getMockModelManager().getModel).toHaveBeenCalledWith('specific-model');
   });
 
   it('should use default model if job has no model', async () => {
@@ -256,7 +260,7 @@ describe('Queue Processor - Job Processing', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getDefaultModelForType.mockReturnValue({
+    getMockModelManager().getDefaultModelForType.mockReturnValue({
       id: 'default-model',
       name: 'Default Model',
       exec_mode: 'server',
@@ -273,7 +277,7 @@ describe('Queue Processor - Job Processing', () => {
 
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(mockModelManager.getDefaultModelForType).toHaveBeenCalledWith('generate');
+    expect(getMockModelManager().getDefaultModelForType).toHaveBeenCalledWith('generate');
   });
 
   it('should fail job if no model available', async () => {
@@ -287,8 +291,8 @@ describe('Queue Processor - Job Processing', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getDefaultModelForType.mockReturnValue(null);
-    mockModelManager.defaultModelId = null;
+    getMockModelManager().getDefaultModelForType.mockReturnValue(null);
+    getMockModelManager().defaultModelId = null;
     updateGenerationStatus.mockResolvedValue({});
 
     startQueueProcessor(100);
@@ -327,15 +331,15 @@ describe('Queue Processor - Model Preparation', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getModel.mockReturnValue({
+    getMockModelManager().getModel.mockReturnValue({
       id: 'server-model',
       name: 'Server Model',
       exec_mode: ExecMode.SERVER,
       api: 'http://localhost:1234/v1',
       args: ['--steps', '20']
     });
-    mockModelManager.isModelRunning.mockReturnValue(false);
-    mockModelManager.startModel.mockResolvedValue({
+    getMockModelManager().isModelRunning.mockReturnValue(false);
+    getMockModelManager().startModel.mockResolvedValue({
       port: 1234,
       pid: 12345
     });
@@ -350,7 +354,7 @@ describe('Queue Processor - Model Preparation', () => {
 
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(mockModelManager.startModel).toHaveBeenCalledWith('server-model');
+    expect(getMockModelManager().startModel).toHaveBeenCalledWith('server-model');
     expect(updateGenerationStatus).toHaveBeenCalledWith(
       job.id,
       GenerationStatus.MODEL_LOADING,
@@ -369,13 +373,13 @@ describe('Queue Processor - Model Preparation', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getModel.mockReturnValue({
+    getMockModelManager().getModel.mockReturnValue({
       id: 'server-model',
       name: 'Server Model',
       exec_mode: ExecMode.SERVER,
       api: 'http://localhost:1234/v1'
     });
-    mockModelManager.isModelRunning.mockReturnValue(true);
+    getMockModelManager().isModelRunning.mockReturnValue(true);
     generateImageDirect.mockResolvedValue({
       data: [{ b64_json: Buffer.from('test').toString('base64') }]
     });
@@ -387,7 +391,7 @@ describe('Queue Processor - Model Preparation', () => {
 
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(mockModelManager.startModel).not.toHaveBeenCalled();
+    expect(getMockModelManager().startModel).not.toHaveBeenCalled();
   });
 
   it('should stop running servers for CLI mode', async () => {
@@ -401,17 +405,17 @@ describe('Queue Processor - Model Preparation', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getModel.mockReturnValue({
+    getMockModelManager().getModel.mockReturnValue({
       id: 'cli-model',
       name: 'CLI Model',
       exec_mode: ExecMode.CLI,
       command: './bin/sd-cli',
       args: []
     });
-    mockModelManager.getRunningModels.mockReturnValue([
+    getMockModelManager().getRunningModels.mockReturnValue([
       { id: 'other-server', name: 'Other Server' }
     ]);
-    mockModelManager.stopModel.mockResolvedValue(true);
+    getMockModelManager().stopModel.mockResolvedValue(true);
     cliHandler.generateImage.mockResolvedValue(Buffer.from('test'));
     updateGenerationProgress.mockResolvedValue({});
     createGeneratedImage.mockResolvedValue({});
@@ -421,7 +425,7 @@ describe('Queue Processor - Model Preparation', () => {
 
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(mockModelManager.stopModel).toHaveBeenCalled();
+    expect(getMockModelManager().stopModel).toHaveBeenCalled();
     expect(cliHandler.generateImage).toHaveBeenCalled();
   });
 });
@@ -603,7 +607,7 @@ describe('Queue Processor - Error Handling', () => {
     };
 
     claimNextPendingGeneration.mockReturnValue(job);
-    mockModelManager.getModel.mockReturnValue(null);
+    getMockModelManager().getModel.mockReturnValue(null);
     updateGenerationStatus.mockResolvedValue({});
 
     startQueueProcessor(100);
@@ -749,6 +753,9 @@ describe('Queue Processor - Current Job Tracking', () => {
   });
 
   it('should return null when no job is processing', () => {
+    // No jobs in queue, so getCurrentJob should return null
+    claimNextPendingGeneration.mockReturnValue(null);
+
     startQueueProcessor(1000);
 
     expect(getCurrentJob()).toBeNull();

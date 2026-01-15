@@ -39,8 +39,13 @@ vi.mock('../frontend/src/components/WebSocketStatusIndicator', () => ({
 }));
 
 // Mock ApiKeyProvider
-vi.mock('../frontend/src/components/ApiKeyModal', () => ({
+vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
   ApiKeyProvider: ({ children }) => React.createElement('div', { 'data-testid': 'apikey-provider' }, children),
+  useApiKeyContext: () => ({ version: 0 }),
+}));
+
+vi.mock('../frontend/src/components/ApiKeyModal', () => ({
+  ApiKeyModal: () => React.createElement('div', { 'data-testid': 'apikey-modal' }),
 }));
 
 // Mock Toaster from sonner
@@ -61,20 +66,38 @@ vi.mock('../frontend/src/utils/api', () => ({
     json: async () => ({}),
     text: async () => '',
   })),
+  isAuthRequired: vi.fn(() => Promise.resolve(false)),
+  getStoredApiKey: vi.fn(() => null),
+  validateApiKey: vi.fn(() => Promise.resolve(true)),
+  saveApiKey: vi.fn(() => {}),
+  clearApiKey: vi.fn(() => {}),
 }));
 
 // Import App after mocks are set up
 const { default: App, AppWithProviders } = await import('../frontend/src/App');
 
 // Helper to render App with a specific route
-const renderAppWithRoute = (initialEntries) => {
-  return render(
+const renderAppWithRoute = async (initialEntries) => {
+  const { container, ...rest } = render(
     React.createElement(
       MemoryRouter,
       { initialEntries },
       React.createElement(AppWithProviders)
     )
   );
+
+  // Wait for AppBoot to complete initialization
+  // The AppBoot component shows "Initializing..." then transitions to the actual app
+  await waitFor(() => {
+    // When initialization is complete, we should see either the unified-queue (success)
+    // or NOT see "Initializing..." (transitioned)
+    const hasInitializing = container.textContent.includes('Initializing...');
+    if (hasInitializing) {
+      throw new Error('Still initializing');
+    }
+  }, { timeout: 3000 });
+
+  return { container, ...rest };
 };
 
 describe('App Routing', () => {
@@ -87,75 +110,75 @@ describe('App Routing', () => {
   });
 
   describe('Main routes', () => {
-    it('should render Studio component on /studio route', () => {
-      renderAppWithRoute(['/studio']);
+    it('should render Studio component on /studio route', async () => {
+      await renderAppWithRoute(['/studio']);
 
       // Studio renders UnifiedQueue which we mocked
       expect(screen.getByTestId('unified-queue')).toBeInTheDocument();
     });
 
-    it('should redirect / to /studio', () => {
-      renderAppWithRoute(['/']);
+    it('should redirect / to /studio', async () => {
+      await renderAppWithRoute(['/']);
 
       expect(screen.getByTestId('unified-queue')).toBeInTheDocument();
     });
   });
 
   describe('Backward compatibility redirects', () => {
-    it('should redirect /generate to /studio', () => {
-      renderAppWithRoute(['/generate']);
+    it('should redirect /generate to /studio', async () => {
+      await renderAppWithRoute(['/generate']);
 
       expect(screen.getByTestId('unified-queue')).toBeInTheDocument();
     });
 
-    it('should redirect /gallery to /studio', () => {
-      renderAppWithRoute(['/gallery']);
+    it('should redirect /gallery to /studio', async () => {
+      await renderAppWithRoute(['/gallery']);
 
       expect(screen.getByTestId('unified-queue')).toBeInTheDocument();
     });
 
-    it('should redirect /models to /studio', () => {
-      renderAppWithRoute(['/models']);
+    it('should redirect /models to /studio', async () => {
+      await renderAppWithRoute(['/models']);
 
       expect(screen.getByTestId('unified-queue')).toBeInTheDocument();
     });
   });
 
   describe('Layout components', () => {
-    it('should render header with logo', () => {
-      renderAppWithRoute(['/studio']);
+    it('should render header with logo', async () => {
+      await renderAppWithRoute(['/studio']);
 
       expect(screen.getByText('sd.cpp Studio')).toBeInTheDocument();
     });
 
-    it('should render WebSocketStatusIndicator', () => {
-      renderAppWithRoute(['/studio']);
+    it('should render WebSocketStatusIndicator', async () => {
+      await renderAppWithRoute(['/studio']);
 
       expect(screen.getByTestId('ws-status-indicator')).toBeInTheDocument();
     });
 
-    it('should render footer', () => {
-      renderAppWithRoute(['/studio']);
+    it('should render footer', async () => {
+      await renderAppWithRoute(['/studio']);
 
       expect(screen.getByText('sd.cpp Studio - OpenAI-Compatible Image Generation Interface')).toBeInTheDocument();
     });
 
-    it('should render Toaster', () => {
-      renderAppWithRoute(['/studio']);
+    it('should render Toaster', async () => {
+      await renderAppWithRoute(['/studio']);
 
       expect(screen.getByTestId('toaster')).toBeInTheDocument();
     });
   });
 
   describe('Provider wrappers', () => {
-    it('should wrap app with ApiKeyProvider', () => {
-      renderAppWithRoute(['/studio']);
+    it('should wrap app with ApiKeyProvider', async () => {
+      await renderAppWithRoute(['/studio']);
 
       expect(screen.getByTestId('apikey-provider')).toBeInTheDocument();
     });
 
-    it('should wrap app with WebSocketProvider', () => {
-      renderAppWithRoute(['/studio']);
+    it('should wrap app with WebSocketProvider', async () => {
+      await renderAppWithRoute(['/studio']);
 
       expect(screen.getByTestId('websocket-provider')).toBeInTheDocument();
     });
@@ -178,7 +201,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'false');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // The Sheet should be open, showing GeneratePanel
       await waitFor(() => {
@@ -192,7 +215,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'true');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // GeneratePanel should NOT be in the document
       await waitFor(() => {
@@ -205,7 +228,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'true');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // Look for the Sparkles icon button (floating action button)
       await waitFor(() => {
@@ -223,7 +246,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'false');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // Sheet should be open (showing GeneratePanel)
       await waitFor(() => {
@@ -239,7 +262,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'false');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // Verify initial state
       expect(window.localStorage.getItem('studio-form-collapsed')).toBe('false');
@@ -252,7 +275,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'false');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       await waitFor(() => {
         const generatePanel = screen.getByTestId('generate-panel');
@@ -267,7 +290,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'false');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // Check that GeneratePanel is present when form is expanded
       await waitFor(() => {
@@ -283,7 +306,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'true');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // GeneratePanel should not be visible
       await waitFor(() => {
@@ -294,7 +317,7 @@ describe('Generate Panel Functionality', () => {
     it('should default to expanded when no localStorage value exists', async () => {
       // Don't set any localStorage value
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       // Should default to expanded (showing GeneratePanel)
       await waitFor(() => {
@@ -309,7 +332,7 @@ describe('Generate Panel Functionality', () => {
         window.localStorage.setItem('studio-form-collapsed', 'false');
       }
 
-      renderAppWithRoute(['/studio']);
+      await renderAppWithRoute(['/studio']);
 
       await waitFor(() => {
         expect(screen.getByTestId('generate-panel')).toBeInTheDocument();

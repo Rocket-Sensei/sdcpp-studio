@@ -188,6 +188,9 @@ const Thumbnail = memo(function Thumbnail({ generation, onViewLogs }) {
 // Export Thumbnail for testing
 export { Thumbnail };
 
+// Export utility functions and constants for testing
+export { isPendingOrProcessing, getStatusConfig, GENERATION_STATUS };
+
 export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
   const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
   const [selectedImage, setSelectedImage] = useState(null);

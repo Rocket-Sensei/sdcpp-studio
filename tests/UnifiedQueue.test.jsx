@@ -6,17 +6,8 @@ import '@testing-library/jest-dom';
 import {
   getStatusConfig,
   isPendingOrProcessing,
+  GENERATION_STATUS,
 } from '../frontend/src/components/UnifiedQueue';
-
-// Mock the imports for testing
-const GENERATION_STATUS = {
-  PENDING: 'pending',
-  MODEL_LOADING: 'model_loading',
-  PROCESSING: 'processing',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
-  CANCELLED: 'cancelled',
-};
 
 describe('UnifiedQueue Helper Functions', () => {
   describe('getStatusConfig', () => {
@@ -79,7 +70,7 @@ describe('UnifiedQueue Helper Functions', () => {
     });
 
     it('should return false for COMPLETED status', () => {
-      expect(isPendingOrProcessing(GENERATION_STATUS.COMPLETED).toBe(false);
+      expect(isPendingOrProcessing(GENERATION_STATUS.COMPLETED)).toBe(false);
     });
 
     it('should return false for FAILED status', () => {
