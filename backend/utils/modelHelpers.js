@@ -120,6 +120,7 @@ export async function getModelFileStatus(model) {
   if (!model.huggingface || !model.huggingface.files) {
     return {
       hasHuggingFace: false,
+      allFilesExist: true,  // Models without huggingface config are configured locally, assume files present
       files: []
     };
   }

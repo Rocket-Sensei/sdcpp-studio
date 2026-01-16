@@ -405,7 +405,9 @@ export function GeneratePanel({ selectedModels = [], onModelsChange, settings, e
         if (formState.upscaleAfterGeneration !== undefined) setUpscaleAfterGeneration(formState.upscaleAfterGeneration);
         if (formState.cfgScale !== undefined) setCfgScale(formState.cfgScale);
         if (formState.samplingMethod !== undefined) setSamplingMethod(formState.samplingMethod);
-        if (formState.sampleSteps !== undefined) setSampleSteps(formState.sampleSteps);
+        // NOTE: sampleSteps is NOT restored from localStorage for server mode models
+        // It's set by the server mode steps detection effect below instead
+        // This prevents overwriting model-specific steps (like z-image-turbo's 9 steps)
         if (formState.clipSkip !== undefined) setClipSkip(formState.clipSkip);
         if (formState.videoFrames !== undefined) setVideoFrames(formState.videoFrames);
         if (formState.videoFps !== undefined) setVideoFps(formState.videoFps);
