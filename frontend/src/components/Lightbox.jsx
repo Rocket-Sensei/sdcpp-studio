@@ -86,14 +86,10 @@ function ImageLightbox({ items, defaultIndex }) {
   };
 
   const handleBackdropClick = (e) => {
-    // Close if click is outside the image container
-    const imageContainer = e.currentTarget.querySelector('[data-lightbox-image-container="true"]');
-    if (imageContainer && !imageContainer.contains(e.target)) {
-      // Check if click is not on header buttons either
-      const header = e.currentTarget.querySelector('header');
-      if (!header || !header.contains(e.target)) {
-        lbContext.close();
-      }
+    // Close if click is directly on the backdrop (not on image or controls)
+    // e.target is the clicked element, e.currentTarget is the Lightbox.Root
+    if (e.target === e.currentTarget) {
+      lbContext.close();
     }
   };
 

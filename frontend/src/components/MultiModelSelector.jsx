@@ -329,10 +329,15 @@ export function MultiModelSelector({
     }));
   };
 
-  // Select all models
+  // Select all models (only visible models based on showMissingModels filter)
   const selectAll = () => {
-    const allIds = models.map((m) => m.id);
-    onModelsChange?.(allIds);
+    const visibleModels = models.filter((model) => {
+      const filesStatus = modelFilesStatus[model.id];
+      const hasMissingFiles = filesStatus && !filesStatus.allFilesExist;
+      return showMissingModels || !hasMissingFiles;
+    });
+    const visibleIds = visibleModels.map((m) => m.id);
+    onModelsChange?.(visibleIds);
   };
 
   // Deselect all models
