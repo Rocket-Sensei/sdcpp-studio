@@ -1391,7 +1391,7 @@ class ModelDownloader {
       method,
       pythonAvailable: pythonAvailable,
       hfHubAvailable: hfHubAvailable,
-      nodeAvailable: !!EasyDl
+      nodeAvailable: true  // Native fetch is always available in Node.js
     };
   }
 }

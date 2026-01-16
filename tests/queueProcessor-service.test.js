@@ -13,6 +13,68 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 
+// Create hoisted state for modelManager mock that can be modified in tests
+const { getMockModelManagerState, setMockModelManagerState, getMockModelManagerInstance, setMockModelManagerInstance } = vi.hoisted(() => {
+  let state = {
+    defaultModelId: 'default-model',
+    configLoaded: true
+  };
+  let instance = null;
+
+  const createInstance = () => ({
+    ...state,
+    loadConfig: vi.fn(),
+    getModel: vi.fn((id) => ({
+      id: id || 'test-model',
+      name: 'Test Model',
+      exec_mode: 'server',
+      api: 'http://localhost:1234/v1',
+      args: ['--steps', '20']
+    })),
+    getDefaultModelForType: vi.fn((type) => ({
+      id: 'default-model',
+      name: 'Default Model',
+      exec_mode: 'server',
+      api: 'http://localhost:1234/v1'
+    })),
+    isModelRunning: vi.fn(() => false),
+    getRunningModels: vi.fn(() => []),
+    startModel: vi.fn(async () => ({
+      port: 1234,
+      pid: 12345,
+      status: 'running'
+    })),
+    stopModel: vi.fn(async () => true),
+    getModelGenerationParams: vi.fn(() => ({
+      cfg_scale: 7.0,
+      sampling_method: 'euler',
+      sample_steps: 20
+    })),
+    getModelStepsFromArgs: vi.fn(() => 20)
+  });
+
+  return {
+    getMockModelManagerState: () => state,
+    setMockModelManagerState: (newState) => {
+      state = { ...state, ...newState };
+      // Update existing instance if it exists
+      if (instance) {
+        Object.assign(instance, state);
+      }
+    },
+    getMockModelManagerInstance: () => {
+      if (!instance) {
+        instance = createInstance();
+      }
+      return instance;
+    },
+    setMockModelManagerInstance: (inst) => { instance = inst; },
+    resetMockModelManager: () => {
+      instance = null;
+    }
+  };
+});
+
 // Mock all dependencies
 vi.mock('../backend/db/queries.js', () => ({
   claimNextPendingGeneration: vi.fn(),
@@ -29,42 +91,8 @@ vi.mock('../backend/db/queries.js', () => ({
   }
 }));
 
-vi.mock('../backend/services/modelManager.js', () => {
-  let mockConfigLoaded = true;
-  return {
-    getModelManager: vi.fn(() => ({
-      get configLoaded() { return mockConfigLoaded; },
-      set configLoaded(val) { mockConfigLoaded = val; },
-      defaultModelId: 'default-model',
-      loadConfig: vi.fn(),
-      getModel: vi.fn((id) => ({
-        id: id || 'test-model',
-        name: 'Test Model',
-        exec_mode: 'server',
-        api: 'http://localhost:1234/v1',
-        args: ['--steps', '20']
-      })),
-      getDefaultModelForType: vi.fn((type) => ({
-        id: 'default-model',
-        name: 'Default Model',
-        exec_mode: 'server',
-        api: 'http://localhost:1234/v1'
-      })),
-      isModelRunning: vi.fn(() => false),
-      getRunningModels: vi.fn(() => []),
-      startModel: vi.fn(async () => ({
-        port: 1234,
-        pid: 12345,
-        status: 'running'
-      })),
-      stopModel: vi.fn(async () => true),
-      getModelGenerationParams: vi.fn(() => ({
-        cfg_scale: 7.0,
-        sampling_method: 'euler',
-        sample_steps: 20
-      })),
-      getModelStepsFromArgs: vi.fn(() => 20)
-    })),
+vi.mock('../backend/services/modelManager.js', () => ({
+  getModelManager: vi.fn(() => getMockModelManagerInstance()),
   ExecMode: {
     SERVER: 'server',
     CLI: 'cli',
@@ -160,7 +188,7 @@ describe('Queue Processor - Initialization', () => {
   });
 
   it('should load model config if not loaded', () => {
-    getMockModelManager().configLoaded = false;
+    setMockModelManagerState({ configLoaded: false });
 
     startQueueProcessor(1000);
 
@@ -168,7 +196,7 @@ describe('Queue Processor - Initialization', () => {
   });
 
   it('should continue even if model config fails to load', () => {
-    getMockModelManager().configLoaded = false;
+    setMockModelManagerState({ configLoaded: false });
     getMockModelManager().loadConfig.mockImplementationOnce(() => {
       throw new Error('Config load failed');
     });

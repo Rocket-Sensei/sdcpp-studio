@@ -68,15 +68,5 @@ vi.mock('easy-dl', () => ({
   }
 }));
 
-// Mock ApiKeyContext for all tests (App component uses it)
-vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
-  ApiKeyProvider: ({ children }) => children,
-  useApiKeyContext: () => ({
-    apiKey: null,
-    version: 0,
-    notifyApiKeyChanged: vi.fn(),
-  }),
-}));
-
 // Don't mock fetch globally - let individual test files decide
 // Integration tests need real fetch, unit tests can mock it locally

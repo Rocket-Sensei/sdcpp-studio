@@ -28,7 +28,10 @@ vi.mock('../frontend/src/utils/api', () => ({
 
 // Mock the ApiKeyContext
 vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
+  ApiKeyProvider: ({ children }) => children,
   useApiKeyContext: () => ({
+    apiKey: null,
+    version: 0,
     notifyApiKeyChanged: vi.fn(),
   }),
 }));
