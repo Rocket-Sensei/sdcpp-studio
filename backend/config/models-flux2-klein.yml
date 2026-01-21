@@ -1,0 +1,31 @@
+models:
+  # ==================== Flux Models ====================
+  flux2-klein-4b:
+    name: "FLUX.2 Klein 4B"
+    description: " FLUX.2 [klein] unifies generation and editing in a single compact architecture"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-2-klein-4b.safetensors"
+      - "--vae"
+      - "./models/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1409
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 4
+      sampling_method: "euler"
