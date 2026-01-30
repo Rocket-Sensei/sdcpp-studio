@@ -1,23 +1,18 @@
 import { useEffect, useState, useCallback, memo, useRef, useMemo } from "react";
 import {
-  Loader2,
   Trash2,
-  Download,
   Image as ImageIcon,
   Calendar,
   Box,
-  Sparkles,
   X,
   Clock,
   XCircle,
   CheckCircle2,
   Cpu,
-  RefreshCw,
-  Terminal,
+  Loader2,
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  Edit3,
-  AlertTriangle,
   Info,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
@@ -25,12 +20,18 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
 import { LogViewer } from "./LogViewer";
-import { LightboxWithImage, LightboxGalleryWithImages } from "./Lightbox";
+import { LightboxGalleryWithImages } from "./Lightbox";
 import { useGenerations } from "../hooks/useImageGeneration";
 import { toast } from "sonner";
 import { useWebSocket, WS_CHANNELS } from "../contexts/WebSocketContext";
 import { formatDate } from "../lib/utils";
 import { authenticatedFetch } from "../utils/api";
+import { ImageCard } from "./gallery/ImageCard";
+
+// Re-export Thumbnail for backward compatibility with tests
+// Note: The Thumbnail component has been replaced by ImageCard
+// This export is maintained for test compatibility
+export const Thumbnail = ImageCard;
 
 const GENERATION_STATUS = {
   PENDING: "pending",
@@ -87,106 +88,6 @@ const isPendingOrProcessing = (status) => {
          status === GENERATION_STATUS.MODEL_LOADING ||
          status === GENERATION_STATUS.PROCESSING;
 };
-
-// Thumbnail component moved outside parent to prevent remounting on parent re-renders
-// Using memo to prevent unnecessary re-renders when generation props haven't changed
-const Thumbnail = memo(function Thumbnail({ generation, onViewLogs }) {
-  // Use first_image_url directly from the list data - no additional API calls needed
-  const src = generation.first_image_url || null;
-  const imageCount = generation.image_count || 0;
-
-  // Show preloader for pending/processing generations
-  // Use the status config to show the correct icon and label (Queued, Loading Model, or Generating)
-  if (isPendingOrProcessing(generation.status)) {
-    const config = getStatusConfig(generation.status);
-    const StatusIcon = config.icon;
-    return (
-      <div className="aspect-square bg-muted rounded-lg flex flex-col items-center justify-center">
-        <StatusIcon className={`h-8 w-8 text-muted-foreground mb-2 ${config.animate ? 'animate-spin' : ''}`} />
-        <span className="text-xs text-muted-foreground">{config.label}</span>
-      </div>
-    );
-  }
-
-  // Show failed state with View Logs button
-  if (generation.status === GENERATION_STATUS.FAILED || generation.status === GENERATION_STATUS.CANCELLED) {
-    return (
-      <div className="aspect-square bg-destructive/10 rounded-lg flex flex-col items-center justify-center p-4">
-        <XCircle className="h-8 w-8 text-destructive mb-3" />
-        <span className="text-xs text-destructive mb-3">
-          {generation.status === GENERATION_STATUS.FAILED ? "Failed" : "Cancelled"}
-        </span>
-        {generation.error && (
-          <span className="text-xs text-destructive/70 mb-3 text-center line-clamp-2">
-            {generation.error}
-          </span>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onViewLogs && onViewLogs(generation)}
-          className="text-xs"
-        >
-          <Terminal className="h-3 w-3 mr-1" />
-          View Logs
-        </Button>
-      </div>
-    );
-  }
-
-  if (!src) {
-    return (
-      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-      </div>
-    );
-  }
-
-  // For single images, use LightboxWithImage
-  // For multiple images, we need to fetch the full generation data first
-  // For now, we'll show the first image with a badge indicating count
-  return (
-    <div className="relative aspect-square w-full h-full">
-      {imageCount === 1 ? (
-        <LightboxWithImage
-          small={src}
-          large={src}
-          alt={generation.prompt || "Generated image"}
-          fileName={generation.prompt?.slice(0, 50) || "image"}
-          hideDownload={false}
-          hideZoom={false}
-          className="w-full h-full object-cover rounded-lg"
-        />
-      ) : (
-        <div className="relative w-full h-full">
-          <LightboxWithImage
-            small={src}
-            large={src}
-            alt={generation.prompt || "Generated image"}
-            fileName={generation.prompt?.slice(0, 50) || "image"}
-            hideDownload={false}
-            hideZoom={false}
-            className="w-full h-full object-cover rounded-lg"
-          />
-          <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full pointer-events-none">
-            {imageCount}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}, (prevProps, nextProps) => {
-  // Custom comparison function for memo
-  // Only re-render if these specific props change
-  return (
-    prevProps.generation.id === nextProps.generation.id &&
-    prevProps.generation.status === nextProps.generation.status &&
-    prevProps.generation.first_image_url === nextProps.generation.first_image_url
-  );
-});
-
-// Export Thumbnail for testing
-export { Thumbnail };
 
 // Export utility functions and constants for testing
 export { isPendingOrProcessing, getStatusConfig, GENERATION_STATUS };
@@ -649,187 +550,19 @@ export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalS
             const canCancel = isPendingOrProcessing(generation.status);
 
             return (
-              <Card key={generation.id} className="overflow-hidden group">
-                <div className="relative aspect-square">
-                  <Thumbnail generation={generation} onViewLogs={handleViewFailedLogs} />
-                  {generation.status === GENERATION_STATUS.COMPLETED && generation.image_count > 1 && (
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewImage(generation);
-                        }}
-                      >
-                        <ImageIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="text-sm line-clamp-2 flex-1 pr-1">{generation.prompt || "No prompt"}</p>
-                    {/* Info button - shows on all screen sizes */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 flex-shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewMobileInfo(generation);
-                          }}
-                        >
-                          <Info className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p>View details</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-                    {canCancel ? (
-                      // Cancel button for pending/processing
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCancel(generation.id);
-                        }}
-                      >
-                        <X className="h-3 w-3 sm:mr-1" />
-                        <span className="hidden sm:inline">Cancel</span>
-                      </Button>
-                    ) : generation.status === GENERATION_STATUS.COMPLETED ? (
-                      // Download button for completed (icon only)
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownload(generation.id);
-                            }}
-                          >
-                            <Download className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Download image</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      // Retry button for failed/cancelled
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRetry(generation);
-                        }}
-                      >
-                        <RefreshCw className="h-3 w-3 sm:mr-1" />
-                        <span className="hidden sm:inline">Retry</span>
-                      </Button>
-                    )}
-                    {generation.status === GENERATION_STATUS.COMPLETED && onCreateMore && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="default"
-                            size="icon"
-                            className="h-8 w-8 flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCreateMore(generation);
-                            }}
-                          >
-                            <Sparkles className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Create more like this</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {generation.status === GENERATION_STATUS.COMPLETED && onEditImage && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 flex-shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditImage(generation);
-                            }}
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Edit image</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {generation.status !== GENERATION_STATUS.PENDING && generation.status !== GENERATION_STATUS.PROCESSING && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:border-destructive/50 hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(generation.id);
-                            }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>Delete generation</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 flex-shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewLogs(generation);
-                          }}
-                        >
-                          <Terminal className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p>View logs</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  {/* Model name at bottom right */}
-                  {generation.model && (
-                    <div className="mt-2 pt-2 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground truncate" title={getModelName(generation.model)}>
-                        {getModelName(generation.model)}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <ImageCard
+                key={generation.id}
+                generation={generation}
+                modelName={getModelName(generation.model)}
+                onDownload={handleDownload}
+                onIterate={onCreateMore}
+                onEdit={onEditImage ? () => handleEditImage(generation) : undefined}
+                onDelete={handleDelete}
+                onViewDetails={handleViewMobileInfo}
+                onViewLogs={handleViewLogs}
+                onCancel={handleCancel}
+                onRetry={handleRetry}
+              />
             );
           })}
           </div>

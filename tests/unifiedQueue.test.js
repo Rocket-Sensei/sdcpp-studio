@@ -107,12 +107,15 @@ describe('UnifiedQueue - Thumbnail Remount Prevention', () => {
     expect(componentBody).not.toContain('const Thumbnail =');
   });
 
-  it('should have proper comments explaining the fix', () => {
+  it('should have proper comments explaining the ImageCard component structure', () => {
     const source = getSource();
 
-    // Verify the comments explain why Thumbnail is outside
-    expect(source).toContain('Thumbnail component moved outside parent');
-    expect(source).toContain('prevent remounting');
+    // Verify the file imports ImageCard from gallery
+    expect(source).toContain('import { ImageCard } from');
+    expect(source).toContain('from "./gallery/ImageCard"');
+
+    // Verify the re-export for backward compatibility
+    expect(source).toContain('export const Thumbnail = ImageCard');
   });
 });
 

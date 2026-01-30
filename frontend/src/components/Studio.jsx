@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
+import { PromptBar } from "./prompt/PromptBar";
+import { SettingsPanel } from "./settings/SettingsPanel";
+import { ModelSelectorModal } from "./model-selector/ModelSelectorModal";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Sparkles, ChevronDown } from "lucide-react";
+import { Dialog, DialogContent } from "./ui/dialog";
+import { Sparkles } from "lucide-react";
 
 // Default editing model
 const DEFAULT_EDIT_MODEL = "qwen-image-edit";
@@ -11,181 +15,232 @@ const DEFAULT_EDIT_MODEL = "qwen-image-edit";
 const STORAGE_KEY = "studio-form-collapsed";
 
 /**
- * Studio Component - A unified page merging Generate and Gallery functionality
+ * Studio Component - Main application page
  *
  * Features:
- * - Side-by-side layout with collapsible Generate form
- * - Left sidebar (1/3 width): GeneratePanel (collapsible)
- * - Right area (2/3 width): UnifiedQueue gallery
+ * - Full-width PromptBar at top for quick generation
+ * - SettingsPanel side sheet for advanced settings
+ * - ModelSelectorModal for model selection
+ * - UnifiedQueue gallery for viewing generations
  * - "Create More" button handling from UnifiedQueue
- * - Persistent collapse state via localStorage
- * - Responsive design (stacked on mobile, side-by-side on desktop)
+ * - "Edit Image" functionality from UnifiedQueue
  *
  * @param {Object} props
- * @param {boolean} props.isFormCollapsed - External control of form collapse state
- * @param {Function} props.onToggleForm - Callback when form toggle is requested
- * @param {Function} props.onCollapseChange - Callback when collapse state changes (for parent to track state)
  * @param {string} props.searchQuery - Search query for filtering generations
  * @param {Array} props.selectedStatuses - Array of selected status values for filtering
  * @param {Array} props.selectedModelsFilter - Array of selected model IDs for filtering
  */
-export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onCollapseChange, searchQuery, selectedStatuses, selectedModelsFilter }) {
-  // State for selected models (array of model IDs)
+export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) {
+  // Generation settings state
+  const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [mode, setMode] = useState("image"); // image, edit, video, upscale
   const [selectedModels, setSelectedModels] = useState([]);
+  const [sourceImage, setSourceImage] = useState(null);
 
-  // Settings from "Create More" button click
-  const [createMoreSettings, setCreateMoreSettings] = useState(null);
-
-  // State for edit image mode
-  const [editImageSettings, setEditImageSettings] = useState(null);
-
-  // Form collapse state with localStorage persistence
-  // Use external state if provided, otherwise use internal state
-  // Default to collapsed when localStorage is empty (first visit)
-  const [internalIsCollapsed, setIsFormCollapsed] = useState(() => {
+  // Advanced settings state
+  const [size, setSize] = useState(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === null) {
-        // First visit - default to collapsed (form closed)
-        return true;
-      }
+      const saved = localStorage.getItem("sd-cpp-studio-size");
+      if (saved) return saved;
+    }
+    return "1024x1024";
+  });
+  const [imageCount, setImageCount] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-image-count");
+      if (saved) return parseInt(saved, 10);
+    }
+    return 1;
+  });
+  const [strength, setStrength] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-strength");
+      if (saved) return parseFloat(saved);
+    }
+    return 0.7;
+  });
+  const [seed, setSeed] = useState("");
+  const [cfgScale, setCfgScale] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-cfg-scale");
+      if (saved) return parseFloat(saved);
+    }
+    return 0.0;
+  });
+  const [sampleSteps, setSampleSteps] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-sample-steps");
+      if (saved) return parseInt(saved, 10);
+    }
+    return 9;
+  });
+  const [samplingMethod, setSamplingMethod] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-sampling-method");
+      if (saved) return saved;
+    }
+    return "euler_a";
+  });
+  const [clipSkip, setClipSkip] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-clip-skip");
+      if (saved) return parseInt(saved, 10);
+    }
+    return 1;
+  });
+  const [queueMode, setQueueMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sd-cpp-studio-queue-mode");
       return saved === "true";
     }
-    return true; // Default to collapsed on server-side
+    return false;
   });
+  const [upscaleAfter, setUpscaleAfter] = useState(false);
 
-  // Determine whether to use external or internal state
-  const isFormCollapsed = externalIsCollapsed ?? internalIsCollapsed;
+  // UI state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
 
-  // Internal setter that persists to localStorage and notifies parent
-  const setFormCollapsed = useCallback((value) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, String(value));
-    }
-    setIsFormCollapsed(value);
-    onCollapseChange?.(value);
-  }, [onCollapseChange]);
+  // "Create More" settings from gallery
+  const [createMoreSettings, setCreateMoreSettings] = useState(null);
+  const [editImageSettings, setEditImageSettings] = useState(null);
 
-  // Persist collapse state to localStorage
+  // Persist settings to localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, String(isFormCollapsed));
+      localStorage.setItem("sd-cpp-studio-size", size);
     }
-  }, [isFormCollapsed]);
+  }, [size]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-image-count", String(imageCount));
+    }
+  }, [imageCount]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-strength", String(strength));
+    }
+  }, [strength]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-cfg-scale", String(cfgScale));
+    }
+  }, [cfgScale]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-sample-steps", String(sampleSteps));
+    }
+  }, [sampleSteps]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-sampling-method", samplingMethod);
+    }
+  }, [samplingMethod]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-clip-skip", String(clipSkip));
+    }
+  }, [clipSkip]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sd-cpp-studio-queue-mode", String(queueMode));
+    }
+  }, [queueMode]);
 
   // Handle "Create More" from UnifiedQueue
-  // Sets the selected model and applies settings from the generation
   const handleCreateMore = useCallback((generation) => {
     setCreateMoreSettings(generation);
-    setEditImageSettings(null); // Clear edit settings when creating more
+    setEditImageSettings(null);
     if (generation.model) {
       setSelectedModels([generation.model]);
     }
-    // Expand form when creating more
-    const newValue = false;
-    setFormCollapsed(newValue);
-  }, [setFormCollapsed]);
+    if (generation.prompt) {
+      setPrompt(generation.prompt);
+    }
+    if (generation.negative_prompt) {
+      setNegativePrompt(generation.negative_prompt);
+    }
+    // Open settings panel to show the applied settings
+    setIsGeneratePanelOpen(true);
+  }, []);
 
   // Handle "Edit Image" from UnifiedQueue
-  // Sets the image for editing, switches to imgedit mode, and sets default edit model
   const handleEditImage = useCallback((imageFile, generation) => {
-    // Create a temporary object URL for preview
     const imageUrl = URL.createObjectURL(imageFile);
-
-    // Set up edit settings with the image
     setEditImageSettings({
       imageFile,
       imageUrl,
       type: 'edit',
-      // Preserve prompt if available
       prompt: generation.prompt || '',
-      // Clear other settings for a fresh edit
       negative_prompt: '',
       size: generation.size || '1024x1024',
     });
-    setCreateMoreSettings(null); // Clear create more settings when editing
-
-    // Set the default editing model
+    setCreateMoreSettings(null);
     setSelectedModels([DEFAULT_EDIT_MODEL]);
+    setMode('edit');
+    setIsGeneratePanelOpen(true);
+  }, []);
 
-    // Expand form when editing
-    setFormCollapsed(false);
-  }, [setFormCollapsed]);
+  // Handle generate from PromptBar
+  const handleGenerate = useCallback(() => {
+    if (!prompt.trim()) return;
+    if (selectedModels.length === 0) {
+      // Open model selector if no models selected
+      setIsModelSelectorOpen(true);
+      return;
+    }
+    // Open generate panel for actual submission
+    setIsGeneratePanelOpen(true);
+  }, [prompt, selectedModels]);
 
-  // Handle generation complete
-  // Gallery auto-refreshes via WebSocket, so this is mainly for any additional actions
+  // Handle generate complete
   const handleGenerated = useCallback(() => {
-    // The gallery will auto-refresh via WebSocket subscription
-    // This callback can be used for additional actions if needed
+    setCreateMoreSettings(null);
+    setEditImageSettings(null);
+    // Optionally close panels after generation
+    // setIsGeneratePanelOpen(false);
   }, []);
 
-  // Toggle form collapse state - use external callback or internal toggle
-  const toggleFormCollapse = useCallback(() => {
-    if (onToggleForm) {
-      onToggleForm();
-    } else {
-      setFormCollapsed((prev) => !prev);
-    }
-  }, [onToggleForm, setFormCollapsed]);
-
-  // Handle model selection change
-  const handleModelChange = useCallback((modelId) => {
-    if (modelId) {
-      // If modelId is provided, set it as the only selected model
-      setSelectedModels([modelId]);
-    } else {
-      // Clear selection if no modelId
-      setSelectedModels([]);
-    }
-  }, []);
-
-  // Handle models array change (for GeneratePanel)
-  const handleModelsChange = useCallback((models) => {
+  // Handle model selector apply
+  const handleModelSelectorApply = useCallback((models) => {
     setSelectedModels(models);
+    setIsModelSelectorOpen(false);
   }, []);
 
-  // Clear createMoreSettings and editImageSettings after they have been applied
+  // Clear settings after they've been applied
   const handleSettingsApplied = useCallback(() => {
     setCreateMoreSettings(null);
     setEditImageSettings(null);
   }, []);
 
+  // Get selected model count for display
+  const selectedModelCount = selectedModels.length;
+
   return (
     <div className="container mx-auto p-4">
-      {/* Desktop Generate Sheet - Offcanvas menu */}
-      <Sheet open={!isFormCollapsed} onOpenChange={(open) => setFormCollapsed(!open)}>
-        {/* Generate button trigger - shown when form is collapsed */}
-        {!isFormCollapsed && (
-          <SheetTrigger asChild>
-            <div className="sr-only">
-              {/* Hidden trigger - Sheet is controlled programmatically */}
-            </div>
-          </SheetTrigger>
-        )}
-
-        <SheetContent side="left" className="w-full sm:w-[500px] md:w-[600px] lg:w-[700px] xl:w-[800px] overflow-y-auto p-0">
-          <SheetHeader className="p-6 pb-0">
-            <SheetTitle>Generate</SheetTitle>
-          </SheetHeader>
-          <div className="p-6 pt-2">
-            <GeneratePanel
-              selectedModels={selectedModels}
-              onModelsChange={handleModelsChange}
-              settings={createMoreSettings}
-              editImageSettings={editImageSettings}
-              onGenerated={(...args) => {
-                handleGenerated(...args);
-                handleSettingsApplied();
-                // Optionally close the sheet after generation
-                // setFormCollapsed(true);
-              }}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* PromptBar - Full width prompt input at top */}
+      <PromptBar
+        prompt={prompt}
+        onPromptChange={setPrompt}
+        selectedModelCount={selectedModelCount}
+        onModelSelectorClick={() => setIsModelSelectorOpen(true)}
+        sourceImage={sourceImage}
+        onSourceImageChange={setSourceImage}
+        onGenerate={handleGenerate}
+        onSettingsClick={() => setIsSettingsOpen(true)}
+      />
 
       {/* Main content - UnifiedQueue Gallery */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="mt-4">
         <UnifiedQueue
           onCreateMore={handleCreateMore}
           onEditImage={handleEditImage}
@@ -195,17 +250,66 @@ export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onC
         />
       </div>
 
-      {/* Floating action button for collapsed form */}
-      {isFormCollapsed && (
-        <Button
-          onClick={toggleFormCollapse}
-          size="lg"
-          className="hidden lg:flex fixed bottom-6 left-6 rounded-full shadow-lg h-14 w-14 p-0 z-40"
-          title="Show Generate Form"
-        >
-          <Sparkles className="h-6 w-6" />
-        </Button>
-      )}
+      {/* Settings Panel - Side Sheet */}
+      <Sheet open={isSettingsOpen || isGeneratePanelOpen} onOpenChange={(open) => {
+        setIsSettingsOpen(open);
+        setIsGeneratePanelOpen(open);
+      }}>
+        <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
+          <SheetHeader className="mt-8 mb-6 px-6">
+            <SheetTitle>{isGeneratePanelOpen ? "Generate" : "Settings"}</SheetTitle>
+          </SheetHeader>
+          <div className="px-6">
+            <SettingsPanel
+              mode={mode}
+              onModeChange={setMode}
+              negativePrompt={negativePrompt}
+              onNegativePromptChange={setNegativePrompt}
+              size={size}
+              onSizeChange={setSize}
+              imageCount={imageCount}
+              onImageCountChange={setImageCount}
+              strength={strength}
+              onStrengthChange={setStrength}
+              seed={seed}
+              onSeedChange={setSeed}
+              cfgScale={cfgScale}
+              onCfgScaleChange={setCfgScale}
+              sampleSteps={sampleSteps}
+              onSampleStepsChange={setSampleSteps}
+              samplingMethod={samplingMethod}
+              onSamplingMethodChange={setSamplingMethod}
+              clipSkip={clipSkip}
+              onClipSkipChange={setClipSkip}
+              queueMode={queueMode}
+              onQueueModeChange={setQueueMode}
+              upscaleAfter={upscaleAfter}
+              onUpscaleAfterChange={setUpscaleAfter}
+              selectedModels={selectedModels}
+              onModelsChange={setSelectedModels}
+              prompt={prompt}
+              sourceImage={sourceImage}
+              createMoreSettings={createMoreSettings}
+              editImageSettings={editImageSettings}
+              onGenerated={() => {
+                handleGenerated();
+                handleSettingsApplied();
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Model Selector Modal */}
+      <Dialog open={isModelSelectorOpen} onOpenChange={setIsModelSelectorOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <ModelSelectorModal
+            selectedModels={selectedModels}
+            onModelsChange={handleModelSelectorApply}
+            onClose={() => setIsModelSelectorOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -9,27 +9,53 @@ import React from 'react';
 
 // Mock the child components with factory functions
 vi.mock('../frontend/src/components/Studio', () => ({
-  Studio: () => React.createElement('div', { 'data-testid': 'studio' }, 'Studio'),
+  Studio: ({ searchQuery, selectedStatuses, selectedModelsFilter }) =>
+    React.createElement('div', {
+      'data-testid': 'studio',
+      'data-search-query': searchQuery || '',
+      'data-selected-statuses': selectedStatuses ? selectedStatuses.join(',') : '',
+      'data-selected-models-filter': selectedModelsFilter ? selectedModelsFilter.join(',') : '',
+    }, 'Studio'),
 }));
 
 vi.mock('../frontend/src/components/ui/sonner', () => ({
   Toaster: () => React.createElement('div', { 'data-testid': 'toaster' }, 'Toaster'),
 }));
 
-vi.mock('../frontend/src/components/WebSocketStatusIndicator', () => ({
-  WebSocketStatusIndicator: () => React.createElement('div', { 'data-testid': 'websocket-status' }, 'WebSocketStatus'),
+vi.mock('../frontend/src/components/header/Header', () => ({
+  Header: ({ totalGenerations, filterSheet, onSettingsClick }) =>
+    React.createElement('div', { 'data-testid': 'header' },
+      React.createElement('div', { 'data-testid': 'total-generations' }, String(totalGenerations || 0)),
+      React.createElement('div', { 'data-testid': 'websocket-status' }, 'WebSocketStatus'),
+      filterSheet && React.createElement('div', { 'data-testid': 'filter-sheet' }, 'Filters'),
+    ),
 }));
 
 vi.mock('../frontend/src/contexts/WebSocketContext', () => ({
-  WebSocketProvider: ({ children }) => React.createElement('div', null, children),
+  WebSocketProvider: ({ children }) => React.createElement('div', { 'data-testid': 'websocket-provider' }, children),
 }));
 
 vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
-  useGenerations: () => ({ fetchGenerations: vi.fn() }),
+  useImageGeneration: () => ({ fetchGenerations: vi.fn(), generateQueued: vi.fn() }),
+  useGenerations: () => ({ fetchGenerations: vi.fn(), generations: [], pagination: { total: 0 } }),
+}));
+
+vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
+  ApiKeyProvider: ({ children }) => React.createElement('div', { 'data-testid': 'apikey-provider' }, children),
+  useApiKeyContext: () => ({ version: 0 }),
 }));
 
 vi.mock('../frontend/src/components/ApiKeyModal', () => ({
-  ApiKeyProvider: ({ children }) => React.createElement('div', null, children),
+  ApiKeyModal: () => React.createElement('div', { 'data-testid': 'apikey-modal' }),
+}));
+
+vi.mock('../frontend/src/components/AppBoot', () => ({
+  AppBoot: ({ onBootComplete, children }) => {
+    React.useEffect(() => {
+      onBootComplete();
+    }, [onBootComplete]);
+    return React.createElement(React.Fragment, null, children);
+  },
 }));
 
 const renderWithRouter = (component, { initialEntries = ['/'] } = {}) => {
@@ -81,8 +107,13 @@ describe('App Component', () => {
     expect(screen.getByTestId('studio')).toBeTruthy();
   });
 
-  it('should render WebSocketStatusIndicator', () => {
+  it('should render WebSocketStatusIndicator via Header', () => {
     renderWithRouter(React.createElement(App));
     expect(screen.getByTestId('websocket-status')).toBeTruthy();
+  });
+
+  it('should render Header component', () => {
+    renderWithRouter(React.createElement(App));
+    expect(screen.getByTestId('header')).toBeTruthy();
   });
 });
