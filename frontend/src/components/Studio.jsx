@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
 import { PromptBar } from "./prompt/PromptBar";
@@ -6,6 +6,7 @@ import { ModelSelectorModal } from "./model-selector/ModelSelectorModal";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
+import { authenticatedFetch } from "../utils/api";
 
 // Default editing model
 const DEFAULT_EDIT_MODEL = "qwen-image-edit";
@@ -39,6 +40,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   const [selectedModels, setSelectedModels] = useState([]);
 
   // Image state for Edit/Upscale modes
+  const [sourceImage, setSourceImage] = useState(null);
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
   const [strength, setStrength] = useState(0.75);
 
@@ -50,9 +52,42 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   const [createMoreSettings, setCreateMoreSettings] = useState(null);
   const [editImageSettings, setEditImageSettings] = useState(null);
 
-  // Image upload handler for upscale mode
-  const handleImageUpload = useCallback(() => {
-    setIsSettingsOpen(true);
+  // Upscale settings state (managed here for top form access)
+  const [upscaleFactor, setUpscaleFactor] = useState(2);
+  const [upscaleResizeMode, setUpscaleResizeMode] = useState(0);
+  const [upscaleTargetWidth, setUpscaleTargetWidth] = useState(1024);
+  const [upscaleTargetHeight, setUpscaleTargetHeight] = useState(1024);
+  const [upscalerName, setUpscalerName] = useState("RealESRGAN 4x+");
+  const [availableUpscalers, setAvailableUpscalers] = useState([]);
+
+  // Fetch available upscalers on mount
+  useEffect(() => {
+    const fetchUpscalers = async () => {
+      try {
+        const response = await authenticatedFetch("/sdapi/v1/upscalers");
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableUpscalers(data);
+          if (data.length > 0 && !upscalerName) {
+            setUpscalerName(data[0].name);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch upscalers:", err);
+      }
+    };
+    fetchUpscalers();
+  }, []);
+
+  // File handlers for upscale mode
+  const handleFileSelect = useCallback((file) => {
+    setSourceImage(file);
+    setSourceImagePreview(URL.createObjectURL(file));
+  }, []);
+
+  const handleClearImage = useCallback(() => {
+    setSourceImage(null);
+    setSourceImagePreview(null);
   }, []);
 
   // Handle "Create More" from UnifiedQueue
@@ -86,8 +121,41 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setIsSettingsOpen(true);
   }, []);
 
-  // Handle generate from PromptBar - direct queue submission
+  // Handle generate from PromptBar - queue submission
   const handleGenerate = useCallback(async () => {
+    // Handle upscale mode - queue the upscale job
+    if (mode === 'upscale') {
+      if (!sourceImage) {
+        toast.error("Please select a source image");
+        return;
+      }
+
+      try {
+        await generateQueued({
+          mode: 'upscale',
+          image: sourceImage,
+          upscaler: upscalerName,
+          resize_mode: upscaleResizeMode,
+          upscale_factor: upscaleFactor,
+          target_width: upscaleResizeMode === 1 ? upscaleTargetWidth : undefined,
+          target_height: upscaleResizeMode === 1 ? upscaleTargetHeight : undefined,
+        });
+        toast.success("Upscale job added to queue!");
+        // Clear the source image after successful queue submission
+        handleClearImage();
+      } catch (err) {
+        toast.error(err.message || "Failed to queue upscale job");
+      }
+      return;
+    }
+
+    // For imgedit mode, user needs to use Settings panel
+    if (mode === 'imgedit') {
+      toast.error("Please open Settings panel below to configure this mode");
+      setIsSettingsOpen(true);
+      return;
+    }
+
     if (!prompt.trim()) {
       toast.error("Please enter a prompt");
       return;
@@ -95,13 +163,6 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     if (selectedModels.length === 0) {
       // Open model selector if no models selected
       setIsModelSelectorOpen(true);
-      return;
-    }
-
-    // For upscale/imagedit modes, user needs to use Settings panel
-    if (mode === 'upscale' || mode === 'imgedit') {
-      toast.error("Please open Settings panel below to configure this mode");
-      setIsSettingsOpen(true);
       return;
     }
 
@@ -126,7 +187,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     } catch (err) {
       toast.error(err.message || "Failed to queue generation");
     }
-  }, [prompt, selectedModels, mode, generateQueued, setIsSettingsOpen]);
+  }, [prompt, selectedModels, mode, generateQueued, sourceImage, upscalerName, upscaleResizeMode, upscaleFactor, upscaleTargetWidth, upscaleTargetHeight, handleClearImage]);
 
   // Handle generate complete
   const handleGenerated = useCallback(() => {
@@ -164,7 +225,12 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
         isLoading={isGenerating}
         disabled={false}
         sourceImagePreview={sourceImagePreview}
-        onImageUpload={handleImageUpload}
+        sourceImage={sourceImage}
+        onFileSelect={handleFileSelect}
+        onClearImage={handleClearImage}
+        availableUpscalers={availableUpscalers}
+        upscalerName={upscalerName}
+        onUpscalerNameChange={setUpscalerName}
         strength={strength}
       />
 
@@ -183,6 +249,21 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
         prompt={prompt}
         mode={mode}
         onModeChange={setMode}
+        // Upscale state (managed in Studio for top form access)
+        sourceImage={sourceImage}
+        sourceImagePreview={sourceImagePreview}
+        upscaleFactor={upscaleFactor}
+        onUpscaleFactorChange={setUpscaleFactor}
+        upscaleResizeMode={upscaleResizeMode}
+        onUpscaleResizeModeChange={setUpscaleResizeMode}
+        upscaleTargetWidth={upscaleTargetWidth}
+        onUpscaleTargetWidthChange={setUpscaleTargetWidth}
+        upscaleTargetHeight={upscaleTargetHeight}
+        onUpscaleTargetHeightChange={setUpscaleTargetHeight}
+        upscalerName={upscalerName}
+        onUpscalerNameChange={setUpscalerName}
+        onFileSelect={handleFileSelect}
+        onClearImage={handleClearImage}
       />
 
       {/* Main content - UnifiedQueue Gallery */}

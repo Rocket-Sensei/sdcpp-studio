@@ -39,7 +39,12 @@ const MODES = [
  * @param {boolean} props.isLoading - Whether generation is in progress
  * @param {boolean} props.disabled - Whether the prompt bar is disabled
  * @param {string} props.sourceImagePreview - URL of source image preview (for edit/upscale modes)
- * @param {function} props.onImageUpload - Callback to trigger image upload (for upscale mode)
+ * @param {File} props.sourceImage - Source image file object (for upscale mode)
+ * @param {function} props.onFileSelect - Callback when file is selected (for upscale mode)
+ * @param {function} props.onClearImage - Callback to clear the selected image (for upscale mode)
+ * @param {Array} props.availableUpscalers - Available upscalers (for upscale mode)
+ * @param {string} props.upscalerName - Selected upscaler name (for upscale mode)
+ * @param {function} props.onUpscalerNameChange - Callback for upscaler name change (for upscale mode)
  * @param {number} props.strength - Strength value for img2img (for image mode)
  */
 export function PromptBar({
@@ -56,7 +61,12 @@ export function PromptBar({
   isLoading = false,
   disabled = false,
   sourceImagePreview = null,
-  onImageUpload,
+  sourceImage = null,
+  onFileSelect,
+  onClearImage,
+  availableUpscalers = [],
+  upscalerName = "",
+  onUpscalerNameChange,
   strength = 0.75,
 }) {
   // Get display text for selected models
@@ -118,30 +128,32 @@ export function PromptBar({
         </div>
       </div>
 
-      {/* Model selector row */}
-      <div className="flex items-center gap-2 mb-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onModelSelectorOpen}
-          disabled={disabled}
-          className="gap-2"
-          data-testid="model-selector-button"
-        >
-          <Settings2 className="h-4 w-4" />
-          <span className="truncate max-w-[200px]">{getModelDisplayText()}</span>
-          <ChevronDown className="h-3 w-3 flex-shrink-0" />
-        </Button>
+      {/* Model selector row - NOT shown for upscale mode */}
+      {mode !== "upscale" && (
+        <div className="flex items-center gap-2 mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onModelSelectorOpen}
+            disabled={disabled}
+            className="gap-2"
+            data-testid="model-selector-button"
+          >
+            <Settings2 className="h-4 w-4" />
+            <span className="truncate max-w-[200px]">{getModelDisplayText()}</span>
+            <ChevronDown className="h-3 w-3 flex-shrink-0" />
+          </Button>
 
-        {selectedModels.length > 1 && (
-          <Badge variant="secondary" className="text-xs">
-            Multi-model
-          </Badge>
-        )}
+          {selectedModels.length > 1 && (
+            <Badge variant="secondary" className="text-xs">
+              Multi-model
+            </Badge>
+          )}
 
-        {/* Hidden selected model count for tests */}
-        <div className="hidden" data-testid="selected-model-count">{selectedModels.length}</div>
-      </div>
+          {/* Hidden selected model count for tests */}
+          <div className="hidden" data-testid="selected-model-count">{selectedModels.length}</div>
+        </div>
+      )}
 
       {/* Mode-specific prompt input */}
       {mode === "image" && (
@@ -182,8 +194,13 @@ export function PromptBar({
           isLoading={isLoading}
           disabled={disabled}
           sourceImagePreview={sourceImagePreview}
+          sourceImage={sourceImage}
           onGenerate={onGenerate}
-          onImageUpload={onImageUpload}
+          onFileSelect={onFileSelect}
+          onClearImage={onClearImage}
+          availableUpscalers={availableUpscalers}
+          upscalerName={upscalerName}
+          onUpscalerNameChange={onUpscalerNameChange}
         />
       )}
     </div>

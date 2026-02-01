@@ -6,6 +6,7 @@ import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
 import { loggedFetch, createLogger, createGenerationLogger } from '../utils/logger.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from './websocket.js';
+import { upscaleImage } from './upscalerService.js';
 
 const logger = createLogger('queueProcessor');
 
@@ -224,18 +225,25 @@ async function processQueue() {
 
     // Process the job based on type
     let result;
-    switch (job.type) {
-      case 'generate':
-        result = await processGenerateJob(job, modelConfig, genLogger);
-        break;
-      case 'edit':
-        result = await processEditJob(job, modelConfig, genLogger);
-        break;
-      case 'variation':
-        result = await processVariationJob(job, modelConfig, genLogger);
-        break;
-      default:
-        throw new Error(`Unknown job type: ${job.type}`);
+
+    // Upscale jobs don't need model preparation - handle separately
+    if (job.type === 'upscale') {
+      result = await processUpscaleJob(job, genLogger);
+    } else {
+      // For other job types, proceed with model-based generation
+      switch (job.type) {
+        case 'generate':
+          result = await processGenerateJob(job, modelConfig, genLogger);
+          break;
+        case 'edit':
+          result = await processEditJob(job, modelConfig, genLogger);
+          break;
+        case 'variation':
+          result = await processVariationJob(job, modelConfig, genLogger);
+          break;
+        default:
+          throw new Error(`Unknown job type: ${job.type}`);
+      }
     }
 
     // Validate that images were actually generated before marking as completed
@@ -960,4 +968,61 @@ async function processVariationJob(job, modelConfig, genLogger) {
   }
 
   return { generationId, imageCount, actualSteps };
+}
+
+/**
+ * Process an upscale job
+ * Upscale jobs don't require model loading - they use the upscaler service directly
+ * @param {Object} job - Queue job object
+ * @param {Object} genLogger - Generation-specific logger
+ * @returns {Promise<Object>} Result with generationId and imageCount
+ */
+async function processUpscaleJob(job, genLogger) {
+  // Check if input image path is provided
+  if (!job.input_image_path) {
+    throw new Error('Upscale job requires input_image_path');
+  }
+
+  // Update progress
+  updateGenerationProgress(job.id, 0.1, 'Loading image for upscaling...');
+  genLogger.debug({ progress: 0.1 }, 'Loading image for upscaling');
+
+  // Load the input image from disk
+  const imageBuffer = await readFile(job.input_image_path);
+
+  updateGenerationProgress(job.id, 0.25, 'Upscaling image...');
+  genLogger.info({
+    upscaler: job.upscaler,
+    resizeMode: job.resize_mode,
+    factor: job.upscale_factor
+  }, 'Starting image upscaling');
+
+  // Call the upscaler service
+  const resultBuffer = await upscaleImage(imageBuffer, {
+    upscaler_1: job.upscaler || 'RealESRGAN 4x+',
+    resize_mode: job.resize_mode || 0,
+    upscaling_resize: job.upscale_factor || 2.0,
+    upscaling_resize_w: job.target_width,
+    upscaling_resize_h: job.target_height,
+  });
+
+  updateGenerationProgress(job.id, 0.85, 'Saving upscaled image...');
+  genLogger.debug({ progress: 0.85 }, 'Saving upscaled image');
+
+  // Save the upscaled image
+  const generationId = job.id;
+  const imageId = randomUUID();
+
+  await createGeneratedImage({
+    id: imageId,
+    generation_id: generationId,
+    index_in_batch: 0,
+    image_data: resultBuffer,
+    mime_type: 'image/png',
+    width: null,
+    height: null,
+  });
+
+  genLogger.info('Upscale completed successfully');
+  return { generationId, imageCount: 1 };
 }

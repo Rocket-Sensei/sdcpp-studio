@@ -6,7 +6,7 @@ import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
 import { authenticatedFetch } from "../utils/api";
-import { ModelSelectorModal } from "./model-selector/ModelSelectorModal";
+import { MultiModelSelector } from "./MultiModelSelector";
 import { Badge } from "./ui/badge";
 import { Settings2, Loader2, Sparkles } from "lucide-react";
 import { ImageSettings } from "./settings/ImageSettings";
@@ -40,6 +40,20 @@ const MODES = [
  * @param {string} props.prompt - Current prompt text from PromptBar
  * @param {string} props.mode - Current mode from PromptBar
  * @param {function} props.onModeChange - Callback when mode changes
+ * @param {File} props.sourceImage - Source image file (for upscale mode)
+ * @param {string} props.sourceImagePreview - URL of source image preview
+ * @param {number} props.upscaleFactor - Upscale factor
+ * @param {function} props.onUpscaleFactorChange - Callback for upscale factor change
+ * @param {number} props.upscaleResizeMode - Resize mode (0=by factor, 1=to size)
+ * @param {function} props.onUpscaleResizeModeChange - Callback for resize mode change
+ * @param {number} props.upscaleTargetWidth - Target width for resize mode
+ * @param {function} props.onUpscaleTargetWidthChange - Callback for target width change
+ * @param {number} props.upscaleTargetHeight - Target height for resize mode
+ * @param {function} props.onUpscaleTargetHeightChange - Callback for target height change
+ * @param {string} props.upscalerName - Selected upscaler name
+ * @param {function} props.onUpscalerNameChange - Callback for upscaler name change
+ * @param {function} props.onFileSelect - Callback for file selection
+ * @param {function} props.onClearImage - Callback for clearing image
  */
 export function GeneratePanel({
   open = false,
@@ -52,6 +66,21 @@ export function GeneratePanel({
   prompt = "",
   mode = "image",
   onModeChange,
+  // Upscale props from Studio
+  sourceImage = null,
+  sourceImagePreview = null,
+  upscaleFactor = 2,
+  onUpscaleFactorChange,
+  upscaleResizeMode = 0,
+  onUpscaleResizeModeChange,
+  upscaleTargetWidth = 1024,
+  onUpscaleTargetWidthChange,
+  upscaleTargetHeight = 1024,
+  onUpscaleTargetHeightChange,
+  upscalerName = "",
+  onUpscalerNameChange,
+  onFileSelect,
+  onClearImage,
 }) {
   const { generateQueued, isLoading } = useImageGeneration();
   const { modelsMap } = useModels();
@@ -79,9 +108,6 @@ export function GeneratePanel({
   const [n, setN] = useState(1);
   const [useQueue, setUseQueue] = useState(true);
 
-  // Model selector modal state
-  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
-
   // Track if selected models support negative prompts
   const [supportsNegativePrompt, setSupportsNegativePrompt] = useState(false);
 
@@ -89,25 +115,15 @@ export function GeneratePanel({
   const [hasServerModeModel, setHasServerModeModel] = useState(false);
   const [serverModeSteps, setServerModeSteps] = useState(null);
 
-  // Image-related settings
-  const [sourceImage, setSourceImage] = useState(null);
-  const [sourceImagePreview, setSourceImagePreview] = useState(null);
-  const [upscaleResult, setUpscaleResult] = useState(null);
-  const [isUpscaling, setIsUpscaling] = useState(false);
+  // Image-related settings (local state for edit mode, props for upscale mode)
+  const [localSourceImage, setLocalSourceImage] = useState(null);
+  const [localSourceImagePreview, setLocalSourceImagePreview] = useState(null);
 
   // Strength parameter for img2img mode
   const [strength, setStrength] = useState(0.75);
 
-  // Upscale settings
+  // Upscale settings - all upscale state is managed in Studio.jsx
   const [upscaleAfterGeneration, setUpscaleAfterGeneration] = useState(false);
-  const [upscaleFactor, setUpscaleFactor] = useState(2);
-  const [upscaleResizeMode, setUpscaleResizeMode] = useState(0);
-  const [upscalerName, setUpscalerName] = useState("RealESRGAN 4x+");
-  const [availableUpscalers, setAvailableUpscalers] = useState([]);
-
-  // Upscale target size for resize mode
-  const [upscaleTargetWidth, setUpscaleTargetWidth] = useState(1024);
-  const [upscaleTargetHeight, setUpscaleTargetHeight] = useState(1024);
 
   // Video settings
   const [videoFrames, setVideoFrames] = useState(33);
@@ -122,25 +138,6 @@ export function GeneratePanel({
   const [samplingMethod, setSamplingMethod] = useState("euler");
   const [sampleSteps, setSampleSteps] = useState(20);
   const [clipSkip, setClipSkip] = useState("-1");
-
-  // Fetch upscalers on mount
-  useEffect(() => {
-    const fetchUpscalers = async () => {
-      try {
-        const response = await authenticatedFetch("/sdapi/v1/upscalers");
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableUpscalers(data);
-          if (data.length > 0) {
-            setUpscalerName(data[0].name);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch upscalers:", err);
-      }
-    };
-    fetchUpscalers();
-  }, []);
 
   // Update negative prompt support when selectedModels change
   useEffect(() => {
@@ -288,9 +285,6 @@ export function GeneratePanel({
         n,
         useQueue,
         strength,
-        upscaleFactor,
-        upscaleResizeMode,
-        upscalerName,
         upscaleAfterGeneration,
         cfgScale,
         samplingMethod,
@@ -312,9 +306,6 @@ export function GeneratePanel({
     n,
     useQueue,
     strength,
-    upscaleFactor,
-    upscaleResizeMode,
-    upscalerName,
     upscaleAfterGeneration,
     cfgScale,
     samplingMethod,
@@ -342,9 +333,7 @@ export function GeneratePanel({
         if (formState.n !== undefined) setN(formState.n);
         if (formState.useQueue !== undefined) setUseQueue(formState.useQueue);
         if (formState.strength !== undefined) setStrength(formState.strength);
-        if (formState.upscaleFactor !== undefined) setUpscaleFactor(formState.upscaleFactor);
-        if (formState.upscaleResizeMode !== undefined) setUpscaleResizeMode(formState.upscaleResizeMode);
-        if (formState.upscalerName) setUpscalerName(formState.upscalerName);
+        // Note: upscaleFactor, upscaleResizeMode, upscalerName are managed by Studio.jsx
         if (formState.upscaleAfterGeneration !== undefined) setUpscaleAfterGeneration(formState.upscaleAfterGeneration);
         if (formState.cfgScale !== undefined) setCfgScale(formState.cfgScale);
         if (formState.samplingMethod) setSamplingMethod(formState.samplingMethod);
@@ -358,15 +347,15 @@ export function GeneratePanel({
     } catch (err) {
       console.warn('Failed to load form state from localStorage:', err);
     }
-  }, []);
+  }, [onModeChange]);
 
   const getApiMode = useCallback((modeValue) => {
     if (modeValue === "imgedit") return "edit";
     if (modeValue === "image") {
-      return sourceImage ? "variation" : "generate";
+      return localSourceImage ? "variation" : "generate";
     }
     return "generate";
-  }, [sourceImage]);
+  }, [localSourceImage]);
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -382,20 +371,32 @@ export function GeneratePanel({
       return;
     }
 
-    setSourceImage(file);
-    setUpscaleResult(null);
+    // For upscale mode, use Studio's handler
+    if (mode === "upscale") {
+      onFileSelect?.(file);
+      return;
+    }
+
+    // For other modes (edit), use local state
+    setLocalSourceImage(file);
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      setSourceImagePreview(e.target.result);
+      setLocalSourceImagePreview(e.target.result);
     };
     reader.readAsDataURL(file);
   };
 
   const handleClearImage = () => {
-    setSourceImage(null);
-    setSourceImagePreview(null);
-    setUpscaleResult(null);
+    // For upscale mode, use Studio's handler
+    if (mode === "upscale") {
+      onClearImage?.();
+      return;
+    }
+
+    // For other modes (edit), use local state
+    setLocalSourceImage(null);
+    setLocalSourceImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -432,57 +433,6 @@ export function GeneratePanel({
     }
   };
 
-  const handleDownloadUpscaled = () => {
-    if (!upscaleResult) return;
-    const a = document.createElement('a');
-    a.href = upscaleResult;
-    a.download = `upscaled_${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
-  const handleUpscale = async () => {
-    if (!sourceImage) {
-      toast.error("Please select a source image");
-      return;
-    }
-
-    setIsUpscaling(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', sourceImage);
-      formData.append('upscale_factor', upscaleFactor);
-      formData.append('resize_mode', upscaleResizeMode);
-      formData.append('upscaler', upscalerName);
-
-      if (upscaleResizeMode === 1) {
-        formData.append('target_width', upscaleTargetWidth);
-        formData.append('target_height', upscaleTargetHeight);
-      }
-
-      const response = await authenticatedFetch("/sdapi/v1/extra-single-image", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upscale failed: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setUpscaleResult(url);
-      setSourceImagePreview(url);
-
-      toast.success("Image upscaled successfully!");
-    } catch (err) {
-      toast.error(err.message || "Failed to upscale image");
-    } finally {
-      setIsUpscaling(false);
-    }
-  };
-
   const handleGenerate = async () => {
     if (selectedModels.length === 0) {
       toast.error("Please select at least one model");
@@ -495,17 +445,12 @@ export function GeneratePanel({
     }
 
     const currentModeConfig = MODES.find(m => m.value === localMode);
-    if (currentModeConfig?.needsImage && !sourceImage && !upscaleResult) {
+    if (currentModeConfig?.needsImage && !sourceImage) {
       toast.error("Please select a source image");
       return;
     }
 
     try {
-      if (localMode === "upscale") {
-        await handleUpscale();
-        return;
-      }
-
       const seedValue = n === 1 ? (seed || undefined) : undefined;
 
       const baseParams = {
@@ -593,6 +538,18 @@ export function GeneratePanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+          {/* Inline Model Selector - NOT shown for upscale mode */}
+          {localMode !== "upscale" && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Select Models</h3>
+              <MultiModelSelector
+                selectedModels={selectedModels}
+                onModelsChange={onModelsChange}
+                mode={localMode}
+              />
+            </div>
+          )}
+
           {/* Mode-specific settings */}
           {localMode === "image" && (
             <ImageSettings
@@ -716,25 +673,14 @@ export function GeneratePanel({
 
           {localMode === "upscale" && (
             <UpscaleSettings
-              sourceImage={sourceImage}
-              sourceImagePreview={sourceImagePreview}
-              upscaleResult={upscaleResult}
-              onFileSelect={handleFileSelect}
-              onClearImage={handleClearImage}
-              onDownloadUpscaled={handleDownloadUpscaled}
-              fileInputRef={fileInputRef}
-              isUpscaling={isUpscaling}
-              availableUpscalers={availableUpscalers}
-              upscalerName={upscalerName}
-              onUpscalerNameChange={setUpscalerName}
               upscaleFactor={upscaleFactor}
-              onUpscaleFactorChange={setUpscaleFactor}
+              onUpscaleFactorChange={onUpscaleFactorChange}
               upscaleResizeMode={upscaleResizeMode}
-              onUpscaleResizeModeChange={setUpscaleResizeMode}
+              onUpscaleResizeModeChange={onUpscaleResizeModeChange}
               upscaleTargetWidth={upscaleTargetWidth}
-              onUpscaleTargetWidthChange={setUpscaleTargetWidth}
+              onUpscaleTargetWidthChange={onUpscaleTargetWidthChange}
               upscaleTargetHeight={upscaleTargetHeight}
-              onUpscaleTargetHeightChange={setUpscaleTargetHeight}
+              onUpscaleTargetHeightChange={onUpscaleTargetHeightChange}
             />
           )}
 
@@ -743,7 +689,7 @@ export function GeneratePanel({
             <div className="flex items-center justify-end pt-4 border-t">
               <Button
                 onClick={handleGenerate}
-                disabled={isLoading || isUpscaling || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
+                disabled={isLoading || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
                 className="gap-2 px-6"
                 data-testid="generate-button"
               >
@@ -763,18 +709,6 @@ export function GeneratePanel({
           )}
         </CardContent>
     </Card>
-
-    {/* Model Selector Modal */}
-    <ModelSelectorModal
-      open={isModelSelectorOpen}
-      onOpenChange={setIsModelSelectorOpen}
-      selectedModels={selectedModels}
-      onModelsChange={(models) => {
-        onModelsChange?.(models);
-        setIsModelSelectorOpen(false);
-      }}
-      mode={localMode}
-    />
     </>
   );
 }
