@@ -64,6 +64,15 @@ export function WebSocketProvider({ children }) {
     setIsConnected(connected);
     setIsConnecting(connecting);
 
+    // Log connection state changes
+    if (connected) {
+      console.log('[WS] Connected');
+    } else if (connecting) {
+      console.log('[WS] Connecting...');
+    } else {
+      console.log('[WS] Disconnected');
+    }
+
     // Notify connection state listeners
     connectionListenersRef.current.forEach((callback) => {
       callback(connected);
@@ -74,6 +83,9 @@ export function WebSocketProvider({ children }) {
   useEffect(() => {
     if (lastJsonMessage) {
       const { channel } = lastJsonMessage;
+
+      // Log incoming WebSocket messages for debugging
+      console.log('[WS] Received:', lastJsonMessage);
 
       // Notify all listeners for this channel
       const channelListeners = listenersRef.current.get(channel);
@@ -102,6 +114,7 @@ export function WebSocketProvider({ children }) {
     listenersRef.current.get(channel).add(callback);
 
     // Send subscription message to server
+    console.log('[WS] Subscribing to channel:', channel);
     sendJsonMessage({ type: 'subscribe', channel });
 
     // Return unsubscribe function
@@ -110,6 +123,7 @@ export function WebSocketProvider({ children }) {
       if (channelListeners) {
         channelListeners.delete(callback);
         if (channelListeners.size === 0) {
+          console.log('[WS] Unsubscribing from channel:', channel);
           listenersRef.current.delete(channel);
           sendJsonMessage({ type: 'unsubscribe', channel });
         }
