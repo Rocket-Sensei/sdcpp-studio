@@ -358,7 +358,7 @@ export function ModelSelectorModal({
           </div>
 
           {/* Model list */}
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0">
             {isLoading ? (
               <div className="flex items-center justify-center h-48">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

@@ -6,11 +6,11 @@ import { ModelSelectorModal } from "./model-selector/ModelSelectorModal";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
 import { Sparkles } from "lucide-react";
+import { useImageGeneration } from "../hooks/useImageGeneration";
+import { toast } from "sonner";
 
 // Default editing model
 const DEFAULT_EDIT_MODEL = "qwen-image-edit";
-
-const STORAGE_KEY = "studio-form-collapsed";
 
 /**
  * Studio Component - Main application page
@@ -29,6 +29,9 @@ const STORAGE_KEY = "studio-form-collapsed";
  * @param {Array} props.selectedModelsFilter - Array of selected model IDs for filtering
  */
 export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) {
+  // Use the image generation hook for quick generation from PromptBar
+  const { generateQueued, isLoading: isGenerating } = useImageGeneration();
+
   // Minimal state for PromptBar (GeneratePanel manages its own settings)
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("image"); // image, edit, video, upscale
@@ -100,28 +103,73 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setEditImageSettings({
       imageFile,
       imageUrl,
-      type: 'edit',
+      type: 'imgedit',
       prompt: generation.prompt || '',
       negative_prompt: '',
       size: generation.size || '1024x1024',
     });
     setCreateMoreSettings(null);
     setSelectedModels([DEFAULT_EDIT_MODEL]);
-    setMode('edit');
+    setMode('imgedit');
     setIsGeneratePanelOpen(true);
   }, []);
 
-  // Handle generate from PromptBar
-  const handleGenerate = useCallback(() => {
-    if (!prompt.trim()) return;
+  // Handle generate from PromptBar - direct queue submission
+  const handleGenerate = useCallback(async () => {
+    if (!prompt.trim()) {
+      toast.error("Please enter a prompt");
+      return;
+    }
     if (selectedModels.length === 0) {
       // Open model selector if no models selected
       setIsModelSelectorOpen(true);
       return;
     }
-    // Open generate panel for actual submission
-    setIsGeneratePanelOpen(true);
-  }, [prompt, selectedModels]);
+
+    // For upscale mode, we need the panel to select an image
+    if (mode === 'upscale') {
+      setIsGeneratePanelOpen(true);
+      return;
+    }
+
+    // For imgedit mode with no source image, open panel
+    if (mode === 'imgedit' && !sourceImage) {
+      setIsGeneratePanelOpen(true);
+      return;
+    }
+
+    // Quick generation: queue directly with default settings
+    try {
+      // Determine the API mode based on current mode and source image
+      let apiMode = 'generate';
+      if (mode === 'imgedit') {
+        apiMode = 'edit';
+      } else if (mode === 'image' && sourceImage) {
+        apiMode = 'variation';
+      }
+
+      // Build params for each selected model
+      const promises = selectedModels.map((modelId) =>
+        generateQueued({
+          mode: apiMode,
+          model: modelId,
+          prompt,
+          size: '1024x1024', // Default size
+          n: 1,
+          image: sourceImage || undefined,
+        })
+      );
+
+      await Promise.all(promises);
+      toast.success(`${selectedModels.length} job(s) added to queue!`);
+
+      // Clear prompt after successful generation
+      setPrompt("");
+      setSourceImage(null);
+    } catch (err) {
+      toast.error(err.message || "Failed to queue generation");
+    }
+  }, [prompt, selectedModels, mode, sourceImage, generateQueued]);
 
   // Handle generate complete
   const handleGenerated = useCallback(() => {
@@ -156,7 +204,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
         onModelSelectorOpen={() => setIsModelSelectorOpen(true)}
         onSettingsOpen={() => setIsSettingsOpen(true)}
         onGenerate={handleGenerate}
-        isLoading={false}
+        isLoading={isGenerating}
         disabled={false}
         sourceImage={sourceImage}
         sourceImagePreview={sourceImagePreview}
@@ -176,14 +224,14 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
         />
       </div>
 
-      {/* Settings Panel - Side Sheet with GeneratePanel */}
+      {/* Generate Panel - Side Sheet with GeneratePanel */}
       <Sheet open={isSettingsOpen || isGeneratePanelOpen} onOpenChange={(open) => {
         setIsSettingsOpen(open);
         setIsGeneratePanelOpen(open);
       }}>
-        <SheetContent side="right" className="w-full sm:w-[600px] overflow-y-auto p-0">
+        <SheetContent side="left" className="w-full sm:w-[600px] overflow-y-auto p-0">
           <SheetHeader className="mt-8 mb-4 px-6">
-            <SheetTitle>{isGeneratePanelOpen ? "Generate" : "Settings"}</SheetTitle>
+            <SheetTitle>Generate</SheetTitle>
           </SheetHeader>
           <div className="px-6 pb-6">
             <GeneratePanel
