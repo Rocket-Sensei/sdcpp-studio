@@ -1,12 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
 import { PromptBar } from "./prompt/PromptBar";
 import { ModelSelectorModal } from "./model-selector/ModelSelectorModal";
-import { Button } from "./ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
-import { Sparkles } from "lucide-react";
 import { useImageGeneration } from "../hooks/useImageGeneration";
+import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
 
 // Default editing model
@@ -16,8 +14,8 @@ const DEFAULT_EDIT_MODEL = "qwen-image-edit";
  * Studio Component - Main application page
  *
  * Features:
- * - Full-width PromptBar at top for quick generation
- * - GeneratePanel side sheet for advanced settings
+ * - PromptBar at top for quick generation with mode selector and model selection
+ * - GeneratePanel as collapsible Settings panel below
  * - ModelSelectorModal for model selection
  * - UnifiedQueue gallery for viewing generations
  * - "Create More" button handling from UnifiedQueue
@@ -32,55 +30,29 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   // Use the image generation hook for quick generation from PromptBar
   const { generateQueued, isLoading: isGenerating } = useImageGeneration();
 
-  // Minimal state for PromptBar (GeneratePanel manages its own settings)
+  // Shared models data
+  const { modelsNameMap } = useModels();
+
+  // Minimal state for PromptBar
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState("image"); // image, edit, video, upscale
+  const [mode, setMode] = useState("image"); // image, imgedit, video, upscale
   const [selectedModels, setSelectedModels] = useState([]);
-  const [sourceImage, setSourceImage] = useState(null);
+
+  // Image state for Edit/Upscale modes
+  const [sourceImagePreview, setSourceImagePreview] = useState(null);
+  const [strength, setStrength] = useState(0.75);
 
   // UI state
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
-  const [isGeneratePanelOpen, setIsGeneratePanelOpen] = useState(false);
-
-  // Store full models data for PromptBar's modelsMap
-  const [modelsData, setModelsData] = useState([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // "Create More" settings from gallery
   const [createMoreSettings, setCreateMoreSettings] = useState(null);
   const [editImageSettings, setEditImageSettings] = useState(null);
 
-  // Create modelsMap for PromptBar
-  const modelsMap = useMemo(() => {
-    const map = {};
-    modelsData.forEach((model) => {
-      map[model.id] = model.name;
-    });
-    return map;
-  }, [modelsData]);
-
-  // Create sourceImagePreview for PromptBar
-  const sourceImagePreview = useMemo(() => {
-    return sourceImage ? URL.createObjectURL(sourceImage) : null;
-  }, [sourceImage]);
-
-  // Fetch models data for modelsMap
-  useEffect(() => {
-    fetch("/api/models")
-      .then((res) => res.json())
-      .then((data) => {
-        setModelsData(data.models || []);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch models:", err);
-      });
-
-    // Cleanup function for object URL
-    return () => {
-      if (sourceImagePreview) {
-        URL.revokeObjectURL(sourceImagePreview);
-      }
-    };
+  // Image upload handler for upscale mode
+  const handleImageUpload = useCallback(() => {
+    setIsSettingsOpen(true);
   }, []);
 
   // Handle "Create More" from UnifiedQueue
@@ -94,7 +66,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
       setPrompt(generation.prompt);
     }
     // Open settings panel to show the applied settings
-    setIsGeneratePanelOpen(true);
+    setIsSettingsOpen(true);
   }, []);
 
   // Handle "Edit Image" from UnifiedQueue
@@ -111,7 +83,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setCreateMoreSettings(null);
     setSelectedModels([DEFAULT_EDIT_MODEL]);
     setMode('imgedit');
-    setIsGeneratePanelOpen(true);
+    setIsSettingsOpen(true);
   }, []);
 
   // Handle generate from PromptBar - direct queue submission
@@ -126,37 +98,23 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
       return;
     }
 
-    // For upscale mode, we need the panel to select an image
-    if (mode === 'upscale') {
-      setIsGeneratePanelOpen(true);
-      return;
-    }
-
-    // For imgedit mode with no source image, open panel
-    if (mode === 'imgedit' && !sourceImage) {
-      setIsGeneratePanelOpen(true);
+    // For upscale/imagedit modes, user needs to use Settings panel
+    if (mode === 'upscale' || mode === 'imgedit') {
+      toast.error("Please open Settings panel below to configure this mode");
+      setIsSettingsOpen(true);
       return;
     }
 
     // Quick generation: queue directly with default settings
     try {
-      // Determine the API mode based on current mode and source image
-      let apiMode = 'generate';
-      if (mode === 'imgedit') {
-        apiMode = 'edit';
-      } else if (mode === 'image' && sourceImage) {
-        apiMode = 'variation';
-      }
-
       // Build params for each selected model
       const promises = selectedModels.map((modelId) =>
         generateQueued({
-          mode: apiMode,
+          mode: 'generate',
           model: modelId,
           prompt,
           size: '1024x1024', // Default size
           n: 1,
-          image: sourceImage || undefined,
         })
       );
 
@@ -165,20 +123,16 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
 
       // Clear prompt after successful generation
       setPrompt("");
-      setSourceImage(null);
     } catch (err) {
       toast.error(err.message || "Failed to queue generation");
     }
-  }, [prompt, selectedModels, mode, sourceImage, generateQueued]);
+  }, [prompt, selectedModels, mode, generateQueued, setIsSettingsOpen]);
 
   // Handle generate complete
   const handleGenerated = useCallback(() => {
     setCreateMoreSettings(null);
     setEditImageSettings(null);
     setPrompt("");
-    setSourceImage(null);
-    // Optionally close panels after generation
-    // setIsGeneratePanelOpen(false);
   }, []);
 
   // Handle model selector apply
@@ -194,59 +148,51 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   }, []);
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 space-y-4">
       {/* PromptBar - Full width prompt input at top */}
       <PromptBar
         prompt={prompt}
         onPromptChange={setPrompt}
+        mode={mode}
+        onModeChange={setMode}
         selectedModels={selectedModels}
-        modelsMap={modelsMap}
+        modelsMap={modelsNameMap}
         onModelSelectorOpen={() => setIsModelSelectorOpen(true)}
-        onSettingsOpen={() => setIsSettingsOpen(true)}
+        onSettingsToggle={() => setIsSettingsOpen(!isSettingsOpen)}
+        settingsOpen={isSettingsOpen}
         onGenerate={handleGenerate}
         isLoading={isGenerating}
         disabled={false}
-        sourceImage={sourceImage}
         sourceImagePreview={sourceImagePreview}
-        onSourceImageChange={setSourceImage}
-        onSourceImageClear={() => setSourceImage(null)}
+        onImageUpload={handleImageUpload}
+        strength={strength}
+      />
+
+      {/* Settings Panel - Collapsible, shown below */}
+      <GeneratePanel
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        selectedModels={selectedModels}
+        onModelsChange={setSelectedModels}
+        settings={createMoreSettings}
+        editImageSettings={editImageSettings}
+        onGenerated={() => {
+          handleGenerated();
+          handleSettingsApplied();
+        }}
+        prompt={prompt}
         mode={mode}
+        onModeChange={setMode}
       />
 
       {/* Main content - UnifiedQueue Gallery */}
-      <div className="mt-4">
-        <UnifiedQueue
-          onCreateMore={handleCreateMore}
-          onEditImage={handleEditImage}
-          searchQuery={searchQuery}
-          selectedStatuses={selectedStatuses}
-          selectedModelsFilter={selectedModelsFilter}
-        />
-      </div>
-
-      {/* Generate Panel - Side Sheet with GeneratePanel */}
-      <Sheet open={isSettingsOpen || isGeneratePanelOpen} onOpenChange={(open) => {
-        setIsSettingsOpen(open);
-        setIsGeneratePanelOpen(open);
-      }}>
-        <SheetContent side="left" className="w-full sm:w-[600px] overflow-y-auto p-0">
-          <SheetHeader className="mt-8 mb-4 px-6">
-            <SheetTitle>Generate</SheetTitle>
-          </SheetHeader>
-          <div className="px-6 pb-6">
-            <GeneratePanel
-              selectedModels={selectedModels}
-              onModelsChange={setSelectedModels}
-              settings={createMoreSettings}
-              editImageSettings={editImageSettings}
-              onGenerated={() => {
-                handleGenerated();
-                handleSettingsApplied();
-              }}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <UnifiedQueue
+        onCreateMore={handleCreateMore}
+        onEditImage={handleEditImage}
+        searchQuery={searchQuery}
+        selectedStatuses={selectedStatuses}
+        selectedModelsFilter={selectedModelsFilter}
+      />
 
       {/* Model Selector Modal */}
       <ModelSelectorModal

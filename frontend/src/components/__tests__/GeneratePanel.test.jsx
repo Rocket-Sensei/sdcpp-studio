@@ -16,6 +16,27 @@ vi.mock('../../hooks/useImageGeneration', () => ({
   }),
 }));
 
+// Mock the useModels hook
+vi.mock('../../hooks/useModels', () => ({
+  useModels: () => ({
+    models: [
+      { id: 'model1', name: 'Model 1', capabilities: ['text-to-image'], supports_negative_prompt: true },
+      { id: 'model2', name: 'Model 2', capabilities: ['text-to-image', 'image-to-image'], supports_negative_prompt: true },
+    ],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+    modelsMap: {
+      model1: { id: 'model1', name: 'Model 1', capabilities: ['text-to-image'], supports_negative_prompt: true },
+      model2: { id: 'model2', name: 'Model 2', capabilities: ['text-to-image', 'image-to-image'], supports_negative_prompt: true },
+    },
+    modelsNameMap: {
+      model1: 'Model 1',
+      model2: 'Model 2',
+    },
+  }),
+}));
+
 // Mock the toast function - must use a function that returns new objects each time
 vi.mock('sonner', () => ({
   toast: {
@@ -88,6 +109,7 @@ describe('GeneratePanel', () => {
     it('should render all mode tabs', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -102,6 +124,7 @@ describe('GeneratePanel', () => {
     it('should render image mode by default', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -119,6 +142,7 @@ describe('GeneratePanel', () => {
     it('should render edit mode', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -136,6 +160,7 @@ describe('GeneratePanel', () => {
     it('should render upscale mode with upscaler settings', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -152,6 +177,7 @@ describe('GeneratePanel', () => {
     it('should NOT show strength slider in image mode without source image', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -164,6 +190,7 @@ describe('GeneratePanel', () => {
     it('should NOT show strength slider in edit mode', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -178,6 +205,7 @@ describe('GeneratePanel', () => {
     it('should show selected models count', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1', 'model2']}
           onModelsChange={mockOnModelsChange}
         />
@@ -190,6 +218,7 @@ describe('GeneratePanel', () => {
     it('should render size sliders and presets', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -206,6 +235,7 @@ describe('GeneratePanel', () => {
     it('should render advanced settings section', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -217,6 +247,7 @@ describe('GeneratePanel', () => {
     it('should render queue mode toggle', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -229,6 +260,7 @@ describe('GeneratePanel', () => {
     it('should render seed input', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -243,6 +275,7 @@ describe('GeneratePanel', () => {
     it('should switch to video mode and show video settings', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -262,6 +295,7 @@ describe('GeneratePanel', () => {
     it('should switch to upscale mode and show upscaler settings', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -283,6 +317,7 @@ describe('GeneratePanel', () => {
     it('should allow typing in the prompt input', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -298,6 +333,7 @@ describe('GeneratePanel', () => {
     it('should allow typing in the negative prompt input', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -315,6 +351,7 @@ describe('GeneratePanel', () => {
     it('should call generateQueued when generate is clicked with valid input', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -336,6 +373,7 @@ describe('GeneratePanel', () => {
     it('should show error when generating without prompt', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -353,6 +391,7 @@ describe('GeneratePanel', () => {
     it('should be disabled when no models selected', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={[]}
           onModelsChange={mockOnModelsChange}
         />
@@ -365,6 +404,7 @@ describe('GeneratePanel', () => {
     it('should be enabled when models are selected', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -379,6 +419,7 @@ describe('GeneratePanel', () => {
     it('should have default strength of 0.75 in image mode with source image', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -395,6 +436,7 @@ describe('GeneratePanel', () => {
     it('should be expanded by default', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -408,6 +450,7 @@ describe('GeneratePanel', () => {
     it('should collapse when header is clicked', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -428,6 +471,7 @@ describe('GeneratePanel', () => {
     it('should render generate button at top', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -439,6 +483,7 @@ describe('GeneratePanel', () => {
     it('should disable generate button when no models selected', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={[]}
           onModelsChange={mockOnModelsChange}
         />
@@ -451,6 +496,7 @@ describe('GeneratePanel', () => {
     it('should enable generate button when models are selected', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -467,6 +513,7 @@ describe('GeneratePanel', () => {
 
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
           settings={settings}
@@ -482,6 +529,7 @@ describe('GeneratePanel', () => {
 
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
           settings={settings}
@@ -499,6 +547,7 @@ describe('GeneratePanel', () => {
 
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
           settings={settings}
@@ -513,6 +562,7 @@ describe('GeneratePanel', () => {
 
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
           settings={settings}
@@ -527,6 +577,7 @@ describe('GeneratePanel', () => {
 
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
           settings={settings}
@@ -541,6 +592,7 @@ describe('GeneratePanel', () => {
     it('should disable generate button and prevent clicking when no models selected', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={[]}
           onModelsChange={mockOnModelsChange}
         />
@@ -555,6 +607,7 @@ describe('GeneratePanel', () => {
     it('should show error when generating without prompt in image mode', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -571,6 +624,7 @@ describe('GeneratePanel', () => {
     it('should show error when generating without source image in edit mode', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -601,6 +655,7 @@ describe('GeneratePanel', () => {
     it('should display count of selected models', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1', 'model2', 'model3']}
           onModelsChange={mockOnModelsChange}
         />
@@ -615,6 +670,7 @@ describe('GeneratePanel', () => {
     it('should collapse advanced settings by default', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -628,6 +684,7 @@ describe('GeneratePanel', () => {
     it('should expand advanced settings when clicked', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -644,6 +701,7 @@ describe('GeneratePanel', () => {
     it('should show all advanced settings when expanded', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -664,6 +722,7 @@ describe('GeneratePanel', () => {
     it('should render size presets', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -683,6 +742,7 @@ describe('GeneratePanel', () => {
     it('should show upscaler settings in upscale mode', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -701,6 +761,7 @@ describe('GeneratePanel', () => {
     it('should not show prompt input in upscale mode', async () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />
@@ -721,6 +782,7 @@ describe('GeneratePanel', () => {
     it('should show upscale after generation option in non-upscale modes', () => {
       render(
         <GeneratePanel
+          open={true}
           selectedModels={['model1']}
           onModelsChange={mockOnModelsChange}
         />

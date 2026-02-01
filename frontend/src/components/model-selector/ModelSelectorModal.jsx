@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Loader2, Cpu, Sparkles } from "lucide-react";
+import { X, Loader2, Cpu } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Button } from "../ui/button";
@@ -370,30 +370,6 @@ export function ModelSelectorModal({
               <TabsContent value={activeTab} className="m-0 h-full">
                 <ScrollArea className="h-full">
                   <div className="p-4 space-y-2">
-                    {/* Featured "Auto" option */}
-                    {activeTab === "image" && (
-                      <div
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg border bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 cursor-pointer hover:border-primary/50 transition-colors mb-4"
-                        )}
-                        onClick={() => {
-                          // Auto mode could select a default model
-                          // For now, just show it as a featured option
-                        }}
-                      >
-                        <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
-                          <Sparkles className="h-6 w-6 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium">Auto</h4>
-                          <p className="text-sm text-muted-foreground">
-                            An intelligent Preset that selects the best model
-                            for your prompt
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
                     {filteredModels.length === 0 ? (
                       <div className="text-center py-12">
                         <Cpu className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

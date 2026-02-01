@@ -1,56 +1,64 @@
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import {
-  Sparkles,
   Settings2,
   ChevronDown,
-  Loader2,
-  ImagePlus,
-  Upload,
-  X,
+  Image as ImageIcon,
+  Video,
 } from "lucide-react";
 import { Button } from "../ui/button";
-import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
-import { toast } from "sonner";
+import { GenerateImage } from "./GenerateImage";
+import { EditImage } from "./EditImage";
+import { GenerateVideo } from "./GenerateVideo";
+import { UpscaleImage } from "./UpscaleImage";
+
+// Generation modes
+const MODES = [
+  { value: "image", label: "Image", icon: ImageIcon, description: "Text to Image / Image to Image" },
+  { value: "imgedit", label: "Edit", icon: ImageIcon, description: "Image Edit" },
+  { value: "video", label: "Video", icon: Video, description: "Text/Image to Video" },
+  { value: "upscale", label: "Upscale", icon: ImageIcon, description: "Upscale" },
+];
 
 /**
- * PromptBar - Full-width prompt input with generate button
+ * PromptBar - Main generation form panel (top)
+ * Mode selector and model selection are shared, prompt input is mode-specific
  *
  * @param {Object} props
  * @param {string} props.prompt - Current prompt text
  * @param {function} props.onPromptChange - Callback when prompt changes
+ * @param {string} props.mode - Current generation mode
+ * @param {function} props.onModeChange - Callback when mode changes
  * @param {string[]} props.selectedModels - Array of selected model IDs
  * @param {Object} props.modelsMap - Map of model ID to model name
  * @param {function} props.onModelSelectorOpen - Callback to open model selector
- * @param {function} props.onSettingsOpen - Callback to open settings panel
+ * @param {function} props.onSettingsToggle - Callback to toggle settings panel
+ * @param {boolean} props.settingsOpen - Whether settings panel is open
  * @param {function} props.onGenerate - Callback when generate is clicked
  * @param {boolean} props.isLoading - Whether generation is in progress
  * @param {boolean} props.disabled - Whether the prompt bar is disabled
- * @param {File} props.sourceImage - Source image for img2img
- * @param {function} props.onSourceImageChange - Callback when source image changes
- * @param {string} props.sourceImagePreview - Preview URL for source image
- * @param {function} props.onSourceImageClear - Callback to clear source image
- * @param {string} props.mode - Current generation mode
+ * @param {string} props.sourceImagePreview - URL of source image preview (for edit/upscale modes)
+ * @param {function} props.onImageUpload - Callback to trigger image upload (for upscale mode)
+ * @param {number} props.strength - Strength value for img2img (for image mode)
  */
 export function PromptBar({
   prompt = "",
   onPromptChange,
+  mode = "image",
+  onModeChange,
   selectedModels = [],
   modelsMap = {},
   onModelSelectorOpen,
-  onSettingsOpen,
+  onSettingsToggle,
+  settingsOpen = false,
   onGenerate,
   isLoading = false,
   disabled = false,
-  sourceImage,
-  sourceImagePreview,
-  onSourceImageChange,
-  onSourceImageClear,
-  mode = "image",
+  sourceImagePreview = null,
+  onImageUpload,
+  strength = 0.75,
 }) {
-  const fileInputRef = useRef(null);
-
   // Get display text for selected models
   const getModelDisplayText = () => {
     if (selectedModels.length === 0) {
@@ -62,39 +70,54 @@ export function PromptBar({
     return `${selectedModels.length} models selected`;
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("Image size must be less than 50MB");
-      return;
-    }
-
-    onSourceImageChange?.(file);
-  };
-
-  const handleKeyDown = (e) => {
-    // Submit on Ctrl+Enter or Cmd+Enter
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
-      if (!disabled && !isLoading && selectedModels.length > 0) {
-        onGenerate?.();
-      }
-    }
-  };
-
-  const showImageUpload = mode === "image" || mode === "imgedit";
-  const requiresImage = mode === "imgedit" || mode === "upscale";
-  const requiresPrompt = mode !== "upscale";
+  // Determine if we should show strength indicator (image mode with source image)
+  const showStrength = mode === "image" && sourceImagePreview;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 shadow-sm" data-testid="prompt-bar">
+    <div className="bg-card border border-border rounded-xl p-4 shadow-sm" data-testid="generate-panel">
+      {/* Header row with title and settings button */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">Generate</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSettingsToggle}
+          className={cn(
+            "gap-1.5",
+            settingsOpen && "bg-primary/10 border-primary"
+          )}
+        >
+          <Settings2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Settings</span>
+        </Button>
+      </div>
+
+      {/* Generation Mode Selector - SHARED between top and bottom panels */}
+      <div className="mb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {MODES.map((modeOption) => {
+            const Icon = modeOption.icon;
+            return (
+              <button
+                key={modeOption.value}
+                onClick={() => onModeChange?.(modeOption.value)}
+                className={cn(
+                  "flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors",
+                  mode === modeOption.value
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border hover:border-primary/50"
+                )}
+                title={modeOption.description}
+                disabled={disabled}
+              >
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs font-medium">{modeOption.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Model selector row */}
       <div className="flex items-center gap-2 mb-3">
         <Button
@@ -120,125 +143,49 @@ export function PromptBar({
         <div className="hidden" data-testid="selected-model-count">{selectedModels.length}</div>
       </div>
 
-      {/* Source image preview for img2img */}
-      {showImageUpload && sourceImagePreview && (
-        <div className="relative mb-3 inline-block">
-          <img
-            src={sourceImagePreview}
-            alt="Source"
-            className="h-20 w-20 object-cover rounded-lg border"
-          />
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            className="absolute -top-2 -right-2 h-5 w-5"
-            onClick={onSourceImageClear}
-            disabled={disabled || isLoading}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
+      {/* Mode-specific prompt input */}
+      {mode === "image" && (
+        <GenerateImage
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+          isLoading={isLoading}
+          disabled={disabled}
+          showStrength={showStrength}
+          strength={strength}
+          onGenerate={onGenerate}
+        />
       )}
 
-      {/* Prompt input */}
-      <div className="relative">
-        <Textarea
-          placeholder={
-            mode === "upscale"
-              ? "Select an image to upscale"
-              : mode === "imgedit"
-              ? "Describe how to edit the image..."
-              : sourceImage
-              ? "Describe how to transform this image..."
-              : "Describe the image you want to generate..."
-          }
-          value={prompt}
-          onChange={(e) => onPromptChange?.(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={disabled || isLoading || mode === "upscale"}
-          className={cn(
-            "min-h-[80px] pr-4 resize-none bg-background",
-            mode === "upscale" && "opacity-50"
-          )}
-          rows={3}
-          data-testid="prompt-input"
+      {mode === "imgedit" && (
+        <EditImage
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+          isLoading={isLoading}
+          disabled={disabled}
+          sourceImagePreview={sourceImagePreview}
+          onGenerate={onGenerate}
         />
-      </div>
+      )}
 
-      {/* Action row */}
-      <div className="flex items-center justify-between mt-3 gap-2">
-        <div className="flex items-center gap-2">
-          {/* Image upload button */}
-          {showImageUpload && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || isLoading}
-                className="gap-1.5"
-              >
-                <ImagePlus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={disabled || isLoading}
-              />
-            </>
-          )}
+      {mode === "video" && (
+        <GenerateVideo
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+          isLoading={isLoading}
+          disabled={disabled}
+          onGenerate={onGenerate}
+        />
+      )}
 
-          {/* Settings button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onSettingsOpen}
-            disabled={disabled}
-            className="gap-1.5"
-            data-testid="settings-button"
-          >
-            <Settings2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Settings</span>
-          </Button>
-        </div>
-
-        {/* Generate button */}
-        <Button
-          onClick={onGenerate}
-          disabled={
-            disabled ||
-            isLoading ||
-            selectedModels.length === 0 ||
-            (requiresPrompt && !prompt.trim()) ||
-            (requiresImage && !sourceImage)
-          }
-          className="gap-2 px-6"
-          data-testid="generate-button"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="hidden sm:inline">Generating...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4" />
-              Generate
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Hint text */}
-      <p className="text-xs text-muted-foreground mt-2 text-right">
-        Press Ctrl+Enter to generate
-      </p>
+      {mode === "upscale" && (
+        <UpscaleImage
+          isLoading={isLoading}
+          disabled={disabled}
+          sourceImagePreview={sourceImagePreview}
+          onGenerate={onGenerate}
+          onImageUpload={onImageUpload}
+        />
+      )}
     </div>
   );
 }

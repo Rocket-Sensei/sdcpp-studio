@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -22,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/t
 import { LogViewer } from "./LogViewer";
 import { LightboxGalleryWithImages } from "./Lightbox";
 import { useGenerations } from "../hooks/useImageGeneration";
+import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
 import { useWebSocket, WS_CHANNELS } from "../contexts/WebSocketContext";
 import { formatDate } from "../lib/utils";
@@ -94,12 +96,12 @@ export { isPendingOrProcessing, getStatusConfig, GENERATION_STATUS };
 
 export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
   const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
+  const { modelsNameMap } = useModels();
   const [selectedImage, setSelectedImage] = useState(null);
   const [galleryImages, setGalleryImages] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
   const [failedLogsGeneration, setFailedLogsGeneration] = useState(null);
   const [isFailedLogsOpen, setIsFailedLogsOpen] = useState(false);
-  const [models, setModels] = useState({});
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [isCancelAllOpen, setIsCancelAllOpen] = useState(false);
   const [isClearFailedOpen, setIsClearFailedOpen] = useState(false);
@@ -113,34 +115,11 @@ export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalS
     fetchGenerationsRef.current = () => fetchGenerations(currentPage);
   }, [fetchGenerations, currentPage]);
 
-  // Fetch models on mount to get model names
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response = await authenticatedFetch('/api/models');
-        if (response.ok) {
-          const data = await response.json();
-          // Create a map of model ID to model name
-          const modelMap = {};
-          if (data.models) {
-            data.models.forEach(model => {
-              modelMap[model.id] = model.name || model.id;
-            });
-          }
-          setModels(modelMap);
-        }
-      } catch (error) {
-        console.error('Failed to fetch models:', error);
-      }
-    };
-    fetchModels();
-  }, []);
-
   // Helper function to get model name from model ID
   const getModelName = useCallback((modelId) => {
     if (!modelId) return 'Unknown Model';
-    return models[modelId] || modelId;
-  }, [models]);
+    return modelsNameMap[modelId] || modelId;
+  }, [modelsNameMap]);
 
   // WebSocket connection for real-time updates - use ref to keep callback stable
   // This prevents constant re-subscription
