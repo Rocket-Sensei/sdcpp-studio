@@ -14,6 +14,8 @@ import {
   X,
   Terminal,
   Image as ImageIcon,
+  Maximize2,
+  Video,
 } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
@@ -82,6 +84,8 @@ const isPendingOrProcessing = (status) => {
  * @param {function} props.onDownload - Download handler
  * @param {function} props.onIterate - Create more like this handler
  * @param {function} props.onEdit - Edit image handler
+ * @param {function} props.onUpscale - Upscale image handler
+ * @param {function} props.onCreateVideo - Create video from image handler
  * @param {function} props.onDelete - Delete handler
  * @param {function} props.onViewDetails - View details/info handler
  * @param {function} props.onViewLogs - View logs handler
@@ -94,6 +98,8 @@ export const ImageCard = memo(function ImageCard({
   onDownload,
   onIterate,
   onEdit,
+  onUpscale,
+  onCreateVideo,
   onDelete,
   onViewDetails,
   onViewLogs,
@@ -281,6 +287,40 @@ export const ImageCard = memo(function ImageCard({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Edit image</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpscale?.(generation);
+                    }}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Upscale</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCreateVideo?.(generation);
+                    }}
+                  >
+                    <Video className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Create video</TooltipContent>
               </Tooltip>
 
               <Tooltip>

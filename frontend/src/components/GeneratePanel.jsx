@@ -124,6 +124,7 @@ export function GeneratePanel({
 
   // Upscale settings - all upscale state is managed in Studio.jsx
   const [upscaleAfterGeneration, setUpscaleAfterGeneration] = useState(false);
+  const [isUpscaling, setIsUpscaling] = useState(false);
 
   // Video settings
   const [videoFrames, setVideoFrames] = useState(33);
@@ -188,9 +189,7 @@ export function GeneratePanel({
   // Apply settings when provided (from "Create More" button)
   useEffect(() => {
     if (settings) {
-      if (settings.prompt && onPromptChange) {
-        // Prompt is handled by parent/Studio
-      }
+      // Prompt is handled by parent/Studio via handleCreateMore
       if (settings.negative_prompt !== undefined) setNegativePrompt(settings.negative_prompt);
       if (settings.size) {
         const [w, h] = settings.size.split('x').map(Number);
@@ -220,9 +219,8 @@ export function GeneratePanel({
             const blob = await response.blob();
             const file = new File([blob], filename, { type: blob.type || 'image/png' });
 
-            setSourceImage(file);
-            setSourceImagePreview(staticUrl);
-            setUpscaleResult(null);
+            setLocalSourceImage(file);
+            setLocalSourceImagePreview(staticUrl);
           } catch (err) {
             console.error('Error loading source image:', err);
           }
@@ -233,35 +231,39 @@ export function GeneratePanel({
     }
   }, [settings, onModeChange]);
 
-  // Apply editImageSettings when provided (from "Edit Image" button)
+  // Apply editImageSettings when provided (from "Edit Image", "Upscale", or "Create Video" button)
   useEffect(() => {
     if (editImageSettings) {
-      onModeChange?.('imgedit');
+      // Set mode based on editImageSettings type
+      const targetMode = editImageSettings.type === 'upscale' ? 'upscale'
+        : editImageSettings.type === 'video' ? 'video'
+        : 'imgedit';
+      onModeChange?.(targetMode);
 
-      if (editImageSettings.prompt !== undefined && onPromptChange) {
-        // Prompt is handled by parent/Studio
-      }
-      if (editImageSettings.negative_prompt !== undefined) {
-        setNegativePrompt(editImageSettings.negative_prompt);
-      }
+      // For imgedit mode, also set negative prompt and size
+      if (targetMode === 'imgedit') {
+        if (editImageSettings.negative_prompt !== undefined) {
+          setNegativePrompt(editImageSettings.negative_prompt);
+        }
 
-      if (editImageSettings.size) {
-        const [w, h] = editImageSettings.size.split('x').map(Number);
-        if (w && h) {
-          setWidth(w);
-          setHeight(h);
+        if (editImageSettings.size) {
+          const [w, h] = editImageSettings.size.split('x').map(Number);
+          if (w && h) {
+            setWidth(w);
+            setHeight(h);
+          }
         }
       }
 
+      // For all modes, set the source image
       if (editImageSettings.imageFile && editImageSettings.imageUrl) {
         if (editImageUrlRef.current && editImageUrlRef.current !== editImageSettings.imageUrl) {
           URL.revokeObjectURL(editImageUrlRef.current);
         }
         editImageUrlRef.current = editImageSettings.imageUrl;
 
-        setSourceImage(editImageSettings.imageFile);
-        setSourceImagePreview(editImageSettings.imageUrl);
-        setUpscaleResult(null);
+        setLocalSourceImage(editImageSettings.imageFile);
+        setLocalSourceImagePreview(editImageSettings.imageUrl);
       }
 
       return () => {
@@ -566,7 +568,7 @@ export function GeneratePanel({
               upscaleAfterGeneration={upscaleAfterGeneration}
               onUpscaleAfterGenerationChange={setUpscaleAfterGeneration}
               upscaleFactor={upscaleFactor}
-              onUpscaleFactorChange={setUpscaleFactor}
+              onUpscaleFactorChange={onUpscaleFactorChange}
               cfgScale={cfgScale}
               onCfgScaleChange={setCfgScale}
               samplingMethod={samplingMethod}

@@ -125,8 +125,8 @@ function App() {
     if (selectedStatuses.length > 0 && !selectedStatuses.includes(g.status)) {
       return false;
     }
-    // Apply model filter
-    if (selectedModelsFilter.length > 0 && !selectedModelsFilter.includes(g.model)) {
+    // Apply model filter (skip for upscale jobs as they don't use models)
+    if (selectedModelsFilter.length > 0 && g.type !== 'upscale' && !selectedModelsFilter.includes(g.model)) {
       return false;
     }
     return true;

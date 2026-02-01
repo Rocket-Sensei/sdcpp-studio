@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import {
   Settings2,
-  ChevronDown,
   Image as ImageIcon,
   Video,
 } from "lucide-react";
@@ -12,6 +11,7 @@ import { GenerateImage } from "./GenerateImage";
 import { EditImage } from "./EditImage";
 import { GenerateVideo } from "./GenerateVideo";
 import { UpscaleImage } from "./UpscaleImage";
+import { MultiModelSelector } from "../MultiModelSelector";
 
 // Generation modes
 const MODES = [
@@ -32,7 +32,6 @@ const MODES = [
  * @param {function} props.onModeChange - Callback when mode changes
  * @param {string[]} props.selectedModels - Array of selected model IDs
  * @param {Object} props.modelsMap - Map of model ID to model name
- * @param {function} props.onModelSelectorOpen - Callback to open model selector
  * @param {function} props.onSettingsToggle - Callback to toggle settings panel
  * @param {boolean} props.settingsOpen - Whether settings panel is open
  * @param {function} props.onGenerate - Callback when generate is clicked
@@ -53,8 +52,8 @@ export function PromptBar({
   mode = "image",
   onModeChange,
   selectedModels = [],
+  onModelsChange,
   modelsMap = {},
-  onModelSelectorOpen,
   onSettingsToggle,
   settingsOpen = false,
   onGenerate,
@@ -69,17 +68,6 @@ export function PromptBar({
   onUpscalerNameChange,
   strength = 0.75,
 }) {
-  // Get display text for selected models
-  const getModelDisplayText = () => {
-    if (selectedModels.length === 0) {
-      return "Select Models";
-    }
-    if (selectedModels.length === 1) {
-      return modelsMap[selectedModels[0]] || selectedModels[0];
-    }
-    return `${selectedModels.length} models selected`;
-  };
-
   // Determine if we should show strength indicator (image mode with source image)
   const showStrength = mode === "image" && sourceImagePreview;
 
@@ -130,26 +118,13 @@ export function PromptBar({
 
       {/* Model selector row - NOT shown for upscale mode */}
       {mode !== "upscale" && (
-        <div className="flex items-center gap-2 mb-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onModelSelectorOpen}
-            disabled={disabled}
-            className="gap-2"
-            data-testid="model-selector-button"
-          >
-            <Settings2 className="h-4 w-4" />
-            <span className="truncate max-w-[200px]">{getModelDisplayText()}</span>
-            <ChevronDown className="h-3 w-3 flex-shrink-0" />
-          </Button>
-
-          {selectedModels.length > 1 && (
-            <Badge variant="secondary" className="text-xs">
-              Multi-model
-            </Badge>
-          )}
-
+        <div className="mb-3">
+          <MultiModelSelector
+            selectedModels={selectedModels}
+            onModelsChange={onModelsChange}
+            mode={mode}
+            className="bg-muted/30 rounded-lg p-2"
+          />
           {/* Hidden selected model count for tests */}
           <div className="hidden" data-testid="selected-model-count">{selectedModels.length}</div>
         </div>

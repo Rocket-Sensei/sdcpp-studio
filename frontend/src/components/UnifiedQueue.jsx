@@ -94,7 +94,7 @@ const isPendingOrProcessing = (status) => {
 // Export utility functions and constants for testing
 export { isPendingOrProcessing, getStatusConfig, GENERATION_STATUS };
 
-export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
+export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCreateVideo, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
   const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
   const { modelsNameMap } = useModels();
   const [selectedImage, setSelectedImage] = useState(null);
@@ -467,6 +467,104 @@ export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalS
     }
   };
 
+  const handleUpscaleImage = async (generation) => {
+    try {
+      // Get the first image URL from the generation
+      let imageUrl = generation.first_image_url;
+
+      // If no first_image_url, try to fetch the full generation data
+      if (!imageUrl) {
+        const response = await authenticatedFetch(`/api/generations/${generation.id}`);
+        if (!response.ok) {
+          toast.error("Failed to fetch generation");
+          return;
+        }
+        const fullGeneration = await response.json();
+        if (!fullGeneration.images || fullGeneration.images.length === 0) {
+          toast.error("No images found");
+          return;
+        }
+        imageUrl = fullGeneration.images[0].static_url || `/api/images/${fullGeneration.images[0].id}`;
+      }
+
+      if (!imageUrl) {
+        toast.error("No image URL found");
+        return;
+      }
+
+      // Fetch the image data
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error("Failed to fetch image");
+      }
+      const blob = await imageResponse.blob();
+
+      // Get filename from URL
+      const urlParts = imageUrl.split('/');
+      const filename = urlParts[urlParts.length - 1] || 'image.png';
+
+      // Create a File object
+      const file = new File([blob], filename, { type: blob.type || 'image/png' });
+
+      // Call the onUpscaleImage callback with the file and generation data
+      if (onUpscaleImage) {
+        onUpscaleImage(file, generation);
+      }
+    } catch (err) {
+      console.error('Error loading image for upscaling:', err);
+      toast.error("Failed to load image for upscaling");
+    }
+  };
+
+  const handleCreateVideo = async (generation) => {
+    try {
+      // Get the first image URL from the generation
+      let imageUrl = generation.first_image_url;
+
+      // If no first_image_url, try to fetch the full generation data
+      if (!imageUrl) {
+        const response = await authenticatedFetch(`/api/generations/${generation.id}`);
+        if (!response.ok) {
+          toast.error("Failed to fetch generation");
+          return;
+        }
+        const fullGeneration = await response.json();
+        if (!fullGeneration.images || fullGeneration.images.length === 0) {
+          toast.error("No images found");
+          return;
+        }
+        imageUrl = fullGeneration.images[0].static_url || `/api/images/${fullGeneration.images[0].id}`;
+      }
+
+      if (!imageUrl) {
+        toast.error("No image URL found");
+        return;
+      }
+
+      // Fetch the image data
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error("Failed to fetch image");
+      }
+      const blob = await imageResponse.blob();
+
+      // Get filename from URL
+      const urlParts = imageUrl.split('/');
+      const filename = urlParts[urlParts.length - 1] || 'image.png';
+
+      // Create a File object
+      const file = new File([blob], filename, { type: blob.type || 'image/png' });
+
+      // Call the onCreateVideo callback with the file and generation data
+      if (onCreateVideo) {
+        onCreateVideo(file, generation);
+      }
+    } catch (err) {
+      console.error('Error loading image for video creation:', err);
+      toast.error("Failed to load image for video creation");
+    }
+  };
+
   // Compute if there are any pending or processing generations
   const hasPendingOrProcessing = generations.some(g =>
     g.status === GENERATION_STATUS.PENDING || g.status === GENERATION_STATUS.PROCESSING
@@ -492,9 +590,9 @@ export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalS
       filtered = filtered.filter(g => externalSelectedStatuses.includes(g.status));
     }
 
-    // Apply model filter
+    // Apply model filter (skip for upscale jobs as they don't use models)
     if (externalSelectedModelsFilter && externalSelectedModelsFilter.length > 0) {
-      filtered = filtered.filter(g => externalSelectedModelsFilter.includes(g.model));
+      filtered = filtered.filter(g => g.type === 'upscale' || externalSelectedModelsFilter.includes(g.model));
     }
 
     return filtered;
@@ -536,6 +634,8 @@ export function UnifiedQueue({ onCreateMore, onEditImage, searchQuery: externalS
                 onDownload={handleDownload}
                 onIterate={onCreateMore}
                 onEdit={onEditImage ? () => handleEditImage(generation) : undefined}
+                onUpscale={onUpscaleImage ? () => handleUpscaleImage(generation) : undefined}
+                onCreateVideo={onCreateVideo ? () => handleCreateVideo(generation) : undefined}
                 onDelete={handleDelete}
                 onViewDetails={handleViewMobileInfo}
                 onViewLogs={handleViewLogs}

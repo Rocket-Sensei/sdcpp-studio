@@ -19,7 +19,7 @@ import { Checkbox } from "./ui/checkbox";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
-import { useDownloadProgress } from "../hooks/useWebSocket";
+import { useDownloadProgress, useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
 
 const API_BASE = "/api/models";
 
@@ -63,7 +63,7 @@ const filterModels = (allModels, mode) => {
       // Only models with video capability
       return allModels.filter((m) => m.capabilities?.includes("video"));
     case "upscale":
-      return []; // Upscale doesn't use models directly
+      return null; // Return null to indicate upscale mode doesn't use models
     default:
       return allModels;
   }
@@ -95,6 +95,7 @@ export function MultiModelSelector({
   const [modelFilesStatus, setModelFilesStatus] = useState({});
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [showMissingModels, setShowMissingModels] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Keep a ref to the latest fetchModels function for polling
   const fetchModelsRef = useRef(null);
@@ -120,6 +121,12 @@ export function MultiModelSelector({
       // Apply mode filter if provided
       if (mode) {
         filteredModels = filterModels(filteredModels, mode);
+        // Return null for upscale mode - it doesn't use generation models
+        if (filteredModels === null) {
+          setModels([]);
+          setIsLoading(false);
+          return null;
+        }
       }
 
       setModels(filteredModels);
@@ -224,14 +231,16 @@ export function MultiModelSelector({
     fetchModelsRef.current = fetchModels;
   }, [fetchModels]);
 
-  // Poll for status updates every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchModelsRef.current?.();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
+  // WebSocket model status updates (replaces polling)
+  useWebSocket({
+    channels: [WS_CHANNELS.MODELS],
+    onMessage: (message) => {
+      if (message.channel === WS_CHANNELS.MODELS) {
+        // Refresh models on any model status change
+        fetchModelsRef.current?.();
+      }
+    },
+  });
 
   // Start a model
   const startModel = async (modelId) => {
@@ -412,6 +421,11 @@ export function MultiModelSelector({
     return `${Math.round(seconds / 3600)}h`;
   };
 
+  // Upscale mode doesn't use generation models - return null
+  if (mode === "upscale") {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className={cn("flex items-center justify-center py-12", className)}>
@@ -436,35 +450,50 @@ export function MultiModelSelector({
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Header with controls */}
+    <div className={cn("space-y-2", className)}>
+      {/* Header with controls - always visible */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <Cpu className="h-5 w-5 text-muted-foreground" />
-          <h3 className="font-semibold">Models</h3>
-          <Badge variant="secondary" className="text-xs">
-            Selected: {selectedModels.length}/{models.length}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={selectAll} disabled={selectedModels.length === models.length}>
-            Select All
-          </Button>
-          <Button size="sm" variant="outline" onClick={deselectAll} disabled={selectedModels.length === 0}>
-            Deselect All
-          </Button>
-          <Button
-            size="sm"
-            variant={showMissingModels ? "default" : "outline"}
-            onClick={() => setShowMissingModels(!showMissingModels)}
-            className="gap-1.5"
-          >
-            {showMissingModels ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-            {showMissingModels ? "Hide Missing" : "Show Missing"}
-          </Button>
-        </div>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 hover:bg-muted/50 rounded px-2 py-1 transition-colors"
+        >
+          {isCollapsed ? (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+          <div className="flex items-center gap-2">
+            <Cpu className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Models</span>
+            <Badge variant="secondary" className="text-xs">
+              {selectedModels.length}/{models.length}
+            </Badge>
+          </div>
+        </button>
+        {!isCollapsed && (
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" onClick={selectAll} disabled={selectedModels.length === models.length} className="h-7 px-2 text-xs">
+              All
+            </Button>
+            <Button size="sm" variant="outline" onClick={deselectAll} disabled={selectedModels.length === 0} className="h-7 px-2 text-xs">
+              None
+            </Button>
+            <Button
+              size="sm"
+              variant={showMissingModels ? "default" : "outline"}
+              onClick={() => setShowMissingModels(!showMissingModels)}
+              className="h-7 w-7 p-0"
+              title={showMissingModels ? "Hide Missing" : "Show Missing"}
+            >
+              {showMissingModels ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        )}
       </div>
 
+      {/* Collapsible content */}
+      {!isCollapsed && (
+        <>
       {/* Download progress display */}
       {downloadProgress && downloadProgress.status === DOWNLOAD_STATUS.DOWNLOADING && (
         <div className="bg-muted rounded-lg p-4 space-y-2">
@@ -493,7 +522,7 @@ export function MultiModelSelector({
       )}
 
       {/* Model list */}
-      <div className="space-y-2">
+      <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
         {models
           .filter((model) => {
             const filesStatus = modelFilesStatus[model.id];
@@ -507,8 +536,9 @@ export function MultiModelSelector({
           const isExpanded = expandedModels[model.id];
           const filesStatus = modelFilesStatus[model.id];
           const hasMissingFiles = filesStatus && !filesStatus.allFilesExist;
-          const isServerMode = model.exec_mode === "server";
-          const isCliMode = model.exec_mode === "cli";
+          // CLI mode models have video capability, server mode models don't
+          const isCliMode = model.capabilities?.includes('video');
+          const isServerMode = !isCliMode;
 
           return (
             <div
@@ -557,7 +587,7 @@ export function MultiModelSelector({
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {hasMissingFiles && model.huggingface && (
+                  {hasMissingFiles && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -620,13 +650,6 @@ export function MultiModelSelector({
                   )}
 
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {model.port && (
-                      <div>
-                        <span className="text-muted-foreground">Port: </span>
-                        <span className="font-mono">{model.port}</span>
-                      </div>
-                    )}
-
                     <div>
                       <span className="text-muted-foreground">Mode: </span>
                       <span>{model.mode === "preload" ? "Preload" : "On-demand"}</span>
@@ -634,7 +657,7 @@ export function MultiModelSelector({
 
                     <div>
                       <span className="text-muted-foreground">Type: </span>
-                      <span>{model.exec_mode === "cli" ? "CLI" : "Server"}</span>
+                      <span>{isCliMode ? "CLI" : "Server"}</span>
                     </div>
 
                     {model.capabilities && model.capabilities.length > 0 && (
@@ -666,13 +689,6 @@ export function MultiModelSelector({
                     </div>
                   )}
 
-                  {/* HuggingFace repo info */}
-                  {model.huggingface && (
-                    <div className="text-xs text-muted-foreground">
-                      <span>HF Repo: {model.huggingface.repo}</span>
-                    </div>
-                  )}
-
                   {/* Error message */}
                   {model.status === MODEL_STATUS.ERROR && model.error && (
                     <div className="text-xs text-destructive">
@@ -685,6 +701,8 @@ export function MultiModelSelector({
           );
         })}
       </div>
+        </>
+      )}
     </div>
   );
 }

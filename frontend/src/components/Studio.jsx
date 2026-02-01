@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
 import { PromptBar } from "./prompt/PromptBar";
-import { ModelSelectorModal } from "./model-selector/ModelSelectorModal";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
@@ -17,7 +16,7 @@ const DEFAULT_EDIT_MODEL = "qwen-image-edit";
  * Features:
  * - PromptBar at top for quick generation with mode selector and model selection
  * - GeneratePanel as collapsible Settings panel below
- * - ModelSelectorModal for model selection
+ * - MultiModelSelector for inline model selection
  * - UnifiedQueue gallery for viewing generations
  * - "Create More" button handling from UnifiedQueue
  * - "Edit Image" functionality from UnifiedQueue
@@ -45,7 +44,6 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   const [strength, setStrength] = useState(0.75);
 
   // UI state
-  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // "Create More" settings from gallery
@@ -121,6 +119,40 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setIsSettingsOpen(true);
   }, []);
 
+  // Handle "Upscale Image" from UnifiedQueue
+  const handleUpscaleImage = useCallback((imageFile, generation) => {
+    const imageUrl = URL.createObjectURL(imageFile);
+    setEditImageSettings({
+      imageFile,
+      imageUrl,
+      type: 'upscale',
+      prompt: generation.prompt || '',
+    });
+    setCreateMoreSettings(null);
+    // Also set sourceImage for upscale mode
+    setSourceImage(imageFile);
+    setSourceImagePreview(imageUrl);
+    setMode('upscale');
+    setIsSettingsOpen(true);
+  }, []);
+
+  // Handle "Create Video" from UnifiedQueue
+  const handleCreateVideo = useCallback((imageFile, generation) => {
+    const imageUrl = URL.createObjectURL(imageFile);
+    setEditImageSettings({
+      imageFile,
+      imageUrl,
+      type: 'video',
+      prompt: generation.prompt || '',
+    });
+    setCreateMoreSettings(null);
+    // Also set sourceImage for video mode
+    setSourceImage(imageFile);
+    setSourceImagePreview(imageUrl);
+    setMode('video');
+    setIsSettingsOpen(true);
+  }, []);
+
   // Handle generate from PromptBar - queue submission
   const handleGenerate = useCallback(async () => {
     // Handle upscale mode - queue the upscale job
@@ -161,8 +193,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
       return;
     }
     if (selectedModels.length === 0) {
-      // Open model selector if no models selected
-      setIsModelSelectorOpen(true);
+      toast.error("Please select at least one model");
       return;
     }
 
@@ -196,12 +227,6 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setPrompt("");
   }, []);
 
-  // Handle model selector apply
-  const handleModelSelectorApply = useCallback((models) => {
-    setSelectedModels(models);
-    setIsModelSelectorOpen(false);
-  }, []);
-
   // Clear settings after they've been applied
   const handleSettingsApplied = useCallback(() => {
     setCreateMoreSettings(null);
@@ -217,8 +242,8 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
         mode={mode}
         onModeChange={setMode}
         selectedModels={selectedModels}
+        onModelsChange={setSelectedModels}
         modelsMap={modelsNameMap}
-        onModelSelectorOpen={() => setIsModelSelectorOpen(true)}
         onSettingsToggle={() => setIsSettingsOpen(!isSettingsOpen)}
         settingsOpen={isSettingsOpen}
         onGenerate={handleGenerate}
@@ -270,18 +295,11 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
       <UnifiedQueue
         onCreateMore={handleCreateMore}
         onEditImage={handleEditImage}
+        onUpscaleImage={handleUpscaleImage}
+        onCreateVideo={handleCreateVideo}
         searchQuery={searchQuery}
         selectedStatuses={selectedStatuses}
         selectedModelsFilter={selectedModelsFilter}
-      />
-
-      {/* Model Selector Modal */}
-      <ModelSelectorModal
-        open={isModelSelectorOpen}
-        onOpenChange={setIsModelSelectorOpen}
-        selectedModels={selectedModels}
-        onModelsChange={handleModelSelectorApply}
-        mode={mode}
       />
     </div>
   );
