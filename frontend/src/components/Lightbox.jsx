@@ -42,16 +42,24 @@ function ImageLightbox({ items, defaultIndex }) {
       const tmpAnchor = document.createElement("a");
       tmpAnchor.setAttribute("download", fileName);
       tmpAnchor.setAttribute("href", blobUrl);
+      // Add to DOM, click, then remove after a delay to ensure download starts
+      tmpAnchor.style.display = "none";
       document.body.appendChild(tmpAnchor);
 
       console.log('[Download] Clicking anchor...');
       tmpAnchor.click();
 
+      // Delay cleanup to ensure browser processes the download
       setTimeout(() => {
         document.body.removeChild(tmpAnchor);
+        console.log('[Download] Removed anchor from DOM');
+      }, 200);
+
+      // Clean up blob URL after a longer delay
+      setTimeout(() => {
         console.log('[Download] Revoking blob URL');
         URL.revokeObjectURL(blobUrl);
-      }, 100);
+      }, 1000);
     };
 
     // Fetch with authentication for same-origin URLs
