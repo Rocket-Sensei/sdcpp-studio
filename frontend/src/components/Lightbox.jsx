@@ -43,70 +43,22 @@ function ImageLightbox({ items, defaultIndex }) {
       'gif': 'image/gif',
     };
 
-    console.log('[Download] Starting download:', { url, fileName });
-
-    try {
-      // Fetch with authentication
-      console.log('[Download] Fetching with authentication...');
-      const res = await authenticatedFetch(url);
-      console.log('[Download] Response:', { status: res.status, ok: res.ok });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
-      }
-
-      const blob = await res.blob();
-      console.log('[Download] Got blob:', { type: blob.type, size: blob.size });
-
-      // Try File System Access API first (modern browsers)
-      if ('showSaveFilePicker' in window) {
-        try {
-          console.log('[Download] Using File System Access API');
-          const fileHandle = await window.showSaveFilePicker({
-            suggestedName: fileName,
-            types: [{
-              description: 'Image files',
-              accept: { [mimeTypes[ext] || 'image/png': [`.${ext}`] },
-            }],
-          });
-          const writable = await fileHandle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          console.log('[Download] File saved successfully');
-          return;
-        } catch (err) {
-          // User cancelled or not supported, fall through to anchor method
-          if (err.name !== 'AbortError') {
-            console.log('[Download] File System Access API failed, falling back:', err.message);
-          } else {
-            console.log('[Download] User cancelled save dialog');
-            return;
-          }
-        }
-      }
-
-      // Fallback: traditional anchor-based download
-      console.log('[Download] Using fallback anchor method');
-      const blobUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = blobUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-
-      // Cleanup after browser processes download
-      setTimeout(() => {
-        document.body.removeChild(anchor);
-        URL.revokeObjectURL(blobUrl);
-        console.log('[Download] Cleanup complete');
-      }, 100);
-
-    } catch (err) {
-      console.error('[Download] Failed:', err);
-      // Last resort: open in new tab
-      console.log('[Download] Last resort: opening in new tab');
-      window.open(url, '_blank', 'noopener,noreferrer');
+    const res = await authenticatedFetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
     }
+
+    const blob = await res.blob();
+    const fileHandle = await window.showSaveFilePicker({
+      suggestedName: fileName,
+      types: [{
+        description: 'Image files',
+        accept: { [mimeTypes[ext] || 'image/png': [`.${ext}`] },
+      }],
+    });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
   };
 
   const renderItem = (item, index) => {
