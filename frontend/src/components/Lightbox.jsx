@@ -13,6 +13,7 @@ import {
   useLightboxState,
 } from "@hanakla/react-lightbox";
 import { authenticatedFetch } from "../utils/api";
+import { toast } from "sonner";
 
 /**
  * Custom Lightbox UI Component
@@ -30,6 +31,15 @@ function ImageLightbox({ items, defaultIndex }) {
 
   const handleDownload = async (e) => {
     e.preventDefault();
+
+    // Check browser support
+    if (!('showSaveFilePicker' in window)) {
+      toast.error('Download not supported', {
+        description: 'Please use Chrome or Edge to download images',
+      });
+      return;
+    }
+
     const url = currentItem.url;
     const fileName = currentItem.fileName || url.split("/").slice(-1)[1];
 
