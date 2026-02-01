@@ -120,8 +120,8 @@ describe('Lightbox - Core Features', () => {
   });
 
   it('should have backdrop click to close functionality', () => {
-    expect(source).toContain('handleBackdropClick');
-    expect(source).toContain('onClick={handleBackdropClick}');
+    // Library handles backdrop clicks internally, we pass $onClose prop
+    expect(source).toContain('$onClose={lbContext.close');
   });
 
   it('should have pinch-to-zoom support', () => {
@@ -365,13 +365,13 @@ describe('Lightbox - Layout Structure', () => {
 describe('Lightbox - Backdrop Behavior', () => {
   const source = getLightboxSource();
 
-  it('should have click handler on root element', () => {
-    expect(source).toContain('onClick={handleBackdropClick}');
+  it('should have $onClose prop on root element for backdrop clicks', () => {
+    expect(source).toContain('$onClose={lbContext.close}');
   });
 
   it('should close only when clicking backdrop, not image', () => {
-    expect(source).toContain('e.target === e.currentTarget');
-    expect(source).toContain('lbContext.close()');
+    // The library handles this internally - we just provide the close callback
+    expect(source).toContain('lbContext.close');
   });
 });
 

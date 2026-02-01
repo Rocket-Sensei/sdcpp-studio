@@ -20,7 +20,7 @@ import {
  * - Image displayed with max-height and max-width of 90% of viewport
  * - Mobile-responsive header with smaller touch targets
  * - Download functionality with cross-origin support
- * - Backdrop click to close
+ * - Backdrop click to close (via $onClose prop)
  * - Pinch-to-zoom support
  */
 function ImageLightbox({ items, defaultIndex }) {
@@ -97,18 +97,10 @@ function ImageLightbox({ items, defaultIndex }) {
     return null;
   };
 
-  const handleBackdropClick = (e) => {
-    // Close if click is directly on the backdrop (not on image or controls)
-    // e.target is the clicked element, e.currentTarget is the Lightbox.Root
-    if (e.target === e.currentTarget) {
-      lbContext.close();
-    }
-  };
-
   return (
     <Lightbox.Root
       className="fixed inset-0 isolate flex flex-col bg-black/80 z-50"
-      onClick={handleBackdropClick}
+      $onClose={lbContext.close}
     >
       {/* Header - mobile responsive with proper touch targets */}
       <Lightbox.Header className="flex items-center justify-between w-full py-2 px-3 sm:px-4 md:py-3 md:px-6 bg-black/70 text-white">
