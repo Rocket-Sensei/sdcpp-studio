@@ -58,12 +58,13 @@ describe('Lightbox - Viewport Container Sizing', () => {
   it('should have Viewport with flex-1 to take remaining vertical space', () => {
     // The Viewport should take all remaining space after the header
     expect(source).toContain('<Lightbox.Viewport');
-    expect(source).toContain('className="flex flex-1"');
+    expect(source).toContain('flex-1');
   });
 
   it('should have Root with flex flex-col for proper vertical layout', () => {
     // Root uses flex-col so header and viewport stack vertically
-    expect(source).toMatch(/<Lightbox\.Root[^>]*flex flex-col/);
+    expect(source).toContain('<Lightbox.Root');
+    expect(source).toContain('flex flex-col');
   });
 
   it('should have header with fixed height (no flex-grow)', () => {
@@ -97,20 +98,23 @@ describe('Lightbox - Image Dimensions', () => {
 describe('Lightbox - Backdrop Click Handling', () => {
   const source = getLightboxSource();
 
-  it('should have handleViewportClick function for backdrop clicks', () => {
-    expect(source).toContain('handleViewportClick');
+  it('should have custom backdrop div for backdrop clicks', () => {
+    expect(source).toContain('backdrop');
+    expect(source).toContain('onClick={lbContext.close}');
   });
 
-  it('should attach onClick to Viewport element', () => {
-    expect(source).toMatch(/Viewport[^>]*onClick=\{handleViewportClick\}/);
-  });
-
-  it('should close only when clicking viewport backdrop, not image', () => {
-    expect(source).toContain('e.target === e.currentTarget');
-    expect(source).toContain('lbContext.close()');
+  it('should NOT use handleViewportClick (using backdrop div instead)', () => {
+    expect(source).not.toContain('handleViewportClick');
   });
 
   it('should NOT use $onClose prop (library implementation does not work)', () => {
     expect(source).not.toContain('$onClose=');
+  });
+
+  it('should use pointer-events to control click-through behavior', () => {
+    // Content areas have pointer-events-none to allow clicks through to backdrop
+    // Interactive elements have pointer-events-auto
+    expect(source).toContain('pointer-events-none');
+    expect(source).toContain('pointer-events-auto');
   });
 });

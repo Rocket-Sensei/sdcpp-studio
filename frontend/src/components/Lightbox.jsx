@@ -70,32 +70,28 @@ function ImageLightbox({ items, defaultIndex }) {
       });
   };
 
-  // Handle backdrop click - close if clicking outside the image
-  const handleViewportClick = (e) => {
-    // Close if clicking directly on the viewport backdrop (not on image or controls)
-    if (e.target === e.currentTarget) {
-      lbContext.close();
-    }
-  };
-
   const renderItem = (item, index) => {
     if (item.kind === "image") {
       return (
         <Lightbox.Item
           $index={index}
-          className="flex items-center justify-center flex-1 p-4 sm:p-6 md:p-8"
+          className="pointer-events-none"
           data-lightbox-image-container="true"
+          // Override library's max-height inline style
+          style={{ maxHeight: 'none' }}
         >
-          <Lightbox.Pinchable onRequestClose={lbContext.close}>
-            <img
-              src={item.url}
-              alt={item.alt}
-              draggable={false}
-              // Use max-w-full and max-h-full to fit within parent container
-              // The parent (Viewport) already accounts for the header height via flex-1
-              className="max-w-full max-h-full w-auto h-auto object-contain select-none"
-            />
-          </Lightbox.Pinchable>
+          <div className="flex items-center justify-center h-full p-4 sm:p-6 md:p-8 pointer-events-auto">
+            <Lightbox.Pinchable onRequestClose={lbContext.close}>
+              <img
+                src={item.url}
+                alt={item.alt}
+                draggable={false}
+                // Use max-w-full and max-h-full to fit within parent container
+                // The parent div now properly constrains the image
+                className="max-w-full max-h-full w-auto h-auto object-contain select-none"
+              />
+            </Lightbox.Pinchable>
+          </div>
         </Lightbox.Item>
       );
     }
@@ -106,12 +102,19 @@ function ImageLightbox({ items, defaultIndex }) {
     <Lightbox.Root
       className="fixed inset-0 isolate flex flex-col bg-black/80 z-50"
     >
+      {/* Custom backdrop element - handles clicks outside content */}
+      <div
+        className="absolute inset-0 z-0"
+        onClick={lbContext.close}
+        aria-label="Close lightbox"
+      />
+
       {/* Header - mobile responsive with proper touch targets */}
-      <Lightbox.Header className="flex items-center justify-between w-full py-2 px-3 sm:px-4 md:py-3 md:px-6 bg-black/70 text-white">
+      <Lightbox.Header className="relative z-10 flex items-center justify-between w-full py-2 px-3 sm:px-4 md:py-3 md:px-6 bg-black/70 text-white pointer-events-none">
         <span className="text-xs sm:text-sm truncate mr-2 sm:mr-4 max-w-[60vw] sm:max-w-[70vw]">
           {currentItem?.alt || ""}
         </span>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto">
           <button
             onClick={handleDownload}
             className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-md transition-colors"
@@ -131,11 +134,10 @@ function ImageLightbox({ items, defaultIndex }) {
         </div>
       </Lightbox.Header>
 
-      {/* Viewport - flex-1 takes remaining space, handles backdrop clicks */}
+      {/* Viewport - flex-1 takes remaining space */}
       <Lightbox.Viewport
-        className="flex flex-1"
+        className="relative z-10 flex flex-1 pointer-events-none"
         $renderItem={renderItem}
-        onClick={handleViewportClick}
       />
     </Lightbox.Root>
   );

@@ -126,9 +126,9 @@ describe('Lightbox - Core Features', () => {
   });
 
   it('should have backdrop click to close functionality', () => {
-    // We use custom onClick handler on Viewport since $onClose doesn't work
-    expect(source).toContain('handleViewportClick');
-    expect(source).toContain('onClick={handleViewportClick}');
+    // We use a custom backdrop div with onClick since library's $onClose doesn't work
+    expect(source).toContain('backdrop');
+    expect(source).toContain('onClick={lbContext.close}');
   });
 
   it('should have pinch-to-zoom support', () => {
@@ -365,21 +365,29 @@ describe('Lightbox - Layout Structure', () => {
   });
 
   it('should have proper container with flex center for image', () => {
-    expect(source).toContain('flex items-center justify-center flex-1');
+    expect(source).toContain('flex items-center justify-center h-full');
   });
 });
 
 describe('Lightbox - Backdrop Behavior', () => {
   const source = getLightboxSource();
 
-  it('should have onClick prop on Viewport for backdrop clicks', () => {
-    expect(source).toContain('onClick={handleViewportClick}');
+  it('should have custom backdrop div with onClick handler', () => {
+    // A separate backdrop div that handles clicks
+    expect(source).toContain('backdrop');
+    expect(source).toContain('onClick={lbContext.close}');
   });
 
-  it('should close only when clicking backdrop, not image', () => {
-    // Checks if click target is the viewport element itself
-    expect(source).toContain('e.target === e.currentTarget');
-    expect(source).toContain('lbContext.close()');
+  it('should use pointer-events to control click-through behavior', () => {
+    // Header and Viewport should have pointer-events-none to allow clicks through to backdrop
+    // Inner content should have pointer-events-auto to be interactive
+    expect(source).toContain('pointer-events-none');
+    expect(source).toContain('pointer-events-auto');
+  });
+
+  it('should use z-index layering with backdrop at z-0 and content at z-10', () => {
+    expect(source).toContain('z-0');
+    expect(source).toContain('z-10');
   });
 });
 
