@@ -82,8 +82,8 @@ export function WebSocketProvider({ children }) {
     if (lastJsonMessage) {
       const { channel, type } = lastJsonMessage;
 
-      // Skip logging for 'subscribed' messages (too noisy)
-      if (type !== 'subscribed') {
+      // Skip logging for 'subscribed' and 'connected' messages (too noisy)
+      if (type !== 'subscribed' && type !== 'connected') {
         console.log('[WS] Received:', lastJsonMessage);
       }
 
