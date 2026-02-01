@@ -49,11 +49,12 @@ function ImageLightbox({ items, defaultIndex }) {
     }
 
     const blob = await res.blob();
+    const mimeType = mimeTypes[ext] || 'image/png';
     const fileHandle = await window.showSaveFilePicker({
       suggestedName: fileName,
       types: [{
         description: 'Image files',
-        accept: { [mimeTypes[ext] || 'image/png': [`.${ext}`] },
+        accept: { [mimeType]: [`.${ext}`] },
       }],
     });
     const writable = await fileHandle.createWritable();
