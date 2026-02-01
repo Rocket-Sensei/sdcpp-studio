@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -88,7 +88,7 @@ export function MultiModelSelector({
   mode = null,
   className = "",
 }) {
-  const [models, setModels] = useState([]);
+  const [allModels, setAllModels] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState({});
   const [expandedModels, setExpandedModels] = useState({});
@@ -100,7 +100,7 @@ export function MultiModelSelector({
   // Keep a ref to the latest fetchModels function for polling
   const fetchModelsRef = useRef(null);
 
-  // Fetch all models
+  // Fetch all models (no filtering - filtering is done via useMemo)
   const fetchModels = useCallback(async () => {
     try {
       const response = await authenticatedFetch(`${API_BASE}`);
@@ -108,33 +108,14 @@ export function MultiModelSelector({
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
       const data = await response.json();
-      let filteredModels = data.models || [];
+      const models = data.models || [];
 
-      // Apply filterCapabilities if provided
-      if (filterCapabilities && Array.isArray(filterCapabilities)) {
-        filteredModels = filteredModels.filter((model) => {
-          const modelCapabilities = model.capabilities || [];
-          return filterCapabilities.some((cap) => modelCapabilities.includes(cap));
-        });
-      }
-
-      // Apply mode filter if provided
-      if (mode) {
-        filteredModels = filterModels(filteredModels, mode);
-        // Return null for upscale mode - it doesn't use generation models
-        if (filteredModels === null) {
-          setModels([]);
-          setIsLoading(false);
-          return null;
-        }
-      }
-
-      setModels(filteredModels);
+      setAllModels(models);
 
       // Extract file status from each model (now included in the API response)
       // No separate API calls needed - fileStatus is inline in the model object
       const fileStatusMap = {};
-      for (const model of filteredModels) {
+      for (const model of models) {
         if (model.fileStatus) {
           fileStatusMap[model.id] = model.fileStatus;
         }
@@ -147,7 +128,31 @@ export function MultiModelSelector({
       toast.error("Failed to load models");
       return null;
     }
-  }, [filterCapabilities, mode]);
+  }, []); // No deps - only run when called directly
+
+  // Filter models based on mode and filterCapabilities
+  const models = useMemo(() => {
+    let filtered = allModels;
+
+    // Apply filterCapabilities if provided
+    if (filterCapabilities && Array.isArray(filterCapabilities)) {
+      filtered = filtered.filter((model) => {
+        const modelCapabilities = model.capabilities || [];
+        return filterCapabilities.some((cap) => modelCapabilities.includes(cap));
+      });
+    }
+
+    // Apply mode filter if provided
+    if (mode) {
+      filtered = filterModels(filtered, mode);
+      // Return null for upscale mode - it doesn't use generation models
+      if (filtered === null) {
+        return [];
+      }
+    }
+
+    return filtered;
+  }, [allModels, filterCapabilities, mode]);
 
   // Poll download progress
   const pollDownloadProgress = useCallback((jobId, modelId) => {
@@ -216,7 +221,7 @@ export function MultiModelSelector({
     }
   });
 
-  // Initial data load
+  // Initial data load - only run on mount
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
@@ -224,7 +229,8 @@ export function MultiModelSelector({
       setIsLoading(false);
     };
     loadInitialData();
-  }, [fetchModels]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps = only run on mount
 
   // Keep ref updated
   useEffect(() => {
@@ -235,8 +241,8 @@ export function MultiModelSelector({
   useWebSocket({
     channels: [WS_CHANNELS.MODELS],
     onMessage: (message) => {
-      if (message.channel === WS_CHANNELS.MODELS) {
-        // Refresh models on any model status change
+      if (message.channel === WS_CHANNELS.MODELS && message.type === 'model_status_changed') {
+        // Only refresh on actual status changes, not on 'subscribed' messages
         fetchModelsRef.current?.();
       }
     },
