@@ -426,19 +426,17 @@ export function AppWithProviders() {
 
   return (
     <ApiKeyContextProvider>
-      <AppBoot
-        onBootComplete={() => setBootComplete(true)}
-        onApiKeyChange={() => {
-          // Trigger re-fetch when API key changes
-          window.location.reload();
-        }}
-      >
-        {bootComplete && (
-          <WebSocketProvider>
-            <App />
-          </WebSocketProvider>
-        )}
-      </AppBoot>
+      <WebSocketProvider>
+        <AppBoot
+          onBootComplete={() => setBootComplete(true)}
+          onApiKeyChange={() => {
+            // Trigger re-fetch when API key changes
+            window.location.reload();
+          }}
+        >
+          {bootComplete && <App />}
+        </AppBoot>
+      </WebSocketProvider>
     </ApiKeyContextProvider>
   );
 }
