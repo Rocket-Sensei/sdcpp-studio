@@ -372,7 +372,6 @@ function App() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <Header
-        totalGenerations={pagination?.total || 0}
         onSettingsClick={() => setIsSettingsOpen(true)}
         filterSheet={filterSheet}
       />
@@ -402,7 +401,7 @@ function App() {
           {/* Footer */}
           <footer className="border-t border-border py-4 mt-8">
             <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-              sd.cpp Studio - OpenAI-Compatible Image Generation Interface
+              {pagination?.total || 0} total generation{pagination?.total !== 1 ? "s" : ""}
             </div>
           </footer>
 
