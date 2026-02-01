@@ -15,9 +15,14 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Read the source file for static analysis
-const getSource = () => {
+// Read the source files for static analysis
+const getUnifiedQueueSource = () => {
   const sourcePath = join(__dirname, '../frontend/src/components/UnifiedQueue.jsx');
+  return readFileSync(sourcePath, 'utf-8');
+};
+
+const getImageCardSource = () => {
+  const sourcePath = join(__dirname, '../frontend/src/components/gallery/ImageCard.jsx');
   return readFileSync(sourcePath, 'utf-8');
 };
 
@@ -34,53 +39,49 @@ describe('UnifiedQueue - Thumbnail Remount Prevention', () => {
     vi.restoreAllMocks();
   });
 
-  it('should define Thumbnail component outside UnifiedQueue (stable identity)', () => {
-    const source = getSource();
+  it('should define ImageCard component in separate file (stable identity)', () => {
+    const unifiedQueueSource = getUnifiedQueueSource();
+    const imageCardSource = getImageCardSource();
 
-    // Verify Thumbnail is defined outside UnifiedQueue function
-    const unifiedQueueMatch = source.match(/export function UnifiedQueue/);
-    const thumbnailMatch = source.match(/const Thumbnail = memo/);
+    // Verify ImageCard is defined in separate file
+    const imageCardMatch = imageCardSource.match(/export const ImageCard = memo/);
+    expect(imageCardMatch).toBeTruthy();
 
-    expect(unifiedQueueMatch).toBeTruthy();
-    expect(thumbnailMatch).toBeTruthy();
+    // Verify UnifiedQueue imports ImageCard
+    expect(unifiedQueueSource).toContain('import { ImageCard } from');
+    expect(unifiedQueueSource).toContain('from "./gallery/ImageCard"');
 
-    // Thumbnail should be defined BEFORE UnifiedQueue
-    const thumbnailIndex = source.indexOf('const Thumbnail = memo');
-    const unifiedQueueIndex = source.indexOf('export function UnifiedQueue');
-
-    expect(thumbnailIndex).toBeLessThan(unifiedQueueIndex);
-    expect(thumbnailIndex).toBeGreaterThan(-1);
-    expect(unifiedQueueIndex).toBeGreaterThan(-1);
+    // Verify the re-export for backward compatibility
+    expect(unifiedQueueSource).toContain('export const Thumbnail = ImageCard');
   });
 
-  it('should use React.memo for Thumbnail component', () => {
-    const source = getSource();
+  it('should use React.memo for ImageCard component', () => {
+    const imageCardSource = getImageCardSource();
 
-    // Verify Thumbnail is wrapped with memo
-    expect(source).toContain('const Thumbnail = memo(function Thumbnail');
+    // Verify ImageCard is wrapped with memo
+    expect(imageCardSource).toContain('export const ImageCard = memo(function ImageCard');
     // Check for memo import (flexible on quote style)
-    expect(source).toMatch(/import.*memo.*from.*['"]react['"]/);
+    expect(imageCardSource).toMatch(/import.*memo.*from.*['"]react['"]/);
   });
 
   it('should use first_image_url directly from list data', () => {
-    const source = getSource();
+    const imageCardSource = getImageCardSource();
 
-    // Verify Thumbnail uses first_image_url directly (no additional API calls)
-    expect(source).toContain('const src = generation.first_image_url || null');
+    // Verify ImageCard uses first_image_url directly (no additional API calls)
+    expect(imageCardSource).toContain('const src = generation.first_image_url || null');
   });
 
   it('should use LightboxWithImage component for images', () => {
-    const source = getSource();
+    const imageCardSource = getImageCardSource();
 
     // Verify LightboxWithImage component is used for modal image viewing
-    expect(source).toContain('LightboxWithImage');
-    expect(source).toContain('LightboxGalleryWithImages');
+    expect(imageCardSource).toContain('LightboxWithImage');
     // Now using local Lightbox component wrapper around @hanakla/react-lightbox
-    expect(source).toContain('from "./Lightbox"');
+    expect(imageCardSource).toContain('from "../Lightbox"');
   });
 
   it('should have helper functions defined outside component', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Helper functions should be outside the component
     // Check that getStatusConfig and isPendingOrProcessing are defined before UnifiedQueue
@@ -92,36 +93,39 @@ describe('UnifiedQueue - Thumbnail Remount Prevention', () => {
   });
 
   it('should not have nested component definitions', () => {
-    const source = getSource();
+    const unifiedQueueSource = getUnifiedQueueSource();
 
     // Find the UnifiedQueue function body
-    const unifiedQueueStart = source.indexOf('export function UnifiedQueue');
-    const unifiedQueueEnd = source.indexOf('export default UnifiedQueue');
+    const unifiedQueueStart = unifiedQueueSource.indexOf('export function UnifiedQueue');
+    const unifiedQueueEnd = unifiedQueueSource.indexOf('export default UnifiedQueue');
 
     expect(unifiedQueueStart).toBeGreaterThan(-1);
     expect(unifiedQueueEnd).toBeGreaterThan(unifiedQueueStart);
 
-    const componentBody = source.substring(unifiedQueueStart, unifiedQueueEnd);
+    const componentBody = unifiedQueueSource.substring(unifiedQueueStart, unifiedQueueEnd);
 
-    // Should not have "const Thumbnail =" inside UnifiedQueue
+    // Should not have "const Thumbnail =" or "const ImageCard =" inside UnifiedQueue
     expect(componentBody).not.toContain('const Thumbnail =');
+    expect(componentBody).not.toContain('const ImageCard =');
   });
 
   it('should have proper comments explaining the ImageCard component structure', () => {
-    const source = getSource();
+    const unifiedQueueSource = getUnifiedQueueSource();
 
     // Verify the file imports ImageCard from gallery
-    expect(source).toContain('import { ImageCard } from');
-    expect(source).toContain('from "./gallery/ImageCard"');
+    expect(unifiedQueueSource).toContain('import { ImageCard } from');
+    expect(unifiedQueueSource).toContain('from "./gallery/ImageCard"');
 
     // Verify the re-export for backward compatibility
-    expect(source).toContain('export const Thumbnail = ImageCard');
+    expect(unifiedQueueSource).toContain('export const Thumbnail = ImageCard');
+    // Verify the comment explaining this re-export
+    expect(unifiedQueueSource).toContain('Re-export Thumbnail for backward compatibility');
   });
 });
 
 describe('UnifiedQueue - Real-time Updates', () => {
   it('should use WebSocket for real-time updates instead of polling', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Verify WebSocket import
     expect(source).toContain('useWebSocket');
@@ -132,7 +136,7 @@ describe('UnifiedQueue - Real-time Updates', () => {
   });
 
   it('should listen to queue and generations channels', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Verify channel subscriptions
     expect(source).toContain('WS_CHANNELS.QUEUE');
@@ -140,7 +144,7 @@ describe('UnifiedQueue - Real-time Updates', () => {
   });
 
   it('should refresh generations on WebSocket messages', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Should fetch on queue messages
     expect(source).toContain('job_updated');
@@ -157,7 +161,7 @@ describe('UnifiedQueue - Real-time Updates', () => {
 
 describe('UnifiedQueue - Model Display', () => {
   it('should display model name for each generation', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Verify Cpu icon import for model display
     expect(source).toContain('Cpu');
@@ -175,7 +179,7 @@ describe('UnifiedQueue - Model Display', () => {
   });
 
   it('should handle null/undefined model values gracefully', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Verify getModelName handles null/undefined
     expect(source).toContain('if (!modelId)');
@@ -183,7 +187,7 @@ describe('UnifiedQueue - Model Display', () => {
   });
 
   it('should include model in the image preview dialog', () => {
-    const source = getSource();
+    const source = getUnifiedQueueSource();
 
     // Verify model is shown in dialog description
     expect(source).toContain('getModelName(selectedImage?.model)');

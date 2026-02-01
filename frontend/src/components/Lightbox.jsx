@@ -15,6 +15,13 @@ import {
 
 /**
  * Custom Lightbox UI Component
+ *
+ * Features:
+ * - Image displayed with max-height and max-width of 90% of viewport
+ * - Mobile-responsive header with smaller touch targets
+ * - Download functionality with cross-origin support
+ * - Backdrop click to close
+ * - Pinch-to-zoom support
  */
 function ImageLightbox({ items, defaultIndex }) {
   const lbContext = useLightboxState();
@@ -68,7 +75,7 @@ function ImageLightbox({ items, defaultIndex }) {
       return (
         <Lightbox.Item
           $index={index}
-          className="flex items-center justify-center flex-1 p-5"
+          className="flex items-center justify-center flex-1 p-2 sm:p-4 md:p-6"
           data-lightbox-image-container="true"
         >
           <Lightbox.Pinchable onRequestClose={lbContext.close}>
@@ -76,7 +83,12 @@ function ImageLightbox({ items, defaultIndex }) {
               src={item.url}
               alt={item.alt}
               draggable={false}
-              className="max-w-[98%] max-h-[98%] object-contain select-none"
+              // 90% of viewport for both width and height with mobile support
+              className="max-w-[90vw] max-h-[90vh] w-auto h-auto object-contain select-none"
+              style={{
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+              }}
             />
           </Lightbox.Pinchable>
         </Lightbox.Item>
@@ -98,25 +110,32 @@ function ImageLightbox({ items, defaultIndex }) {
       className="fixed inset-0 isolate flex flex-col bg-black/80 z-50"
       onClick={handleBackdropClick}
     >
-      {/* Header */}
-      <Lightbox.Header className="flex items-center justify-between w-full py-2 px-4 bg-black/70 text-white">
-        <span className="text-sm truncate mr-4">{currentItem?.alt || ""}</span>
-        <div className="flex items-center gap-2">
+      {/* Header - mobile responsive with proper touch targets */}
+      <Lightbox.Header className="flex items-center justify-between w-full py-2 px-3 sm:px-4 md:py-3 md:px-6 bg-black/70 text-white">
+        <span className="text-xs sm:text-sm truncate mr-2 sm:mr-4 max-w-[60vw] sm:max-w-[70vw]">
+          {currentItem?.alt || ""}
+        </span>
+        <div className="flex items-center gap-1 sm:gap-2">
           <button
             onClick={handleDownload}
-            className="p-2 text-white hover:bg-white/10 rounded-md transition-colors"
-            aria-label="Download"
+            className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-md transition-colors"
+            aria-label="Download image"
+            title="Download"
           >
-            <Download className="w-6 h-6" />
+            <Download className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
           {/* Lightbox.Close is already a button - just pass className and icon */}
-          <Lightbox.Close className="p-2 text-white hover:bg-white/10 rounded-md transition-colors">
-            <X className="w-6 h-6" />
+          <Lightbox.Close
+            className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-md transition-colors"
+            aria-label="Close lightbox"
+            title="Close"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </Lightbox.Close>
         </div>
       </Lightbox.Header>
 
-      {/* Viewport */}
+      {/* Viewport - flex-1 takes remaining space */}
       <Lightbox.Viewport className="flex flex-1" $renderItem={renderItem} />
     </Lightbox.Root>
   );
