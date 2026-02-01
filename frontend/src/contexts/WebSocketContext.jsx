@@ -64,13 +64,11 @@ export function WebSocketProvider({ children }) {
     setIsConnected(connected);
     setIsConnecting(connecting);
 
-    // Log connection state changes
-    if (connected) {
-      console.log('[WS] Connected');
+    // Only log disconnection and connecting states (not connected, to reduce noise)
+    if (!connected && !connecting) {
+      console.log('[WS] Disconnected');
     } else if (connecting) {
       console.log('[WS] Connecting...');
-    } else {
-      console.log('[WS] Disconnected');
     }
 
     // Notify connection state listeners
@@ -82,10 +80,12 @@ export function WebSocketProvider({ children }) {
   // Handle incoming messages
   useEffect(() => {
     if (lastJsonMessage) {
-      const { channel } = lastJsonMessage;
+      const { channel, type } = lastJsonMessage;
 
-      // Log incoming WebSocket messages for debugging
-      console.log('[WS] Received:', lastJsonMessage);
+      // Skip logging for 'subscribed' messages (too noisy)
+      if (type !== 'subscribed') {
+        console.log('[WS] Received:', lastJsonMessage);
+      }
 
       // Notify all listeners for this channel
       const channelListeners = listenersRef.current.get(channel);
