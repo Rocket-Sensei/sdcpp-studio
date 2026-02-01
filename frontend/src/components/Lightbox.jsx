@@ -12,6 +12,7 @@ import {
   Lightbox,
   useLightboxState,
 } from "@hanakla/react-lightbox";
+import { authenticatedFetch } from "../utils/api";
 
 /**
  * Custom Lightbox UI Component
@@ -31,42 +32,39 @@ function ImageLightbox({ items, defaultIndex }) {
     const url = currentItem.url;
     const fileName = currentItem.fileName || url.split("/").slice(-1)[1];
 
-    const createAnchor = (_href, target = "") => {
+    const downloadBlob = (blob) => {
+      const blobUrl = URL.createObjectURL(blob);
       const tmpAnchor = document.createElement("a");
       tmpAnchor.setAttribute("download", fileName);
-      tmpAnchor.setAttribute("href", _href);
-      tmpAnchor.setAttribute("target", target);
-      return tmpAnchor;
-    };
-
-    const clickAnchor = (tmpAnchor) => {
+      tmpAnchor.setAttribute("href", blobUrl);
       document.body.appendChild(tmpAnchor);
       tmpAnchor.click();
       document.body.removeChild(tmpAnchor);
+      // Clean up the blob URL after a short delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
     };
 
-    const isSameOrigin =
-      !url.includes("http") || document.location.hostname === new URL(url).hostname;
-
-    if (!isSameOrigin) {
-      clickAnchor(createAnchor(url));
-      return;
-    }
-
-    fetch(url)
+    // Fetch with authentication for same-origin URLs
+    authenticatedFetch(url)
       .then((res) => {
         if (!res.ok) {
-          clickAnchor(createAnchor(url, "_blank"));
+          throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
         }
         return res.blob();
       })
       .then((blob) => {
-        clickAnchor(createAnchor(URL.createObjectURL(blob), "_blank"));
+        downloadBlob(blob);
       })
       .catch((err) => {
-        console.error(err);
-        console.error("Failed to download image from " + url);
-        clickAnchor(createAnchor(url, "_blank"));
+        console.error("Failed to download image:", err);
+        // Fallback: try opening in new tab
+        const tmpAnchor = document.createElement("a");
+        tmpAnchor.setAttribute("href", url);
+        tmpAnchor.setAttribute("target", "_blank");
+        tmpAnchor.setAttribute("rel", "noopener noreferrer");
+        document.body.appendChild(tmpAnchor);
+        tmpAnchor.click();
+        document.body.removeChild(tmpAnchor);
       });
   };
 
