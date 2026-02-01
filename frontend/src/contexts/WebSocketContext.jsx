@@ -49,12 +49,21 @@ export function WebSocketProvider({ children }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const listenersRef = useRef(new Map()); // channel -> Set of callbacks
   const connectionListenersRef = useRef(new Set()); // Connection state callbacks
+  const mountId = useRef(Date.now()); // Track mount instances for debugging
 
   const { sendJsonMessage, lastJsonMessage, readyState, getWebSocket } = useReactWebSocket(WS_URL, {
     shouldReconnect: () => true,
     reconnectInterval: RECONNECT_INTERVAL,
     retryOnError: true,
   });
+
+  // Log provider mount/remount for debugging
+  useEffect(() => {
+    console.log('[WS] WebSocketProvider mounted, mountId:', mountId.current);
+    return () => {
+      console.log('[WS] WebSocketProvider unmounted, mountId:', mountId.current);
+    };
+  }, []);
 
   // Track connection state
   useEffect(() => {
@@ -108,14 +117,17 @@ export function WebSocketProvider({ children }) {
   // Subscribe to a channel
   const subscribe = useCallback((channel, callback) => {
     // Add callback to listeners
-    if (!listenersRef.current.has(channel)) {
+    const isFirstSubscriber = !listenersRef.current.has(channel);
+    if (isFirstSubscriber) {
       listenersRef.current.set(channel, new Set());
     }
     listenersRef.current.get(channel).add(callback);
 
-    // Send subscription message to server
-    console.log('[WS] Subscribing to channel:', channel);
-    sendJsonMessage({ type: 'subscribe', channel });
+    // Send subscription message to server only if we're the first subscriber
+    if (isFirstSubscriber) {
+      console.log('[WS] Subscribing to channel:', channel);
+      sendJsonMessage({ type: 'subscribe', channel });
+    }
 
     // Return unsubscribe function
     return () => {
