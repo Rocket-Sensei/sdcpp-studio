@@ -15,27 +15,33 @@ const getLightboxSource = () => {
   return fs.readFileSync(sourcePath, 'utf-8');
 };
 
-describe('Lightbox - Viewport Sizing (90%)', () => {
+describe('Lightbox - Viewport Sizing (fits with header)', () => {
   const source = getLightboxSource();
 
-  it('should have image with max-width of 90vw (90% of viewport width)', () => {
-    // Check for max-w-[90vw] class
-    expect(source).toContain('max-w-[90vw]');
-    // Also check inline style
-    expect(source).toContain('maxWidth: \'90vw\'');
+  it('should have image with max-w-full to fit within container', () => {
+    // max-w-full fits within the parent container which already has padding
+    expect(source).toContain('max-w-full');
   });
 
-  it('should have image with max-height of 90vh (90% of viewport height)', () => {
-    // Check for max-h-[90vh] class
-    expect(source).toContain('max-h-[90vh]');
-    // Also check inline style
-    expect(source).toContain('maxHeight: \'90vh\'');
+  it('should have image with max-h-full to fit within container', () => {
+    // max-h-full fits within the Viewport which accounts for header height via flex-1
+    expect(source).toContain('max-h-full');
   });
 
-  it('should not have the old 98% sizing', () => {
-    // Should not contain the old 98% values
-    expect(source).not.toContain('max-w-[98%]');
-    expect(source).not.toContain('max-h-[98%]');
+  it('should not use 90vh as it causes overflow with header', () => {
+    // 90vh of viewport + header height = overflow at bottom
+    expect(source).not.toContain('max-h-[90vh]');
+  });
+
+  it('should not use 90vw - container padding provides the margin', () => {
+    // max-w-full with parent padding is better than 90vw
+    expect(source).not.toContain('max-w-[90vw]');
+  });
+
+  it('should not have inline styles with viewport units', () => {
+    // Should not have inline styles that override Tailwind classes
+    expect(source).not.toMatch(/maxWidth:\s*['"]90vw/);
+    expect(source).not.toMatch(/maxHeight:\s*['"]90vh/);
   });
 
   it('should have object-contain to preserve aspect ratio', () => {
@@ -52,8 +58,8 @@ describe('Lightbox - Mobile Support', () => {
   const source = getLightboxSource();
 
   it('should have responsive padding on image container', () => {
-    // Should have responsive padding: p-2 sm:p-4 md:p-6
-    expect(source).toMatch(/p-2.*sm:p-4.*md:p-6/);
+    // Should have responsive padding: p-4 sm:p-6 md:p-8
+    expect(source).toMatch(/p-4.*sm:p-6.*md:p-8/);
   });
 
   it('should have responsive header padding', () => {
@@ -120,8 +126,9 @@ describe('Lightbox - Core Features', () => {
   });
 
   it('should have backdrop click to close functionality', () => {
-    // Library handles backdrop clicks internally, we pass $onClose prop
-    expect(source).toContain('$onClose={lbContext.close');
+    // We use custom onClick handler on Viewport since $onClose doesn't work
+    expect(source).toContain('handleViewportClick');
+    expect(source).toContain('onClick={handleViewportClick}');
   });
 
   it('should have pinch-to-zoom support', () => {
@@ -277,9 +284,9 @@ describe('Lightbox - LightboxGalleryWithImages Component', () => {
 describe('Lightbox - Image Styling', () => {
   const source = getLightboxSource();
 
-  it('should have viewport-based sizing (90vw x 90vh)', () => {
-    expect(source).toContain('max-w-[90vw]');
-    expect(source).toContain('max-h-[90vh]');
+  it('should have container-based sizing (max-w-full x max-h-full)', () => {
+    expect(source).toContain('max-w-full');
+    expect(source).toContain('max-h-full');
   });
 
   it('should preserve aspect ratio with auto dimensions', () => {
@@ -365,13 +372,14 @@ describe('Lightbox - Layout Structure', () => {
 describe('Lightbox - Backdrop Behavior', () => {
   const source = getLightboxSource();
 
-  it('should have $onClose prop on root element for backdrop clicks', () => {
-    expect(source).toContain('$onClose={lbContext.close}');
+  it('should have onClick prop on Viewport for backdrop clicks', () => {
+    expect(source).toContain('onClick={handleViewportClick}');
   });
 
   it('should close only when clicking backdrop, not image', () => {
-    // The library handles this internally - we just provide the close callback
-    expect(source).toContain('lbContext.close');
+    // Checks if click target is the viewport element itself
+    expect(source).toContain('e.target === e.currentTarget');
+    expect(source).toContain('lbContext.close()');
   });
 });
 
@@ -384,9 +392,9 @@ describe('Lightbox - Component Comments', () => {
   });
 
   it('should have feature list comment for ImageLightbox', () => {
-    // Comment should list features including 90% viewport sizing and mobile support
+    // Comment should list features including proper sizing and mobile support
     expect(source).toMatch(/Features:|Custom Lightbox/);
-    expect(source).toMatch(/90% of viewport/);
+    expect(source).toMatch(/proper sizing/i);
     expect(source).toMatch(/mobile/i); // Case-insensitive for mobile
     expect(source).toMatch(/responsive/i); // Case-insensitive for responsive
   });

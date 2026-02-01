@@ -18,20 +18,22 @@ const getLightboxSource = () => {
 describe('Lightbox - Backdrop Click to Close', () => {
   const source = getLightboxSource();
 
-  it('should use $onClose prop to handle backdrop clicks (library-provided)', () => {
-    // The @hanakla/react-lightbox library handles backdrop clicks internally
-    // and calls the $onClose callback when the backdrop is clicked
-    expect(source).toContain('$onClose={lbContext.close}');
+  it('should use handleViewportClick function for backdrop clicks', () => {
+    expect(source).toContain('handleViewportClick');
   });
 
-  it('should attach $onClose to Lightbox.Root element', () => {
-    // Verify the $onClose is on Lightbox.Root specifically
-    const rootMatch = source.match(/<Lightbox\.Root[^>]*\$onClose=/);
-    expect(rootMatch).toBeTruthy();
+  it('should attach onClick to Viewport element (not Root)', () => {
+    // The library's Root doesn't properly handle clicks, so we use Viewport
+    expect(source).toMatch(/Viewport[^>]*onClick=\{handleViewportClick\}/);
   });
 
   it('should use lbContext.close as the close handler', () => {
-    expect(source).toContain('lbContext.close');
+    expect(source).toContain('lbContext.close()');
+  });
+
+  it('should check if click target is the viewport element (backdrop)', () => {
+    // Should compare e.target === e.currentTarget to ensure click is on backdrop
+    expect(source).toContain('e.target === e.currentTarget');
   });
 
   it('should have backdrop with proper CSS for full screen overlay', () => {
@@ -62,46 +64,45 @@ describe('Lightbox - Backdrop Click to Close', () => {
 describe('Lightbox - Backdrop Click Implementation Details', () => {
   const source = getLightboxSource();
 
-  it('should NOT use custom onClick handler for backdrop', () => {
-    // The implementation should use library's $onClose prop instead of custom onClick
-    expect(source).not.toContain('onClick={handleBackdropClick}');
+  it('should define handleViewportClick as a const function', () => {
+    expect(source).toContain('const handleViewportClick =');
   });
 
-  it('should NOT have handleBackdropClick function', () => {
-    // Using library's built-in backdrop handling, no custom function needed
-    expect(source).not.toContain('handleBackdropClick');
+  it('should receive event parameter', () => {
+    expect(source).toMatch(/const handleViewportClick = \(/);
   });
 
   it('should have comment explaining the backdrop click behavior', () => {
-    // Should have explanatory comment about backdrop click (case-insensitive)
-    expect(source).toMatch(/backdrop click/i);
+    // Should have explanatory comment about backdrop click
+    expect(source).toMatch(/backdrop/i);
   });
 
   it('should call close method on lbContext', () => {
-    expect(source).toContain('lbContext.close');
+    expect(source).toContain('lbContext.close()');
+  });
+
+  it('should NOT use $onClose prop (library implementation does not work)', () => {
+    expect(source).not.toContain('$onClose=');
   });
 });
 
-describe('Lightbox - Library Integration', () => {
+describe('Lightbox - Viewport Integration', () => {
   const source = getLightboxSource();
 
-  it('should use $onClose prop from @hanakla/react-lightbox', () => {
-    // Props starting with $ are special props for the library
-    expect(source).toMatch(/\$onClose=/);
+  it('should attach onClick to Lightbox.Viewport component', () => {
+    expect(source).toMatch(/<Lightbox\.Viewport[^>]*onClick=/);
   });
 
-  it('should pass lbContext.close to $onClose', () => {
-    expect(source).toMatch(/\$onClose=\{lbContext\.close\}/);
+  it('should pass handleViewportClick to onClick prop', () => {
+    expect(source).toMatch(/onClick=\{handleViewportClick\}/);
   });
 
-  it('documents the library-provided backdrop click handling', () => {
-    // This test documents that we rely on the library's built-in handling
-    expect(source).toMatch(/Lightbox\.Root/);
+  it('should have flex-1 on Viewport to take remaining space', () => {
+    expect(source).toContain('className="flex flex-1"');
   });
 
-  it('should also have onRequestClose on Pinchable for gesture close', () => {
-    // Multiple ways to close: backdrop click, close button, pinch gesture
-    expect(source).toContain('Lightbox.Pinchable');
-    expect(source).toMatch(/onRequestClose=\{lbContext\.close\}/);
+  it('documents the viewport-based backdrop click handling', () => {
+    // This test documents that we use Viewport onClick instead of Root $onClose
+    expect(source).toMatch(/Viewport/);
   });
 });

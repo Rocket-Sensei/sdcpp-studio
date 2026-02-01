@@ -17,10 +17,10 @@ import {
  * Custom Lightbox UI Component
  *
  * Features:
- * - Image displayed with max-height and max-width of 90% of viewport
+ * - Image displayed with proper sizing (fits within container with header)
  * - Mobile-responsive header with smaller touch targets
  * - Download functionality with cross-origin support
- * - Backdrop click to close (via $onClose prop)
+ * - Backdrop click to close
  * - Pinch-to-zoom support
  */
 function ImageLightbox({ items, defaultIndex }) {
@@ -70,12 +70,20 @@ function ImageLightbox({ items, defaultIndex }) {
       });
   };
 
+  // Handle backdrop click - close if clicking outside the image
+  const handleViewportClick = (e) => {
+    // Close if clicking directly on the viewport backdrop (not on image or controls)
+    if (e.target === e.currentTarget) {
+      lbContext.close();
+    }
+  };
+
   const renderItem = (item, index) => {
     if (item.kind === "image") {
       return (
         <Lightbox.Item
           $index={index}
-          className="flex items-center justify-center flex-1 p-2 sm:p-4 md:p-6"
+          className="flex items-center justify-center flex-1 p-4 sm:p-6 md:p-8"
           data-lightbox-image-container="true"
         >
           <Lightbox.Pinchable onRequestClose={lbContext.close}>
@@ -83,12 +91,9 @@ function ImageLightbox({ items, defaultIndex }) {
               src={item.url}
               alt={item.alt}
               draggable={false}
-              // 90% of viewport for both width and height with mobile support
-              className="max-w-[90vw] max-h-[90vh] w-auto h-auto object-contain select-none"
-              style={{
-                maxWidth: '90vw',
-                maxHeight: '90vh',
-              }}
+              // Use max-w-full and max-h-full to fit within parent container
+              // The parent (Viewport) already accounts for the header height via flex-1
+              className="max-w-full max-h-full w-auto h-auto object-contain select-none"
             />
           </Lightbox.Pinchable>
         </Lightbox.Item>
@@ -100,7 +105,6 @@ function ImageLightbox({ items, defaultIndex }) {
   return (
     <Lightbox.Root
       className="fixed inset-0 isolate flex flex-col bg-black/80 z-50"
-      $onClose={lbContext.close}
     >
       {/* Header - mobile responsive with proper touch targets */}
       <Lightbox.Header className="flex items-center justify-between w-full py-2 px-3 sm:px-4 md:py-3 md:px-6 bg-black/70 text-white">
@@ -127,8 +131,12 @@ function ImageLightbox({ items, defaultIndex }) {
         </div>
       </Lightbox.Header>
 
-      {/* Viewport - flex-1 takes remaining space */}
-      <Lightbox.Viewport className="flex flex-1" $renderItem={renderItem} />
+      {/* Viewport - flex-1 takes remaining space, handles backdrop clicks */}
+      <Lightbox.Viewport
+        className="flex flex-1"
+        $renderItem={renderItem}
+        onClick={handleViewportClick}
+      />
     </Lightbox.Root>
   );
 }
