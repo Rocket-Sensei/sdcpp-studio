@@ -32,21 +32,33 @@ function ImageLightbox({ items, defaultIndex }) {
     const url = currentItem.url;
     const fileName = currentItem.fileName || url.split("/").slice(-1)[1];
 
+    console.log('[Download] Starting download:', { url, fileName });
+
     const downloadBlob = (blob) => {
+      console.log('[Download] Got blob:', { type: blob.type, size: blob.size });
       const blobUrl = URL.createObjectURL(blob);
+      console.log('[Download] Created blob URL:', blobUrl);
+
       const tmpAnchor = document.createElement("a");
       tmpAnchor.setAttribute("download", fileName);
       tmpAnchor.setAttribute("href", blobUrl);
       document.body.appendChild(tmpAnchor);
+
+      console.log('[Download] Clicking anchor...');
       tmpAnchor.click();
-      document.body.removeChild(tmpAnchor);
-      // Clean up the blob URL after a short delay
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+      setTimeout(() => {
+        document.body.removeChild(tmpAnchor);
+        console.log('[Download] Revoking blob URL');
+        URL.revokeObjectURL(blobUrl);
+      }, 100);
     };
 
     // Fetch with authentication for same-origin URLs
+    console.log('[Download] Fetching with authentication...');
     authenticatedFetch(url)
       .then((res) => {
+        console.log('[Download] Response:', { status: res.status, ok: res.ok, headers: res.headers.get('content-type') });
         if (!res.ok) {
           throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
         }
@@ -56,8 +68,9 @@ function ImageLightbox({ items, defaultIndex }) {
         downloadBlob(blob);
       })
       .catch((err) => {
-        console.error("Failed to download image:", err);
+        console.error("[Download] Failed:", err);
         // Fallback: try opening in new tab
+        console.log('[Download] Fallback: opening in new tab');
         const tmpAnchor = document.createElement("a");
         tmpAnchor.setAttribute("href", url);
         tmpAnchor.setAttribute("target", "_blank");
