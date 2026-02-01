@@ -1,6 +1,7 @@
 import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
+import { useHotkeys } from "react-hotkeys-hook";
 
 /**
  * GenerateImage - Prompt input for image generation mode
@@ -24,6 +25,18 @@ export function GenerateImage({
   onGenerate,
 }) {
   const requiresPrompt = true;
+
+  // Ctrl+Enter to generate
+  useHotkeys(
+    ['ctrl+enter', 'cmd+enter'],
+    (e) => {
+      e.preventDefault();
+      if (!disabled && !isLoading && prompt.trim()) {
+        onGenerate?.();
+      }
+    },
+    { enabled: !disabled && !isLoading && prompt.trim() !== '', enableOnFormTags: true }
+  );
 
   return (
     <>

@@ -3,6 +3,7 @@ import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Image as ImageIcon, Loader2, Upload, MinusCircle } from "lucide-react";
 import { useRef, useCallback } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 
 /**
  * UpscaleImage - Prompt input for upscale mode
@@ -35,6 +36,18 @@ export function UpscaleImage({
   const fileInputRef = useRef(null);
 
   const hasImage = !!sourceImagePreview;
+
+  // Ctrl+Enter to upscale (when image is selected)
+  useHotkeys(
+    ['ctrl+enter', 'cmd+enter'],
+    (e) => {
+      e.preventDefault();
+      if (!disabled && !isLoading && hasImage) {
+        onGenerate?.();
+      }
+    },
+    { enabled: !disabled && !isLoading && hasImage }
+  );
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
