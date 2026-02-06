@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Key } from 'lucide-react';
-import { isAuthRequired, getStoredApiKey, validateApiKey, saveApiKey } from '../utils/api';
+import { getStoredApiKey, saveApiKey, authenticatedFetch } from '../utils/api';
 import { ApiKeyModal } from './ApiKeyModal';
 
 /**
@@ -8,9 +8,7 @@ import { ApiKeyModal } from './ApiKeyModal';
  */
 const BOOT_STATE = {
   INITIALIZING: 'initializing',
-  CHECKING_AUTH: 'checking_auth',
   NEEDS_API_KEY: 'needs_api_key',
-  VALIDATING_KEY: 'validating_key',
   READY: 'ready',
   ERROR: 'error',
 };
@@ -18,10 +16,10 @@ const BOOT_STATE = {
 /**
  * AppBoot Component - Handles initial app initialization and auth checking
  *
- * This component ensures that:
- * 1. Auth is checked BEFORE any UI renders
- * 2. API key is collected if needed before app loads
- * 3. Clean loading states are shown during boot
+ * Simplified logic:
+ * 1. Call /api/config to check config
+ * 2. If we get 401, show API key dialog
+ * 3. No pre-validation, no "Validating API key" state
  *
  * @param {Object} props
  * @param {React.ReactNode} props.children - The main app component (only rendered when ready)
@@ -30,41 +28,27 @@ const BOOT_STATE = {
  */
 export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
   const [bootState, setBootState] = useState(BOOT_STATE.INITIALIZING);
-  const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState(null);
 
-  // Initialize: Check if auth is required
+  // Initialize: Try to fetch config, if we get 401 show API key modal
   useEffect(() => {
     const initialize = async () => {
-      setBootState(BOOT_STATE.CHECKING_AUTH);
-
       try {
-        const required = await isAuthRequired();
-        setAuthRequired(required);
+        const response = await authenticatedFetch('/api/config');
 
-        if (required) {
-          const storedKey = getStoredApiKey();
-          if (!storedKey) {
-            // Auth required and no key - show modal
-            setBootState(BOOT_STATE.NEEDS_API_KEY);
-          } else {
-            // Auth required but key exists - validate it
-            setBootState(BOOT_STATE.VALIDATING_KEY);
-            const isValid = await validateApiKey(storedKey);
-
-            if (isValid) {
-              setBootState(BOOT_STATE.READY);
-              onBootComplete?.();
-            } else {
-              // Key is invalid - show modal to get new key
-              setBootState(BOOT_STATE.NEEDS_API_KEY);
-            }
-          }
-        } else {
-          // No auth required - ready to boot
-          setBootState(BOOT_STATE.READY);
-          onBootComplete?.();
+        if (response.status === 401) {
+          // Unauthorized - need API key
+          setBootState(BOOT_STATE.NEEDS_API_KEY);
+          return;
         }
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch config: ${response.statusText}`);
+        }
+
+        // Success - ready to boot
+        setBootState(BOOT_STATE.READY);
+        onBootComplete?.();
       } catch (err) {
         console.error('Boot initialization error:', err);
         setError(err.message);
@@ -75,38 +59,37 @@ export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
     initialize();
   }, [onBootComplete]);
 
-  // Handle API key submission
+  // Handle API key submission - just save it and retry the config fetch
   const handleApiKeySubmit = useCallback(async (apiKey) => {
-    setBootState(BOOT_STATE.VALIDATING_KEY);
-    setError(null);
-
     try {
-      const isValid = await validateApiKey(apiKey);
+      saveApiKey(apiKey);
+      onApiKeyChange?.();
 
-      if (isValid) {
-        saveApiKey(apiKey);
-        onApiKeyChange?.();
-        setBootState(BOOT_STATE.READY);
-        onBootComplete?.();
-      } else {
+      // Retry the config fetch with the new API key
+      const response = await authenticatedFetch('/api/config');
+
+      if (response.status === 401) {
         setError('Invalid API key. Please check and try again.');
-        setBootState(BOOT_STATE.NEEDS_API_KEY);
+        return;
       }
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch config: ${response.statusText}`);
+      }
+
+      // Success - ready to boot
+      setError(null);
+      setBootState(BOOT_STATE.READY);
+      onBootComplete?.();
     } catch (err) {
       console.error('API key validation error:', err);
       setError('Failed to validate API key. Please try again.');
-      setBootState(BOOT_STATE.NEEDS_API_KEY);
     }
   }, [onBootComplete, onApiKeyChange]);
 
   // Render loading state during initialization
-  if (bootState === BOOT_STATE.INITIALIZING || bootState === BOOT_STATE.CHECKING_AUTH) {
+  if (bootState === BOOT_STATE.INITIALIZING) {
     return <BootLoadingScreen message="Initializing..." />;
-  }
-
-  // Render validating state
-  if (bootState === BOOT_STATE.VALIDATING_KEY) {
-    return <BootLoadingScreen message="Validating API key..." />;
   }
 
   // Render error state

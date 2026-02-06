@@ -1,211 +1,306 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
-import { Button } from "./ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { Sparkles, ChevronDown } from "lucide-react";
+import { PromptBar } from "./prompt/PromptBar";
+import { useImageGeneration } from "../hooks/useImageGeneration";
+import { useModels } from "../hooks/useModels";
+import { toast } from "sonner";
+import { authenticatedFetch } from "../utils/api";
 
 // Default editing model
 const DEFAULT_EDIT_MODEL = "qwen-image-edit";
 
-const STORAGE_KEY = "studio-form-collapsed";
-
 /**
- * Studio Component - A unified page merging Generate and Gallery functionality
+ * Studio Component - Main application page
  *
  * Features:
- * - Side-by-side layout with collapsible Generate form
- * - Left sidebar (1/3 width): GeneratePanel (collapsible)
- * - Right area (2/3 width): UnifiedQueue gallery
+ * - PromptBar at top for quick generation with mode selector and model selection
+ * - GeneratePanel as collapsible Settings panel below
+ * - MultiModelSelector for inline model selection
+ * - UnifiedQueue gallery for viewing generations
  * - "Create More" button handling from UnifiedQueue
- * - Persistent collapse state via localStorage
- * - Responsive design (stacked on mobile, side-by-side on desktop)
+ * - "Edit Image" functionality from UnifiedQueue
  *
  * @param {Object} props
- * @param {boolean} props.isFormCollapsed - External control of form collapse state
- * @param {Function} props.onToggleForm - Callback when form toggle is requested
- * @param {Function} props.onCollapseChange - Callback when collapse state changes (for parent to track state)
  * @param {string} props.searchQuery - Search query for filtering generations
  * @param {Array} props.selectedStatuses - Array of selected status values for filtering
  * @param {Array} props.selectedModelsFilter - Array of selected model IDs for filtering
  */
-export function Studio({ isFormCollapsed: externalIsCollapsed, onToggleForm, onCollapseChange, searchQuery, selectedStatuses, selectedModelsFilter }) {
-  // State for selected models (array of model IDs)
+export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) {
+  // Use the image generation hook for quick generation from PromptBar
+  const { generateQueued, isLoading: isGenerating } = useImageGeneration();
+
+  // Shared models data
+  const { modelsNameMap } = useModels();
+
+  // Minimal state for PromptBar
+  const [prompt, setPrompt] = useState("");
+  const [mode, setMode] = useState("image"); // image, imgedit, video, upscale
   const [selectedModels, setSelectedModels] = useState([]);
 
-  // Settings from "Create More" button click
-  const [createMoreSettings, setCreateMoreSettings] = useState(null);
+  // Image state for Edit/Upscale modes
+  const [sourceImage, setSourceImage] = useState(null);
+  const [sourceImagePreview, setSourceImagePreview] = useState(null);
+  const [strength, setStrength] = useState(0.75);
 
-  // State for edit image mode
+  // UI state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // "Create More" settings from gallery
+  const [createMoreSettings, setCreateMoreSettings] = useState(null);
   const [editImageSettings, setEditImageSettings] = useState(null);
 
-  // Form collapse state with localStorage persistence
-  // Use external state if provided, otherwise use internal state
-  // Default to collapsed when localStorage is empty (first visit)
-  const [internalIsCollapsed, setIsFormCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === null) {
-        // First visit - default to collapsed (form closed)
-        return true;
-      }
-      return saved === "true";
-    }
-    return true; // Default to collapsed on server-side
-  });
+  // Upscale settings state (managed here for top form access)
+  const [upscaleFactor, setUpscaleFactor] = useState(2);
+  const [upscaleResizeMode, setUpscaleResizeMode] = useState(0);
+  const [upscaleTargetWidth, setUpscaleTargetWidth] = useState(1024);
+  const [upscaleTargetHeight, setUpscaleTargetHeight] = useState(1024);
+  const [upscalerName, setUpscalerName] = useState("RealESRGAN 4x+");
+  const [availableUpscalers, setAvailableUpscalers] = useState([]);
 
-  // Determine whether to use external or internal state
-  const isFormCollapsed = externalIsCollapsed ?? internalIsCollapsed;
-
-  // Internal setter that persists to localStorage and notifies parent
-  const setFormCollapsed = useCallback((value) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, String(value));
-    }
-    setIsFormCollapsed(value);
-    onCollapseChange?.(value);
-  }, [onCollapseChange]);
-
-  // Persist collapse state to localStorage
+  // Fetch available upscalers on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, String(isFormCollapsed));
-    }
-  }, [isFormCollapsed]);
+    const fetchUpscalers = async () => {
+      try {
+        const response = await authenticatedFetch("/sdapi/v1/upscalers");
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableUpscalers(data);
+          if (data.length > 0 && !upscalerName) {
+            setUpscalerName(data[0].name);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch upscalers:", err);
+      }
+    };
+    fetchUpscalers();
+  }, []);
+
+  // File handlers for upscale mode
+  const handleFileSelect = useCallback((file) => {
+    setSourceImage(file);
+    setSourceImagePreview(URL.createObjectURL(file));
+  }, []);
+
+  const handleClearImage = useCallback(() => {
+    setSourceImage(null);
+    setSourceImagePreview(null);
+  }, []);
 
   // Handle "Create More" from UnifiedQueue
-  // Sets the selected model and applies settings from the generation
   const handleCreateMore = useCallback((generation) => {
     setCreateMoreSettings(generation);
-    setEditImageSettings(null); // Clear edit settings when creating more
+    setEditImageSettings(null);
     if (generation.model) {
       setSelectedModels([generation.model]);
     }
-    // Expand form when creating more
-    const newValue = false;
-    setFormCollapsed(newValue);
-  }, [setFormCollapsed]);
+    if (generation.prompt) {
+      setPrompt(generation.prompt);
+    }
+    // Open settings panel to show the applied settings
+    setIsSettingsOpen(true);
+  }, []);
 
   // Handle "Edit Image" from UnifiedQueue
-  // Sets the image for editing, switches to imgedit mode, and sets default edit model
   const handleEditImage = useCallback((imageFile, generation) => {
-    // Create a temporary object URL for preview
     const imageUrl = URL.createObjectURL(imageFile);
-
-    // Set up edit settings with the image
     setEditImageSettings({
       imageFile,
       imageUrl,
-      type: 'edit',
-      // Preserve prompt if available
+      type: 'imgedit',
       prompt: generation.prompt || '',
-      // Clear other settings for a fresh edit
       negative_prompt: '',
       size: generation.size || '1024x1024',
     });
-    setCreateMoreSettings(null); // Clear create more settings when editing
-
-    // Set the default editing model
+    setCreateMoreSettings(null);
     setSelectedModels([DEFAULT_EDIT_MODEL]);
+    setMode('imgedit');
+    setIsSettingsOpen(true);
+  }, []);
 
-    // Expand form when editing
-    setFormCollapsed(false);
-  }, [setFormCollapsed]);
+  // Handle "Upscale Image" from UnifiedQueue
+  const handleUpscaleImage = useCallback((imageFile, generation) => {
+    const imageUrl = URL.createObjectURL(imageFile);
+    setEditImageSettings({
+      imageFile,
+      imageUrl,
+      type: 'upscale',
+      prompt: generation.prompt || '',
+    });
+    setCreateMoreSettings(null);
+    // Also set sourceImage for upscale mode
+    setSourceImage(imageFile);
+    setSourceImagePreview(imageUrl);
+    setMode('upscale');
+    setIsSettingsOpen(true);
+  }, []);
 
-  // Handle generation complete
-  // Gallery auto-refreshes via WebSocket, so this is mainly for any additional actions
+  // Handle "Create Video" from UnifiedQueue
+  const handleCreateVideo = useCallback((imageFile, generation) => {
+    const imageUrl = URL.createObjectURL(imageFile);
+    setEditImageSettings({
+      imageFile,
+      imageUrl,
+      type: 'video',
+      prompt: generation.prompt || '',
+    });
+    setCreateMoreSettings(null);
+    // Also set sourceImage for video mode
+    setSourceImage(imageFile);
+    setSourceImagePreview(imageUrl);
+    setMode('video');
+    setIsSettingsOpen(true);
+  }, []);
+
+  // Handle generate from PromptBar - queue submission
+  const handleGenerate = useCallback(async () => {
+    // Handle upscale mode - queue the upscale job
+    if (mode === 'upscale') {
+      if (!sourceImage) {
+        toast.error("Please select a source image");
+        return;
+      }
+
+      try {
+        await generateQueued({
+          mode: 'upscale',
+          image: sourceImage,
+          upscaler: upscalerName,
+          resize_mode: upscaleResizeMode,
+          upscale_factor: upscaleFactor,
+          target_width: upscaleResizeMode === 1 ? upscaleTargetWidth : undefined,
+          target_height: upscaleResizeMode === 1 ? upscaleTargetHeight : undefined,
+        });
+        toast.success("Upscale job added to queue!");
+        // Clear the source image after successful queue submission
+        handleClearImage();
+      } catch (err) {
+        toast.error(err.message || "Failed to queue upscale job");
+      }
+      return;
+    }
+
+    // For imgedit mode, user needs to use Settings panel
+    if (mode === 'imgedit') {
+      toast.error("Please open Settings panel below to configure this mode");
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    if (!prompt.trim()) {
+      toast.error("Please enter a prompt");
+      return;
+    }
+    if (selectedModels.length === 0) {
+      toast.error("Please select at least one model");
+      return;
+    }
+
+    // Quick generation: queue directly with default settings
+    try {
+      // Build params for each selected model
+      const promises = selectedModels.map((modelId) =>
+        generateQueued({
+          mode: 'generate',
+          model: modelId,
+          prompt,
+          size: '1024x1024', // Default size
+          n: 1,
+        })
+      );
+
+      await Promise.all(promises);
+      toast.success(`${selectedModels.length} job(s) added to queue!`);
+
+      // Clear prompt after successful generation
+      setPrompt("");
+    } catch (err) {
+      toast.error(err.message || "Failed to queue generation");
+    }
+  }, [prompt, selectedModels, mode, generateQueued, sourceImage, upscalerName, upscaleResizeMode, upscaleFactor, upscaleTargetWidth, upscaleTargetHeight, handleClearImage]);
+
+  // Handle generate complete
   const handleGenerated = useCallback(() => {
-    // The gallery will auto-refresh via WebSocket subscription
-    // This callback can be used for additional actions if needed
+    setCreateMoreSettings(null);
+    setEditImageSettings(null);
+    setPrompt("");
   }, []);
 
-  // Toggle form collapse state - use external callback or internal toggle
-  const toggleFormCollapse = useCallback(() => {
-    if (onToggleForm) {
-      onToggleForm();
-    } else {
-      setFormCollapsed((prev) => !prev);
-    }
-  }, [onToggleForm, setFormCollapsed]);
-
-  // Handle model selection change
-  const handleModelChange = useCallback((modelId) => {
-    if (modelId) {
-      // If modelId is provided, set it as the only selected model
-      setSelectedModels([modelId]);
-    } else {
-      // Clear selection if no modelId
-      setSelectedModels([]);
-    }
-  }, []);
-
-  // Handle models array change (for GeneratePanel)
-  const handleModelsChange = useCallback((models) => {
-    setSelectedModels(models);
-  }, []);
-
-  // Clear createMoreSettings and editImageSettings after they have been applied
+  // Clear settings after they've been applied
   const handleSettingsApplied = useCallback(() => {
     setCreateMoreSettings(null);
     setEditImageSettings(null);
   }, []);
 
   return (
-    <div className="container mx-auto p-4">
-      {/* Desktop Generate Sheet - Offcanvas menu */}
-      <Sheet open={!isFormCollapsed} onOpenChange={(open) => setFormCollapsed(!open)}>
-        {/* Generate button trigger - shown when form is collapsed */}
-        {!isFormCollapsed && (
-          <SheetTrigger asChild>
-            <div className="sr-only">
-              {/* Hidden trigger - Sheet is controlled programmatically */}
-            </div>
-          </SheetTrigger>
-        )}
+    <div className="container mx-auto p-4 space-y-4">
+      {/* PromptBar - Full width prompt input at top */}
+      <PromptBar
+        prompt={prompt}
+        onPromptChange={setPrompt}
+        mode={mode}
+        onModeChange={setMode}
+        selectedModels={selectedModels}
+        onModelsChange={setSelectedModels}
+        modelsMap={modelsNameMap}
+        onSettingsToggle={() => setIsSettingsOpen(!isSettingsOpen)}
+        settingsOpen={isSettingsOpen}
+        onGenerate={handleGenerate}
+        isLoading={isGenerating}
+        disabled={false}
+        sourceImagePreview={sourceImagePreview}
+        sourceImage={sourceImage}
+        onFileSelect={handleFileSelect}
+        onClearImage={handleClearImage}
+        availableUpscalers={availableUpscalers}
+        upscalerName={upscalerName}
+        onUpscalerNameChange={setUpscalerName}
+        strength={strength}
+      />
 
-        <SheetContent side="left" className="w-full sm:w-[500px] md:w-[600px] lg:w-[700px] xl:w-[800px] overflow-y-auto p-0">
-          <SheetHeader className="p-6 pb-0">
-            <SheetTitle>Generate</SheetTitle>
-          </SheetHeader>
-          <div className="p-6 pt-2">
-            <GeneratePanel
-              selectedModels={selectedModels}
-              onModelsChange={handleModelsChange}
-              settings={createMoreSettings}
-              editImageSettings={editImageSettings}
-              onGenerated={(...args) => {
-                handleGenerated(...args);
-                handleSettingsApplied();
-                // Optionally close the sheet after generation
-                // setFormCollapsed(true);
-              }}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Settings Panel - Collapsible, shown below */}
+      <GeneratePanel
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        selectedModels={selectedModels}
+        onModelsChange={setSelectedModels}
+        settings={createMoreSettings}
+        editImageSettings={editImageSettings}
+        onGenerated={() => {
+          handleGenerated();
+          handleSettingsApplied();
+        }}
+        prompt={prompt}
+        mode={mode}
+        onModeChange={setMode}
+        // Upscale state (managed in Studio for top form access)
+        sourceImage={sourceImage}
+        sourceImagePreview={sourceImagePreview}
+        upscaleFactor={upscaleFactor}
+        onUpscaleFactorChange={setUpscaleFactor}
+        upscaleResizeMode={upscaleResizeMode}
+        onUpscaleResizeModeChange={setUpscaleResizeMode}
+        upscaleTargetWidth={upscaleTargetWidth}
+        onUpscaleTargetWidthChange={setUpscaleTargetWidth}
+        upscaleTargetHeight={upscaleTargetHeight}
+        onUpscaleTargetHeightChange={setUpscaleTargetHeight}
+        upscalerName={upscalerName}
+        onUpscalerNameChange={setUpscalerName}
+        onFileSelect={handleFileSelect}
+        onClearImage={handleClearImage}
+      />
 
       {/* Main content - UnifiedQueue Gallery */}
-      <div className="grid grid-cols-1 gap-6">
-        <UnifiedQueue
-          onCreateMore={handleCreateMore}
-          onEditImage={handleEditImage}
-          searchQuery={searchQuery}
-          selectedStatuses={selectedStatuses}
-          selectedModelsFilter={selectedModelsFilter}
-        />
-      </div>
-
-      {/* Floating action button for collapsed form */}
-      {isFormCollapsed && (
-        <Button
-          onClick={toggleFormCollapse}
-          size="lg"
-          className="hidden lg:flex fixed bottom-6 left-6 rounded-full shadow-lg h-14 w-14 p-0 z-40"
-          title="Show Generate Form"
-        >
-          <Sparkles className="h-6 w-6" />
-        </Button>
-      )}
+      <UnifiedQueue
+        onCreateMore={handleCreateMore}
+        onEditImage={handleEditImage}
+        onUpscaleImage={handleUpscaleImage}
+        onCreateVideo={handleCreateVideo}
+        searchQuery={searchQuery}
+        selectedStatuses={selectedStatuses}
+        selectedModelsFilter={selectedModelsFilter}
+      />
     </div>
   );
 }

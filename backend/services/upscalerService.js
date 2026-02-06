@@ -145,7 +145,7 @@ export async function upscaleImage(imageInput, options = {}) {
       : imageInput;
     imageBuffer = Buffer.from(base64Data, 'base64');
   } else if (Buffer.isBuffer(imageInput)) {
-    imageBuffer = imageBuffer;
+    imageBuffer = imageInput;
   } else {
     throw new Error('Invalid image input: must be Buffer or base64 string');
   }

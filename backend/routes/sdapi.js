@@ -12,6 +12,7 @@ import {
 } from '../db/queries.js';
 import { SD_SAMPLERS, findModelIdByName } from '../utils/modelHelpers.js';
 import { authenticateRequest } from '../middleware/auth.js';
+import { upload } from '../middleware/upload.js';
 
 const logger = createLogger('routes:sdapi');
 
@@ -357,26 +358,62 @@ export function registerSdApiRoutes(app) {
    * POST /sdapi/v1/extra-single-image
    * Upscale a single image
    * Compatible with SD.next / Automatic1111 API
+   * Supports both JSON (base64) and multipart/form-data (file upload)
    */
-  app.post('/sdapi/v1/extra-single-image', authenticateRequest, async (req, res) => {
+  app.post('/sdapi/v1/extra-single-image', upload.single('image'), authenticateRequest, async (req, res) => {
     try {
       const { upscaleImage } = await import('../services/upscalerService.js');
 
-      const {
-        image, // Base64 string
-        resize_mode = 0,
-        show_extras_results = true,
-        gfpgan_visibility = 0,
-        codeformer_visibility = 0,
-        codeformer_weight = 0,
-        upscaling_resize = 2.0,
-        upscaling_resize_w = 512,
-        upscaling_resize_h = 512,
-        upscaling_crop = true,
-        upscaler_1 = 'RealESRGAN 4x+',
-        upscaler_2 = 'None',
-        extras_upscaler_2_visibility = 0
-      } = req.body;
+      let image;
+      let resize_mode = 0;
+      let show_extras_results = true;
+      let gfpgan_visibility = 0;
+      let codeformer_visibility = 0;
+      let codeformer_weight = 0;
+      let upscaling_resize = 2.0;
+      let upscaling_resize_w = 512;
+      let upscaling_resize_h = 512;
+      let upscaling_crop = true;
+      let upscaler_1 = 'RealESRGAN 4x+';
+      let upscaler_2 = 'None';
+      let extras_upscaler_2_visibility = 0;
+
+      // Handle both multipart form data (file upload) and JSON (base64)
+      if (req.file) {
+        // File upload via multipart/form-data
+        const { buffer, mimetype } = req.file;
+        image = `data:${mimetype};base64,${buffer.toString('base64')}`;
+
+        // Get other fields from req.body (form fields)
+        if (req.body) {
+          if (req.body.resize_mode !== undefined) resize_mode = parseInt(req.body.resize_mode, 10);
+          if (req.body.upscale_factor !== undefined) upscaling_resize = parseFloat(req.body.upscale_factor);
+          if (req.body.upscaler) upscaler_1 = req.body.upscaler;
+          if (req.body.target_width !== undefined) upscaling_resize_w = parseInt(req.body.target_width, 10);
+          if (req.body.target_height !== undefined) upscaling_resize_h = parseInt(req.body.target_height, 10);
+        }
+      } else {
+        // JSON body with base64 image
+        ({
+          image,
+          resize_mode = 0,
+          show_extras_results = true,
+          gfpgan_visibility = 0,
+          codeformer_visibility = 0,
+          codeformer_weight = 0,
+          upscaling_resize = 2.0,
+          upscaling_resize_w = 512,
+          upscaling_resize_h = 512,
+          upscaling_crop = true,
+          upscaler_1 = 'RealESRGAN 4x+',
+          upscaler_2 = 'None',
+          extras_upscaler_2_visibility = 0
+        } = req.body);
+
+        if (!image) {
+          return res.status(400).json({ error: 'Missing required field: image' });
+        }
+      }
 
       if (!image) {
         return res.status(400).json({ error: 'Missing required field: image' });

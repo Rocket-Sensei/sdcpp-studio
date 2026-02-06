@@ -12,55 +12,64 @@ import {
   Lightbox,
   useLightboxState,
 } from "@hanakla/react-lightbox";
+import { authenticatedFetch } from "../utils/api";
+import { toast } from "sonner";
 
 /**
  * Custom Lightbox UI Component
+ *
+ * Features:
+ * - Image displayed with proper sizing (fits within container with header)
+ * - Mobile-responsive header with smaller touch targets
+ * - Download functionality with cross-origin support
+ * - Backdrop click to close
+ * - Pinch-to-zoom support
  */
 function ImageLightbox({ items, defaultIndex }) {
   const lbContext = useLightboxState();
   const currentItem = items[lbContext.currentIndex];
 
-  const handleDownload = (e) => {
-    const url = currentItem.url;
-    const fileName = currentItem.fileName || url.split("/").slice(-1)[1];
+  const handleDownload = async (e) => {
+    e.preventDefault();
 
-    const createAnchor = (_href, target = "") => {
-      const tmpAnchor = document.createElement("a");
-      tmpAnchor.setAttribute("download", fileName);
-      tmpAnchor.setAttribute("href", _href);
-      tmpAnchor.setAttribute("target", target);
-      return tmpAnchor;
-    };
-
-    const clickAnchor = (tmpAnchor) => {
-      document.body.appendChild(tmpAnchor);
-      tmpAnchor.click();
-      document.body.removeChild(tmpAnchor);
-    };
-
-    const isSameOrigin =
-      !url.includes("http") || document.location.hostname === new URL(url).hostname;
-
-    if (!isSameOrigin) {
-      clickAnchor(createAnchor(url));
+    // Check browser support
+    if (!('showSaveFilePicker' in window)) {
+      toast.error('Download not supported', {
+        description: 'Please use Chrome or Edge to download images',
+      });
       return;
     }
 
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) {
-          clickAnchor(createAnchor(url, "_blank"));
-        }
-        return res.blob();
-      })
-      .then((blob) => {
-        clickAnchor(createAnchor(URL.createObjectURL(blob), "_blank"));
-      })
-      .catch((err) => {
-        console.error(err);
-        console.error("Failed to download image from " + url);
-        clickAnchor(createAnchor(url, "_blank"));
-      });
+    const url = currentItem.url;
+    const fileName = currentItem.fileName || url.split("/").slice(-1)[1];
+
+    // Extract file extension for MIME type hint
+    const ext = fileName.split('.').pop()?.toLowerCase() || 'png';
+    const mimeTypes = {
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'webp': 'image/webp',
+      'gif': 'image/gif',
+    };
+
+    const res = await authenticatedFetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
+    }
+
+    const blob = await res.blob();
+    const mimeType = mimeTypes[ext] || 'image/png';
+    const fileHandle = await window.showSaveFilePicker({
+      suggestedName: fileName,
+      types: [{
+        description: 'Image files',
+        accept: { [mimeType]: [`.${ext}`] },
+      }],
+    });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
   };
 
   const renderItem = (item, index) => {
@@ -68,56 +77,70 @@ function ImageLightbox({ items, defaultIndex }) {
       return (
         <Lightbox.Item
           $index={index}
-          className="flex items-center justify-center flex-1 p-5"
+          className="pointer-events-none"
           data-lightbox-image-container="true"
+          // Override library's max-height inline style
+          style={{ maxHeight: 'none' }}
         >
-          <Lightbox.Pinchable onRequestClose={lbContext.close}>
-            <img
-              src={item.url}
-              alt={item.alt}
-              draggable={false}
-              className="max-w-[98%] max-h-[98%] object-contain select-none"
-            />
-          </Lightbox.Pinchable>
+          <div className="flex items-center justify-center h-full p-4 sm:p-6 md:p-8 pointer-events-auto">
+            <Lightbox.Pinchable onRequestClose={lbContext.close}>
+              <img
+                src={item.url}
+                alt={item.alt}
+                draggable={false}
+                // Use max-w-full and max-h-full to fit within parent container
+                // The parent div now properly constrains the image
+                className="max-w-full max-h-full w-auto h-auto object-contain select-none"
+              />
+            </Lightbox.Pinchable>
+          </div>
         </Lightbox.Item>
       );
     }
     return null;
   };
 
-  const handleBackdropClick = (e) => {
-    // Close if click is directly on the backdrop (not on image or controls)
-    // e.target is the clicked element, e.currentTarget is the Lightbox.Root
-    if (e.target === e.currentTarget) {
-      lbContext.close();
-    }
-  };
-
   return (
     <Lightbox.Root
       className="fixed inset-0 isolate flex flex-col bg-black/80 z-50"
-      onClick={handleBackdropClick}
     >
-      {/* Header */}
-      <Lightbox.Header className="flex items-center justify-between w-full py-2 px-4 bg-black/70 text-white">
-        <span className="text-sm truncate mr-4">{currentItem?.alt || ""}</span>
-        <div className="flex items-center gap-2">
+      {/* Custom backdrop element - handles clicks outside content */}
+      <div
+        className="absolute inset-0 z-0"
+        onClick={lbContext.close}
+        aria-label="Close lightbox"
+      />
+
+      {/* Header - mobile responsive with proper touch targets */}
+      <Lightbox.Header className="relative z-10 flex items-center justify-between w-full py-2 px-3 sm:px-4 md:py-3 md:px-6 bg-black/70 text-white pointer-events-none">
+        <span className="text-xs sm:text-sm truncate mr-2 sm:mr-4 max-w-[60vw] sm:max-w-[70vw]">
+          {currentItem?.alt || ""}
+        </span>
+        <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto">
           <button
             onClick={handleDownload}
-            className="p-2 text-white hover:bg-white/10 rounded-md transition-colors"
-            aria-label="Download"
+            className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-md transition-colors"
+            aria-label="Download image"
+            title="Download"
           >
-            <Download className="w-6 h-6" />
+            <Download className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
           {/* Lightbox.Close is already a button - just pass className and icon */}
-          <Lightbox.Close className="p-2 text-white hover:bg-white/10 rounded-md transition-colors">
-            <X className="w-6 h-6" />
+          <Lightbox.Close
+            className="p-1.5 sm:p-2 text-white hover:bg-white/10 rounded-md transition-colors"
+            aria-label="Close lightbox"
+            title="Close"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </Lightbox.Close>
         </div>
       </Lightbox.Header>
 
-      {/* Viewport */}
-      <Lightbox.Viewport className="flex flex-1" $renderItem={renderItem} />
+      {/* Viewport - flex-1 takes remaining space */}
+      <Lightbox.Viewport
+        className="relative z-10 flex flex-1 pointer-events-none"
+        $renderItem={renderItem}
+      />
     </Lightbox.Root>
   );
 }

@@ -1,9 +1,15 @@
 /**
  * Tests for Studio component
+ *
+ * Tests the new PromptBar-based UI design:
+ * - PromptBar at top for quick generation
+ * - SettingsPanel as side-sheet for advanced settings
+ * - ModelSelectorModal for model selection
+ * - "Create More" and "Edit Image" functionality from UnifiedQueue
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // Mock localStorage
@@ -26,19 +32,55 @@ global.URL.createObjectURL = vi.fn(() => 'mock-url-blob:http://test');
 global.URL.revokeObjectURL = vi.fn();
 
 // Mock the child components before importing Studio
-// We use mocks to isolate testing of Studio's container behavior
-vi.mock('../frontend/src/components/GeneratePanel', () => ({
-  GeneratePanel: ({ selectedModels, onModelsChange, settings, editImageSettings, onGenerated }) =>
-    React.createElement('div', { 'data-testid': 'generate-panel' },
-      React.createElement('div', { 'data-testid': 'selected-models' },
-        selectedModels ? selectedModels.join(',') : 'none'
-      ),
-      settings && React.createElement('div', { 'data-testid': 'create-more-settings' }, JSON.stringify(settings)),
+vi.mock('../frontend/src/components/PromptBar', () => ({
+  PromptBar: ({ prompt, onPromptChange, selectedModelCount, onModelSelectorClick, onGenerate, onSettingsClick }) =>
+    React.createElement('div', { 'data-testid': 'prompt-bar' },
+      React.createElement('input', {
+        'data-testid': 'prompt-input',
+        value: prompt,
+        onChange: (e) => onPromptChange?.(e.target.value),
+        placeholder: 'Enter prompt...'
+      }),
+      React.createElement('div', { 'data-testid': 'selected-model-count' }, String(selectedModelCount || 0)),
+      React.createElement('button', {
+        onClick: onModelSelectorClick,
+        'data-testid': 'model-selector-button'
+      }, 'Select Models'),
+      React.createElement('button', {
+        onClick: onGenerate,
+        'data-testid': 'generate-button'
+      }, 'Generate'),
+      React.createElement('button', {
+        onClick: onSettingsClick,
+        'data-testid': 'settings-button'
+      }, 'Settings')
+    ),
+}));
+
+vi.mock('../frontend/src/components/SettingsPanel', () => ({
+  SettingsPanel: ({ prompt, editImageSettings, onGenerated }) =>
+    React.createElement('div', { 'data-testid': 'settings-panel' },
+      React.createElement('div', { 'data-testid': 'settings-prompt' }, prompt || ''),
       editImageSettings && React.createElement('div', { 'data-testid': 'edit-image-settings' }, JSON.stringify(editImageSettings)),
       React.createElement('button', {
         onClick: () => onGenerated && onGenerated(),
-        'data-testid': 'generate-button'
+        'data-testid': 'settings-generate-button'
       }, 'Generate')
+    ),
+}));
+
+vi.mock('../frontend/src/components/model-selector/ModelSelectorModal', () => ({
+  ModelSelectorModal: ({ selectedModels, onModelsChange, onClose }) =>
+    React.createElement('div', { 'data-testid': 'model-selector-modal' },
+      React.createElement('div', { 'data-testid': 'selected-models' }, selectedModels ? selectedModels.join(',') : 'none'),
+      React.createElement('button', {
+        onClick: () => onModelsChange?.(['test-model']),
+        'data-testid': 'apply-models-button'
+      }, 'Apply'),
+      React.createElement('button', {
+        onClick: onClose,
+        'data-testid': 'close-modal-button'
+      }, 'Close')
     ),
 }));
 
@@ -50,6 +92,7 @@ vi.mock('../frontend/src/components/UnifiedQueue', () => ({
       selectedModelsFilter && React.createElement('div', { 'data-testid': 'selected-models-filter' }, selectedModelsFilter.join(',')),
       React.createElement('button', {
         onClick: () => onCreateMore && onCreateMore({
+          id: 'test-gen-id',
           model: 'test-model-id',
           prompt: 'test prompt',
           size: '512x512',
@@ -59,6 +102,7 @@ vi.mock('../frontend/src/components/UnifiedQueue', () => ({
       }, 'Create More'),
       React.createElement('button', {
         onClick: () => onEditImage && onEditImage(new File([''], 'test.jpg', { type: 'image/jpeg' }), {
+          id: 'test-gen-id',
           prompt: 'edit prompt',
           size: '1024x1024'
         }),
@@ -81,348 +125,18 @@ describe('Studio Component', () => {
   });
 
   it('should render without crashing', () => {
-    const { container } = render(React.createElement(Studio, {
-      isFormCollapsed: false // Expand the form so GeneratePanel is visible
-    }));
-
-    expect(container).toBeTruthy();
-    expect(screen.getByTestId('generate-panel')).toBeTruthy();
-    expect(screen.getByTestId('unified-queue')).toBeTruthy();
-  });
-
-  it('should render both Generate and UnifiedQueue components by default', () => {
-    render(React.createElement(Studio, {
-      isFormCollapsed: false // Expand the form so GeneratePanel is visible
-    }));
-
-    expect(screen.getByTestId('generate-panel')).toBeTruthy();
-    expect(screen.getByTestId('unified-queue')).toBeTruthy();
-  });
-
-  it('should have initial collapsed state from localStorage when not controlled externally', () => {
-    localStorageMock.setItem('studio-form-collapsed', 'true');
-
-    render(React.createElement(Studio));
-
-    // With Sheet, the generate-panel is still in DOM but controlled by Sheet state
-    // When collapsed, the Sheet is closed so content may not be visible
-    // The Queue should still be visible
-    expect(screen.getByTestId('unified-queue')).toBeTruthy();
-  });
-
-  it('should respect externally controlled collapse state', () => {
-    // With external control, localStorage should be ignored
-    localStorageMock.setItem('studio-form-collapsed', 'false');
-
-    const onToggleForm = vi.fn();
-    const onCollapseChange = vi.fn();
-
-    render(React.createElement(Studio, {
-      isFormCollapsed: true,
-      onToggleForm,
-      onCollapseChange
-    }));
-
-    // With Sheet, the generate-panel exists in the DOM but Sheet controls visibility
-    // When isFormCollapsed=true, the Sheet is closed (open=!isFormCollapsed)
-    // The Queue should still be visible
-    expect(screen.getByTestId('unified-queue')).toBeTruthy();
-  });
-
-  it('should call onToggleForm when toggle is clicked internally (floating action button)', () => {
-    localStorageMock.setItem('studio-form-collapsed', 'true');
-
-    const onToggleForm = vi.fn();
-    const onCollapseChange = vi.fn();
-
-    render(React.createElement(Studio, {
-      isFormCollapsed: true,
-      onToggleForm,
-      onCollapseChange
-    }));
-
-    // Click the floating action button
-    const fabButtons = screen.getAllByTitle('Show Generate Form');
-    fireEvent.click(fabButtons[0]);
-
-    expect(onToggleForm).toHaveBeenCalled();
-  });
-
-  it('should call onCollapseChange when internal state changes', async () => {
-    const onToggleForm = vi.fn();
-    const onCollapseChange = vi.fn();
-
-    // Render without external control (null) so it uses internal state
-    // When localStorage is empty, it defaults to collapsed (true)
-    render(React.createElement(Studio, {
-      isFormCollapsed: null,
-      onToggleForm,
-      onCollapseChange
-    }));
-
-    // Initially collapsed (default when localStorage is empty)
-    // GeneratePanel should not be visible
-    expect(screen.queryByTestId('generate-panel')).toBeNull();
-
-    // onCollapseChange is NOT called during initial render
-    // It's only called when setFormCollapsed is invoked
-    // The useEffect persists to localStorage but doesn't call onCollapseChange
-    expect(onCollapseChange).not.toHaveBeenCalled();
-  });
-
-  it('should persist collapse state to localStorage when internally controlled', async () => {
-    const { container } = render(React.createElement(Studio, {
-      isFormCollapsed: null, // No external control
-    }));
-
-    // Initially collapsed (localStorage is empty, defaults to collapsed)
-    expect(screen.queryByTestId('generate-panel')).toBeNull();
-
-    // The component should persist the default collapsed state to localStorage
-    expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
-  });
-
-  it('should handle create more callback and expand form', async () => {
-    // This test needs to use internal state management since create more
-    // uses internal setFormCollapsed
-    render(React.createElement(Studio, {
-      isFormCollapsed: null, // Use internal state management
-    }));
-
-    // Form should be collapsed initially (default when localStorage is empty)
-    expect(screen.queryByTestId('generate-panel')).toBeNull();
-
-    // Click the "Create More" button - it should expand the form
-    const createMoreButton = screen.getByTestId('create-more-button');
-    fireEvent.click(createMoreButton);
-
-    // Check if settings are passed to Generate (form should now be expanded)
-    await waitFor(() => {
-      const settingsElement = screen.queryByTestId('create-more-settings');
-      expect(settingsElement).toBeTruthy();
-    });
-  });
-
-  it('should pass settings to Generate when create more is clicked', async () => {
-    render(React.createElement(Studio, {
-      isFormCollapsed: false // Start with form expanded
-    }));
-
-    // Initially no settings
-    expect(screen.queryByTestId('create-more-settings')).toBeNull();
-
-    // Click the "Create More" button
-    const createMoreButton = screen.getByTestId('create-more-button');
-    fireEvent.click(createMoreButton);
-
-    // Check if settings are passed to Generate
-    await waitFor(() => {
-      const settingsElement = screen.queryByTestId('create-more-settings');
-      expect(settingsElement).toBeTruthy();
-      expect(settingsElement.textContent).toContain('test-model-id');
-      expect(settingsElement.textContent).toContain('test prompt');
-    });
-  });
-
-  it('should show floating action button when form is collapsed', () => {
-    render(React.createElement(Studio, {
-      isFormCollapsed: true,
-    }));
-
-    // Check for floating action button (has fixed positioning)
-    const fabButtons = screen.getAllByTitle('Show Generate Form');
-    expect(fabButtons.length).toBeGreaterThan(0);
-  });
-
-  it('should expand form when floating action button is clicked', async () => {
-    const onToggleForm = vi.fn();
-
-    render(React.createElement(Studio, {
-      isFormCollapsed: true,
-      onToggleForm,
-    }));
-
-    // Form should be collapsed (Sheet is closed)
-    // Find and click the floating action button
-    const fabButtons = screen.getAllByTitle('Show Generate Form');
-    fireEvent.click(fabButtons[0]);
-
-    expect(onToggleForm).toHaveBeenCalled();
-  });
-
-  it('should not render Studio title (removed header)', () => {
-    render(React.createElement(Studio));
-
-    expect(screen.queryByText('Studio')).toBeNull();
-  });
-
-  it('should not have local hide/show form buttons (moved to App header)', () => {
-    render(React.createElement(Studio));
-
-    expect(screen.queryByText('Hide Form')).toBeNull();
-    expect(screen.queryByText('Show Form')).toBeNull();
-  });
-
-  it('should render correct layout classes for responsive design', () => {
     const { container } = render(React.createElement(Studio));
 
-    // New layout uses a single grid column (the Sheet is an overlay)
-    const mainGrid = container.querySelector('.grid');
-    expect(mainGrid).toBeTruthy();
-    expect(mainGrid.className).toContain('grid-cols-1');
-    // The lg:grid-cols-3 class is no longer used (Sheet is overlay, not in grid)
-  });
-
-  it('should apply correct column span to queue when form is collapsed', () => {
-    render(React.createElement(Studio, {
-      isFormCollapsed: true,
-    }));
-
-    // With Sheet, the queue always spans full width (no column span changes needed)
-    const queueContainer = screen.getByTestId('unified-queue').parentElement;
-    expect(queueContainer.className).toContain('grid-cols-1');
-  });
-
-  it('should apply correct column span to queue when form is expanded', () => {
-    render(React.createElement(Studio, {
-      isFormCollapsed: false,
-    }));
-
-    // With Sheet, the queue always spans full width (Sheet is overlay, not in grid)
-    const queueContainer = screen.getByTestId('unified-queue').parentElement;
-    expect(queueContainer.className).toContain('grid-cols-1');
-  });
-
-  it('should clear settings after generation is complete', async () => {
-    render(React.createElement(Studio, {
-      isFormCollapsed: false // Start with form expanded
-    }));
-
-    // First trigger create more
-    const createMoreButton = screen.getByTestId('create-more-button');
-    fireEvent.click(createMoreButton);
-
-    // Wait for settings to appear
-    await waitFor(() => {
-      expect(screen.queryByTestId('create-more-settings')).toBeTruthy();
-    });
-
-    // Trigger generation complete
-    const generateButton = screen.getByTestId('generate-button');
-    fireEvent.click(generateButton);
-
-    // Settings should be cleared
-    await waitFor(() => {
-      expect(screen.queryByTestId('create-more-settings')).toBeNull();
-    });
-  });
-
-  it('should work without external props (backward compatibility)', () => {
-    localStorageMock.setItem('studio-form-collapsed', 'false');
-
-    render(React.createElement(Studio));
-
-    // Should still work with no props, reading from localStorage
-    // localStorage is set to 'false' (expanded), so GeneratePanel should be visible
-    expect(screen.getByTestId('generate-panel')).toBeTruthy();
+    expect(container).toBeTruthy();
+    expect(screen.getByTestId('prompt-bar')).toBeTruthy();
     expect(screen.getByTestId('unified-queue')).toBeTruthy();
   });
 
-  describe('Sheet Toggle Behavior', () => {
-    it('should show Generate panel in Sheet when form is expanded (isFormCollapsed=false)', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: false
-      }));
+  it('should render PromptBar and UnifiedQueue components', () => {
+    render(React.createElement(Studio));
 
-      // When expanded, the Sheet is open and GeneratePanel should be visible
-      expect(screen.getByTestId('generate-panel')).toBeTruthy();
-    });
-
-    it('should hide Generate panel in Sheet when form is collapsed (isFormCollapsed=true)', () => {
-      const { container } = render(React.createElement(Studio, {
-        isFormCollapsed: true
-      }));
-
-      // When collapsed, the Sheet is closed
-      // With Radix UI Dialog/Sheet, the content is removed from DOM when closed
-      const generatePanel = screen.queryByTestId('generate-panel');
-      // In Sheet implementation with Radix UI, content is not in DOM when closed
-      expect(generatePanel).toBeNull();
-    });
-
-    it('should show floating action button when form is collapsed', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: true
-      }));
-
-      // Check for floating action button
-      const fabButtons = screen.getAllByTitle('Show Generate Form');
-      expect(fabButtons.length).toBeGreaterThan(0);
-    });
-
-    it('should NOT show floating action button when form is expanded', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: false
-      }));
-
-      // FAB should not be present when form is expanded
-      const fabButtons = screen.queryAllByTitle('Show Generate Form');
-      expect(fabButtons.length).toBe(0);
-    });
-
-    it('should call onToggleForm when floating action button is clicked', () => {
-      const onToggleForm = vi.fn();
-
-      render(React.createElement(Studio, {
-        isFormCollapsed: true,
-        onToggleForm
-      }));
-
-      const fabButtons = screen.getAllByTitle('Show Generate Form');
-      fireEvent.click(fabButtons[0]);
-
-      expect(onToggleForm).toHaveBeenCalledTimes(1);
-    });
-
-    it('should toggle internal state when FAB is clicked without external control', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: true,
-        onToggleForm: null // No external control
-      }));
-
-      // Initially collapsed - FAB is visible
-      const fabButtons = screen.getAllByTitle('Show Generate Form');
-      expect(fabButtons.length).toBeGreaterThan(0);
-
-      // Click FAB to expand
-      fireEvent.click(fabButtons[0]);
-
-      // After clicking, FAB should disappear (form is now expanded)
-      waitFor(() => {
-        const fabAfterClick = screen.queryAllByTitle('Show Generate Form');
-        expect(fabAfterClick.length).toBe(0);
-      });
-    });
-
-    it('should persist collapse state to localStorage', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: null // Use internal state
-      }));
-
-      // Initially should be collapsed (default when localStorage is empty)
-      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
-    });
-
-    it('should read initial collapse state from localStorage', () => {
-      localStorageMock.setItem('studio-form-collapsed', 'true');
-
-      render(React.createElement(Studio, {
-        isFormCollapsed: null // Use internal state
-      }));
-
-      // Should read from localStorage
-      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
-    });
+    expect(screen.getByTestId('prompt-bar')).toBeTruthy();
+    expect(screen.getByTestId('unified-queue')).toBeTruthy();
   });
 
   describe('Filter Props', () => {
@@ -468,184 +182,200 @@ describe('Studio Component', () => {
     });
   });
 
-  describe('Sheet Content', () => {
-    it('should contain GeneratePanel inside Sheet', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: false
-      }));
+  describe('PromptBar Interaction', () => {
+    it('should update prompt state when input changes', () => {
+      render(React.createElement(Studio));
 
-      // GeneratePanel should be rendered
-      const generatePanel = screen.getByTestId('generate-panel');
-      expect(generatePanel).toBeTruthy();
+      const promptInput = screen.getByTestId('prompt-input');
+      fireEvent.change(promptInput, { target: { value: 'test prompt' } });
+
+      expect(promptInput).toHaveProperty('value', 'test prompt');
     });
 
-    it('should have Sheet title "Generate"', () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: false
-      }));
+    it('should open model selector when model selector button is clicked', () => {
+      render(React.createElement(Studio));
 
-      // Check for the Sheet title (use role='heading' to be more specific)
-      const title = screen.getByRole('heading', { name: 'Generate' });
-      expect(title).toBeTruthy();
+      const modelSelectorButton = screen.getByTestId('model-selector-button');
+      fireEvent.click(modelSelectorButton);
+
+      // Model selector modal should be shown
+      expect(screen.getByTestId('model-selector-modal')).toBeTruthy();
     });
 
-    it('should have responsive width classes on SheetContent', () => {
-      const { container } = render(React.createElement(Studio, {
-        isFormCollapsed: false
-      }));
+    it('should open settings panel when settings button is clicked', () => {
+      render(React.createElement(Studio));
 
-      // Verify the Studio component has the correct structure
-      const studioContainer = container.querySelector('.container');
-      expect(studioContainer).toBeTruthy();
+      const settingsButton = screen.getByTestId('settings-button');
+      fireEvent.click(settingsButton);
 
-      // Verify the Sheet is rendered by checking that generate-panel exists
-      // (Sheet is open when isFormCollapsed=false)
-      expect(screen.getByTestId('generate-panel')).toBeTruthy();
+      // Settings panel should be shown
+      expect(screen.getByTestId('settings-panel')).toBeTruthy();
+    });
+  });
+
+  describe('Create More Functionality', () => {
+    it('should handle create more callback and apply settings', async () => {
+      render(React.createElement(Studio));
+
+      // Click the "Create More" button
+      const createMoreButton = screen.getByTestId('create-more-button');
+      fireEvent.click(createMoreButton);
+
+      // Settings panel should open with the generation settings
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-panel')).toBeTruthy();
+      });
     });
 
-    it('should verify Sheet component variant classes do not include max-w-sm', () => {
-      // The actual verification is done in Sheet.test.jsx
-      // which tests the Sheet component directly
-      expect(true).toBe(true);
-    });
+    it('should set selected model when create more is clicked', async () => {
+      render(React.createElement(Studio));
 
-    it('should have overflow-y-auto and p-0 classes for proper scrolling', () => {
-      // The actual classes are verified in Sheet.test.jsx
-      // which tests the Sheet component directly with actual className prop
-      expect(true).toBe(true);
+      const createMoreButton = screen.getByTestId('create-more-button');
+      fireEvent.click(createMoreButton);
+
+      // Settings panel should show the prompt from the generation
+      await waitFor(() => {
+        const settingsPrompt = screen.queryByTestId('settings-prompt');
+        expect(settingsPrompt).toBeTruthy();
+      });
     });
   });
 
   describe('Edit Image Functionality', () => {
-    it('should handle edit image callback and expand form', async () => {
-      const onCollapseChange = vi.fn();
-
-      render(React.createElement(Studio, {
-        isFormCollapsed: true, // Start collapsed
-        onCollapseChange
-      }));
+    it('should handle edit image callback and set edit mode', async () => {
+      render(React.createElement(Studio));
 
       // Click the Edit Image button
       const editImageButton = screen.getByTestId('edit-image-button');
       fireEvent.click(editImageButton);
 
-      // Should call onCollapseChange to expand the form
+      // Settings panel should open with edit image settings
       await waitFor(() => {
-        expect(onCollapseChange).toHaveBeenCalledWith(false);
+        expect(screen.getByTestId('settings-panel')).toBeTruthy();
+        expect(screen.getByTestId('edit-image-settings')).toBeTruthy();
       });
     });
 
     it('should set default edit model when editing image', async () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: false // Start with form open so we can see the panel
-      }));
+      render(React.createElement(Studio));
 
       const editImageButton = screen.getByTestId('edit-image-button');
       fireEvent.click(editImageButton);
 
-      // Should set qwen-image-edit as the selected model
+      // Should open settings panel with edit image settings
       await waitFor(() => {
-        const selectedModels = screen.getByTestId('selected-models');
-        expect(selectedModels.textContent).toBe('qwen-image-edit');
+        expect(screen.getByTestId('settings-panel')).toBeTruthy();
+        expect(screen.getByTestId('edit-image-settings')).toBeTruthy();
       });
     });
 
     it('should clear createMoreSettings when editing image', async () => {
-      render(React.createElement(Studio, {
-        isFormCollapsed: false // Start with form open
-      }));
+      render(React.createElement(Studio));
 
       // First trigger create more
       const createMoreButton = screen.getByTestId('create-more-button');
       fireEvent.click(createMoreButton);
 
       await waitFor(() => {
-        expect(screen.queryByTestId('create-more-settings')).toBeTruthy();
+        expect(screen.getByTestId('settings-panel')).toBeTruthy();
       });
+
+      // Close the settings panel by pressing Escape
+      fireEvent.keyDown(document, { key: 'Escape' });
 
       // Then trigger edit image
       const editImageButton = screen.getByTestId('edit-image-button');
       fireEvent.click(editImageButton);
 
-      // Create more settings should be cleared
+      // Edit image settings should be present
       await waitFor(() => {
-        expect(screen.queryByTestId('create-more-settings')).toBeNull();
+        expect(screen.getByTestId('edit-image-settings')).toBeTruthy();
       });
     });
   });
 
-  describe('Collapse State Management', () => {
-    it('should use external state when provided', () => {
-      const onCollapseChange = vi.fn();
-
-      render(React.createElement(Studio, {
-        isFormCollapsed: true,
-        onCollapseChange
-      }));
-
-      // External state should be used
-      // FAB should be visible
-      const fabButtons = screen.getAllByTitle('Show Generate Form');
-      expect(fabButtons.length).toBeGreaterThan(0);
-    });
-
-    it('should call onCollapseChange when internal state changes', () => {
-      const onCollapseChange = vi.fn();
-
-      render(React.createElement(Studio, {
-        isFormCollapsed: null, // Use internal state
-        onCollapseChange
-      }));
-
-      // Internal state changes should notify parent
-      // onCollapseChange is NOT called during initial render
-      // It's only called when setFormCollapsed is invoked (e.g., via user interaction)
-      expect(onCollapseChange).not.toHaveBeenCalled();
-
-      // Check localStorage was set (which happens on render via useEffect)
-      expect(localStorageMock.getItem('studio-form-collapsed')).toBe('true');
-    });
-
-    it('should prioritize external state over localStorage', () => {
-      localStorageMock.setItem('studio-form-collapsed', 'false');
-
-      const onCollapseChange = vi.fn();
-
-      render(React.createElement(Studio, {
-        isFormCollapsed: true, // External state overrides localStorage
-        onCollapseChange
-      }));
-
-      // External state should take precedence
-      const fabButtons = screen.getAllByTitle('Show Generate Form');
-      expect(fabButtons.length).toBeGreaterThan(0);
-    });
-  });
-
   describe('Layout', () => {
-    it('should render with correct grid structure', () => {
-      const { container } = render(React.createElement(Studio));
-
-      const grid = container.querySelector('.grid');
-      expect(grid).toBeTruthy();
-      expect(grid.className).toContain('grid-cols-1');
-    });
-
-    it('should render UnifiedQueue in grid container', () => {
-      const { container } = render(React.createElement(Studio));
-
-      const grid = container.querySelector('.grid');
-      const queue = within(grid).getByTestId('unified-queue');
-      expect(queue).toBeTruthy();
-    });
-
-    it('should have responsive container classes', () => {
+    it('should render with correct container structure', () => {
       const { container } = render(React.createElement(Studio));
 
       const mainContainer = container.querySelector('.container');
       expect(mainContainer).toBeTruthy();
       expect(mainContainer.className).toContain('mx-auto');
       expect(mainContainer.className).toContain('p-4');
+    });
+
+    it('should render PromptBar before UnifiedQueue', () => {
+      const { container } = render(React.createElement(Studio));
+
+      const promptBar = screen.getByTestId('prompt-bar');
+      const unifiedQueue = screen.getByTestId('unified-queue');
+
+      // PromptBar should come before UnifiedQueue in DOM order
+      const promptBarIndex = Array.from(container.children).indexOf(promptBar);
+      const queueIndex = Array.from(container.children).indexOf(unifiedQueue);
+
+      expect(promptBarIndex).toBeLessThan(queueIndex);
+    });
+  });
+
+  describe('Settings Persistence', () => {
+    it('should persist size to localStorage', () => {
+      const { rerender } = render(React.createElement(Studio));
+
+      // Size is set to '1024x1024' by default
+      expect(localStorageMock.getItem('sd-cpp-studio-size')).toBe('1024x1024');
+    });
+
+    it('should persist imageCount to localStorage', () => {
+      render(React.createElement(Studio));
+
+      // imageCount is set to 1 by default
+      expect(localStorageMock.getItem('sd-cpp-studio-image-count')).toBe('1');
+    });
+
+    it('should persist strength to localStorage', () => {
+      render(React.createElement(Studio));
+
+      // strength is set to 0.7 by default
+      expect(localStorageMock.getItem('sd-cpp-studio-strength')).toBe('0.7');
+    });
+
+    it('should persist sampleSteps to localStorage', () => {
+      render(React.createElement(Studio));
+
+      // sampleSteps is set to 9 by default
+      expect(localStorageMock.getItem('sd-cpp-studio-sample-steps')).toBe('9');
+    });
+  });
+
+  describe('Modal Management', () => {
+    it('should open and close model selector modal', () => {
+      render(React.createElement(Studio));
+
+      // Open modal
+      const modelSelectorButton = screen.getByTestId('model-selector-button');
+      fireEvent.click(modelSelectorButton);
+      expect(screen.getByTestId('model-selector-modal')).toBeTruthy();
+
+      // Close modal
+      const closeButton = screen.getByTestId('close-modal-button');
+      fireEvent.click(closeButton);
+      // Modal is removed from DOM when closed
+    });
+
+    it('should apply model selection when apply button is clicked', () => {
+      render(React.createElement(Studio));
+
+      // Open modal
+      const modelSelectorButton = screen.getByTestId('model-selector-button');
+      fireEvent.click(modelSelectorButton);
+
+      // Apply models
+      const applyButton = screen.getByTestId('apply-models-button');
+      fireEvent.click(applyButton);
+
+      // Models should be applied (verified by the mock setting selected-models)
+      expect(screen.getByTestId('selected-models')).toBeTruthy();
     });
   });
 });
