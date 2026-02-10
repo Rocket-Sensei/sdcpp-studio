@@ -4,6 +4,7 @@ import { join, basename } from 'path';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../utils/logger.js';
 import { modelManager } from '../services/modelManager.js';
+import { generationWaiter } from '../services/generationWaiter.js';
 
 const logger = createLogger('queries');
 
@@ -332,7 +333,18 @@ export function updateGenerationStatus(id, status, additionalData = {}) {
   const stmt = db.prepare(query);
   stmt.run(...params);
 
-  return getGenerationById(id);
+  const updatedGeneration = getGenerationById(id);
+
+  // Notify waiters of terminal states
+  if (status === GenerationStatus.COMPLETED) {
+    generationWaiter.notifyCompleted(id, updatedGeneration);
+  } else if (status === GenerationStatus.FAILED) {
+    generationWaiter.notifyFailed(id, updatedGeneration);
+  } else if (status === GenerationStatus.CANCELLED) {
+    generationWaiter.notifyCancelled(id, updatedGeneration);
+  }
+
+  return updatedGeneration;
 }
 
 /**
