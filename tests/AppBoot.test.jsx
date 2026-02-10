@@ -2,14 +2,13 @@
  * Tests for AppBoot component and API key entry flow
  *
  * Verifies the proper boot sequence:
- * 1. Initial loading state
- * 2. Auth check via /api/config
- * 3. API key modal if auth required and no key
- * 4. Validation of existing keys
- * 5. App renders after successful auth
+ * 1. Initial loading state (initializing)
+ * 2. Auth check via authenticatedFetch('/api/config')
+ * 3. API key modal if 401 response
+ * 4. App renders after successful auth
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -18,23 +17,13 @@ import * as apiUtils from '../frontend/src/utils/api';
 
 // Mock API utilities
 vi.mock('../frontend/src/utils/api', () => ({
-  isAuthRequired: vi.fn(),
   getStoredApiKey: vi.fn(),
-  validateApiKey: vi.fn(),
   saveApiKey: vi.fn(),
-  clearApiKey: vi.fn(),
   authenticatedFetch: vi.fn(),
 }));
 
-// Mock the ApiKeyContext
-vi.mock('../frontend/src/contexts/ApiKeyContext', () => ({
-  ApiKeyProvider: ({ children }) => children,
-  useApiKeyContext: () => ({
-    apiKey: null,
-    version: 0,
-    notifyApiKeyChanged: vi.fn(),
-  }),
-}));
+// Import mock helper
+import { createMockResponse } from './setup.js';
 
 // Mock the ApiKeyModal
 vi.mock('../frontend/src/components/ApiKeyModal', () => {
@@ -76,13 +65,12 @@ describe('AppBoot Component', () => {
 
     // Setup default mock returns
     vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
-    vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(false);
   });
 
   describe('Initial Loading State', () => {
     it('should show loading screen on mount', () => {
-      // Make isAuthRequired hang to test initial state
-      vi.mocked(apiUtils.isAuthRequired).mockImplementation(
+      // Make authenticatedFetch hang to test initial state
+      vi.mocked(apiUtils.authenticatedFetch).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -92,7 +80,7 @@ describe('AppBoot Component', () => {
     });
 
     it('should show loading with correct message', () => {
-      vi.mocked(apiUtils.isAuthRequired).mockImplementation(
+      vi.mocked(apiUtils.authenticatedFetch).mockImplementation(
         () => new Promise(() => {})
       );
 
@@ -103,9 +91,11 @@ describe('AppBoot Component', () => {
     });
   });
 
-  describe('No Auth Required', () => {
-    it('should render children when auth is not required', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(false);
+  describe('No Auth Required (200 OK)', () => {
+    it('should render children when config fetch returns 200', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(200, true)
+      );
 
       render(<AppBoot>App Content</AppBoot>);
 
@@ -114,8 +104,10 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should call onBootComplete when auth is not required', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(false);
+    it('should call onBootComplete when config fetch succeeds', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(200, true)
+      );
       const onBootComplete = vi.fn();
 
       render(<AppBoot onBootComplete={onBootComplete}>App Content</AppBoot>);
@@ -126,13 +118,16 @@ describe('AppBoot Component', () => {
     });
   });
 
-  describe('Auth Required - No Stored Key', () => {
+  describe('Auth Required (401 Response)', () => {
     beforeEach(() => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
       vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
     });
 
-    it('should show API key modal when auth is required and no key exists', async () => {
+    it('should show API key modal when config fetch returns 401', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(401, false)
+      );
+
       render(<AppBoot>App Content</AppBoot>);
 
       await waitFor(() => {
@@ -141,6 +136,10 @@ describe('AppBoot Component', () => {
     });
 
     it('should NOT render children while waiting for API key', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(401, false)
+      );
+
       render(<AppBoot>App Content</AppBoot>);
 
       await waitFor(() => {
@@ -148,10 +147,14 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should validate and save API key when submitted', async () => {
-      vi.mocked(apiUtils.validateApiKey).mockResolvedValue(true);
+    it('should save API key and retry config fetch when submitted', async () => {
       const onApiKeyChange = vi.fn();
       const onBootComplete = vi.fn();
+
+      // First call returns 401, second returns 200 after API key is submitted
+      vi.mocked(apiUtils.authenticatedFetch)
+        .mockResolvedValueOnce(createMockResponse(401, false))
+        .mockResolvedValueOnce(createMockResponse(200, true));
 
       render(
         <AppBoot onApiKeyChange={onApiKeyChange} onBootComplete={onBootComplete}>
@@ -167,33 +170,41 @@ describe('AppBoot Component', () => {
       // Submit the API key
       fireEvent.click(screen.getByTestId('submit-button'));
 
-      // Wait for validation and boot completion
+      // Wait for saveApiKey and onBootComplete to be called
       await waitFor(() => {
-        expect(apiUtils.validateApiKey).toHaveBeenCalled();
+        expect(apiUtils.saveApiKey).toHaveBeenCalledWith('test-api-key');
+        expect(onApiKeyChange).toHaveBeenCalled();
         expect(onBootComplete).toHaveBeenCalled();
       });
     });
 
-    it('should show error when API key validation fails', async () => {
-      vi.mocked(apiUtils.validateApiKey).mockResolvedValue(false);
+    it('should show error when API key is invalid (second 401)', async () => {
+      // Both calls return 401 - API key is invalid
+      vi.mocked(apiUtils.authenticatedFetch)
+        .mockResolvedValueOnce(createMockResponse(401, false))
+        .mockResolvedValueOnce(createMockResponse(401, false));
 
       render(<AppBoot>App Content</AppBoot>);
 
+      // Wait for modal to appear
       await waitFor(() => {
         expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
       });
 
+      // Submit the API key
       fireEvent.click(screen.getByTestId('submit-button'));
 
+      // Should show error message
       await waitFor(() => {
         expect(screen.getByTestId('error-message')).toBeInTheDocument();
+        expect(screen.getByTestId('error-message').textContent).toContain('Invalid API key');
       });
     });
 
-    it('should show error when validation throws', async () => {
-      vi.mocked(apiUtils.validateApiKey).mockRejectedValue(
-        new Error('Network error')
-      );
+    it('should show error when second fetch throws', async () => {
+      vi.mocked(apiUtils.authenticatedFetch)
+        .mockResolvedValueOnce(createMockResponse(401, false))
+        .mockRejectedValueOnce(new Error('Network error'));
 
       render(<AppBoot>App Content</AppBoot>);
 
@@ -209,74 +220,31 @@ describe('AppBoot Component', () => {
         expect(errorElement.textContent).toContain('Failed to validate');
       });
     });
-  });
 
-  describe('Auth Required - Invalid Stored Key', () => {
-    beforeEach(() => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
-      vi.mocked(apiUtils.getStoredApiKey).mockReturnValue('invalid-key');
-      vi.mocked(apiUtils.validateApiKey).mockResolvedValue(false);
-    });
+    it('should stay in needs_api_key state when fetch returns non-401 error after submit', async () => {
+      vi.mocked(apiUtils.authenticatedFetch)
+        .mockResolvedValueOnce(createMockResponse(401, false))
+        .mockResolvedValueOnce(createMockResponse(500, false));
 
-    it('should show API key modal when stored key is invalid', async () => {
       render(<AppBoot>App Content</AppBoot>);
 
       await waitFor(() => {
         expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
       });
-    });
 
-    it('should show validating state first', async () => {
-      // Make validateApiKey hang temporarily
-      vi.mocked(apiUtils.validateApiKey).mockImplementation(
-        () => new Promise(() => {})
-      );
+      fireEvent.click(screen.getByTestId('submit-button'));
 
-      render(<AppBoot>App Content</AppBoot>);
-
+      // Should still show modal with error
       await waitFor(() => {
-        expect(screen.getByText('Validating API key...')).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Auth Required - Valid Stored Key', () => {
-    beforeEach(() => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
-      vi.mocked(apiUtils.getStoredApiKey).mockReturnValue('valid-key');
-      vi.mocked(apiUtils.validateApiKey).mockResolvedValue(true);
-    });
-
-    it('should render children when valid key exists', async () => {
-      render(<AppBoot>App Content</AppBoot>);
-
-      await waitFor(() => {
-        expect(screen.getByText('App Content')).toBeInTheDocument();
-      });
-    });
-
-    it('should not show API key modal', async () => {
-      render(<AppBoot>App Content</AppBoot>);
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('api-key-modal')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should call onBootComplete', async () => {
-      const onBootComplete = vi.fn();
-
-      render(<AppBoot onBootComplete={onBootComplete}>App Content</AppBoot>);
-
-      await waitFor(() => {
-        expect(onBootComplete).toHaveBeenCalled();
+        expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
+        expect(screen.getByTestId('error-message')).toBeInTheDocument();
       });
     });
   });
 
   describe('Error Handling', () => {
-    it('should show error screen when auth check fails', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockRejectedValue(
+    it('should show error screen when config fetch throws', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
         new Error('Config fetch failed')
       );
 
@@ -287,8 +255,21 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should allow retry when error occurs', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockRejectedValue(
+    it('should display error message when boot fails', async () => {
+      const errorMessage = 'Network connection failed';
+      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
+        new Error(errorMessage)
+      );
+
+      render(<AppBoot>App Content</AppBoot>);
+
+      await waitFor(() => {
+        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+      });
+    });
+
+    it('should show retry button when error occurs', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
         new Error('Config fetch failed')
       );
 
@@ -297,15 +278,26 @@ describe('AppBoot Component', () => {
       await waitFor(() => {
         expect(screen.getByText('Retry')).toBeInTheDocument();
       });
+    });
 
-      // Note: Testing the actual retry would require reloading the page
-      // which is not practical in unit tests
+    it('should show error when response is not OK and not 401', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(500, false)
+      );
+
+      render(<AppBoot>App Content</AppBoot>);
+
+      await waitFor(() => {
+        expect(screen.getByText('Initialization Error')).toBeInTheDocument();
+      });
     });
   });
 
   describe('Boot State Transitions', () => {
-    it('should transition: initializing -> checking_auth -> ready (no auth)', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(false);
+    it('should transition: initializing -> ready (200 OK)', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(200, true)
+      );
 
       render(<AppBoot>App Content</AppBoot>);
 
@@ -319,9 +311,10 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should transition: initializing -> checking_auth -> needs_api_key (auth required)', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
-      vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
+    it('should transition: initializing -> needs_api_key (401)', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(401, false)
+      );
 
       render(<AppBoot>App Content</AppBoot>);
 
@@ -335,12 +328,29 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should transition: needs_api_key -> validating_key -> ready after submit', async () => {
-      vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
-      vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
-      vi.mocked(apiUtils.validateApiKey).mockResolvedValue(true);
+    it('should transition: initializing -> error (network error)', async () => {
+      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
+        new Error('Network error')
+      );
 
+      render(<AppBoot>App Content</AppBoot>);
+
+      // Should show loading first
+      expect(screen.getByText('Initializing...')).toBeInTheDocument();
+
+      // Should transition to error screen
+      await waitFor(() => {
+        expect(screen.getByText('Initialization Error')).toBeInTheDocument();
+        expect(screen.queryByText('Initializing...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should transition: needs_api_key -> ready after valid API key submit', async () => {
       const onBootComplete = vi.fn();
+
+      vi.mocked(apiUtils.authenticatedFetch)
+        .mockResolvedValueOnce(createMockResponse(401, false))
+        .mockResolvedValueOnce(createMockResponse(200, true));
 
       render(
         <AppBoot onBootComplete={onBootComplete}>App Content</AppBoot>
@@ -361,22 +371,53 @@ describe('AppBoot Component', () => {
       });
     });
   });
+
+  describe('Existing API Key in Storage', () => {
+    it('should use stored API key via authenticatedFetch', async () => {
+      vi.mocked(apiUtils.getStoredApiKey).mockReturnValue('stored-key');
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(200, true)
+      );
+
+      const onBootComplete = vi.fn();
+      render(<AppBoot onBootComplete={onBootComplete}>App Content</AppBoot>);
+
+      await waitFor(() => {
+        expect(apiUtils.authenticatedFetch).toHaveBeenCalledWith('/api/config');
+        expect(onBootComplete).toHaveBeenCalled();
+      });
+    });
+
+    it('should show API key modal if stored key returns 401', async () => {
+      vi.mocked(apiUtils.getStoredApiKey).mockReturnValue('invalid-stored-key');
+      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
+        createMockResponse(401, false)
+      );
+
+      render(<AppBoot>App Content</AppBoot>);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
+      });
+    });
+  });
 });
 
 describe('API Key Entry Flow - Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
   });
 
-  it('should complete full flow: check -> prompt -> validate -> boot', async () => {
-    // Simulate: auth required, no key
-    vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
-    vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
-    vi.mocked(apiUtils.validateApiKey).mockResolvedValue(true);
-
+  it('should complete full flow: 401 -> prompt -> submit -> boot', async () => {
     const onBootComplete = vi.fn();
     const onApiKeyChange = vi.fn();
+
+    // Simulate: 401 first, then 200 after key submit
+    vi.mocked(apiUtils.authenticatedFetch)
+      .mockResolvedValueOnce(createMockResponse(401, false))
+      .mockResolvedValueOnce(createMockResponse(200, true));
 
     render(
       <AppBoot onBootComplete={onBootComplete} onApiKeyChange={onApiKeyChange}>
@@ -399,17 +440,16 @@ describe('API Key Entry Flow - Integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('main-app')).toBeInTheDocument();
       expect(onBootComplete).toHaveBeenCalled();
+      expect(onApiKeyChange).toHaveBeenCalled();
     });
   });
 
-  it('should allow retry after failed validation', async () => {
-    vi.mocked(apiUtils.isAuthRequired).mockResolvedValue(true);
-    vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
-
-    // First attempt fails, second succeeds
-    vi.mocked(apiUtils.validateApiKey)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
+  it('should allow retry after failed validation (401 on retry)', async () => {
+    // First 401 triggers modal, second 401 is invalid key, third 200 is success
+    vi.mocked(apiUtils.authenticatedFetch)
+      .mockResolvedValueOnce(createMockResponse(401, false))
+      .mockResolvedValueOnce(createMockResponse(401, false))
+      .mockResolvedValueOnce(createMockResponse(200, true));
 
     render(
       <AppBoot>
@@ -421,11 +461,47 @@ describe('API Key Entry Flow - Integration', () => {
       expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
     });
 
-    // First submit fails (empty input, but that's okay for the mock)
+    // First submit fails
     fireEvent.click(screen.getByTestId('submit-button'));
 
     await waitFor(() => {
       expect(screen.getByTestId('error-message')).toBeInTheDocument();
+    });
+
+    // Type something for the second attempt
+    const input = screen.getByTestId('api-key-input');
+    fireEvent.change(input, { target: { value: 'valid-key' } });
+
+    // Second submit succeeds
+    fireEvent.click(screen.getByTestId('submit-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('main-app')).toBeInTheDocument();
+    });
+  });
+
+  it('should allow retry after network error on submit', async () => {
+    vi.mocked(apiUtils.authenticatedFetch)
+      .mockResolvedValueOnce(createMockResponse(401, false))
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(createMockResponse(200, true));
+
+    render(
+      <AppBoot>
+        <div data-testid="main-app">Main Application</div>
+      </AppBoot>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
+    });
+
+    // First submit fails with network error
+    fireEvent.click(screen.getByTestId('submit-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('error-message')).toBeInTheDocument();
+      expect(screen.getByTestId('error-message').textContent).toContain('Failed to validate');
     });
 
     // Type something for the second attempt

@@ -159,33 +159,32 @@ describe('Lightbox - Core Features', () => {
 describe('Lightbox - Download Functionality', () => {
   const source = getLightboxSource();
 
-  it('should handle same-origin downloads with fetch', () => {
-    expect(source).toContain('fetch(url)');
+  it('should use File System Access API (showSaveFilePicker)', () => {
+    expect(source).toContain('showSaveFilePicker');
+  });
+
+  it('should fetch image data with authenticatedFetch', () => {
+    expect(source).toContain('authenticatedFetch');
     expect(source).toContain('res.blob()');
   });
 
-  it('should handle cross-origin downloads with direct anchor', () => {
-    expect(source).toContain('isSameOrigin');
-    expect(source).toContain('new URL(url).hostname');
+  it('should check for browser support before downloading', () => {
+    expect(source).toContain("'showSaveFilePicker' in window");
   });
 
-  it('should create temporary anchor element for download', () => {
-    expect(source).toContain('document.createElement("a")');
-    expect(source).toContain('setAttribute("download"');
+  it('should show error toast when File System Access API is not supported', () => {
+    expect(source).toContain('Download not supported');
+    expect(source).toContain('Please use Chrome or Edge to download images');
   });
 
-  it('should use URL.createObjectURL for blob downloads', () => {
-    expect(source).toContain('URL.createObjectURL(blob)');
-  });
-
-  it('should clean up object URLs after download', () => {
-    // The component should handle cleanup (in the full implementation)
-    expect(source).toContain('URL.createObjectURL');
+  it('should create writable file handle and write blob', () => {
+    expect(source).toContain('createWritable');
+    expect(source).toContain('writable.write(blob)');
+    expect(source).toContain('writable.close()');
   });
 
   it('should have error handling for failed downloads', () => {
-    expect(source).toContain('.catch(');
-    expect(source).toContain('Failed to download image');
+    expect(source).toContain('Failed to fetch image');
   });
 
   it('should have aria-label on download button for accessibility', () => {

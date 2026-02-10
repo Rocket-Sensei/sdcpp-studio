@@ -76,9 +76,10 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify conditional rendering based on image count
-      expect(componentContent).toContain('imageCount === 1');
-      expect(componentContent).toContain('image_count > 1');
+      // The UnifiedQueue component uses ImageCard which handles image count
+      // Check that ImageCard is imported
+      expect(componentContent).toContain('import { ImageCard } from');
+      expect(componentContent).toContain('from "./gallery/ImageCard"');
     });
   });
 
@@ -122,9 +123,9 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify badge rendering for multiple images
-      expect(componentContent).toContain('bg-black/70');
-      expect(componentContent).toContain('pointer-events-none');
+      // Verify image count is used
+      expect(componentContent).toContain('const imageCount = generation.image_count || 0');
+      expect(componentContent).toContain('generation.first_image_url');
     });
 
     it('should not render old Eye icon and click handlers', () => {
@@ -217,9 +218,10 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify view button for gallery
-      expect(componentContent).toContain('image_count > 1 && (');
-      expect(componentContent).toContain('handleViewImage(generation)');
+      // ImageCard handles the click and display, UnifiedQueue just passes handlers
+      // Verify that ImageCard is used for displaying generations
+      expect(componentContent).toContain('ImageCard');
+      expect(componentContent).toContain('generation={generation}');
     });
 
     it('should keep existing Download, Iterate, Edit, and Delete buttons', () => {

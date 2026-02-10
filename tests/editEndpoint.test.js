@@ -24,7 +24,7 @@ const TEST_IMAGES_DIR = path.join(__dirname, '..', 'backend', 'data', 'test-edit
 const TEST_INPUT_DIR = path.join(__dirname, '..', 'backend', 'data', 'test-edit-input');
 process.env.IMAGES_DIR = TEST_IMAGES_DIR;
 process.env.INPUT_DIR = TEST_INPUT_DIR;
-const API_URL = 'http://127.0.0.1:3000';
+const API_URL = 'http://127.0.0.1:3999';
 
 // Mock test data
 const createTestImageBuffer = () => {

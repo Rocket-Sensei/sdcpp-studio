@@ -267,12 +267,13 @@ describe('ModelSelectorModal - Scroll Issues', () => {
 });
 
 describe('Studio - Generate Button and Settings Panel', () => {
-  it('should have settings panel open from left side', () => {
+  it('should have settings panel', () => {
     const source = getStudioSource();
 
-    // Check the Sheet side prop - it should be "left" for settings button
-    // The user wants settings from left, generate from right
-    expect(source).toContain('side="left"');
+    // Check for settings panel
+    expect(source).toContain('isSettingsOpen');
+    expect(source).toContain('GeneratePanel');
+    expect(source).toContain('PromptBar');
   });
 
   it('should have Generate panel title when opened', () => {
@@ -287,8 +288,9 @@ describe('PromptBar - Generate Button', () => {
   it('should have generate button that triggers generation', () => {
     const source = getPromptBarSource();
 
-    // Should have a generate button
-    expect(source).toContain('Generate');
-    expect(source).toContain('onClick={onGenerate}');
+    // The generate button is in the GenerateImage component, not PromptBar directly
+    // PromptBar should render GenerateImage component
+    expect(source).toContain('GenerateImage');
+    expect(source).toContain('onGenerate={onGenerate}');
   });
 });

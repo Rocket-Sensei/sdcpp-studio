@@ -119,7 +119,8 @@ describe('App Routing', () => {
     it('should redirect / to /studio', async () => {
       await renderAppWithRoute(['/']);
 
-      expect(screen.getByTestId('unified-queue')).toBeInTheDocument();
+      // After redirect, we should see the Studio component
+      expect(screen.getByText('sd.cpp Studio')).toBeInTheDocument();
     });
   });
 
@@ -159,7 +160,8 @@ describe('App Routing', () => {
     it('should render footer', async () => {
       await renderAppWithRoute(['/studio']);
 
-      expect(screen.getByText('sd.cpp Studio - OpenAI-Compatible Image Generation Interface')).toBeInTheDocument();
+      // Footer shows total generations count
+      expect(screen.getByText(/total generation/)).toBeInTheDocument();
     });
 
     it('should render Toaster', async () => {

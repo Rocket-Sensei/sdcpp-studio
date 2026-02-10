@@ -18,7 +18,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-api-sd-cpp-studio.db');
 process.env.DB_PATH = TEST_DB_PATH;
 
-const API_URL = 'http://127.0.0.1:3000';
+// Use the same port as the test server helper
+const API_URL = 'http://127.0.0.1:3999';
 
 // Create a minimal test PNG buffer
 const createTestImageBuffer = () => {

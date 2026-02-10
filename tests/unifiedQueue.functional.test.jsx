@@ -348,8 +348,9 @@ describe('UnifiedQueue - Model Display', () => {
   const source = getUnifiedQueueSource();
 
   it('should fetch models on mount', () => {
-    expect(source).toContain('/api/models');
-    expect(source).toContain('fetchModels');
+    // Models are now fetched via useModels hook instead of directly
+    expect(source).toContain('useModels');
+    expect(source).toContain('modelsNameMap');
   });
 
   it('should have getModelName helper function', () => {

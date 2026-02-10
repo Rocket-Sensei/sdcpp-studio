@@ -26,7 +26,7 @@ const TEST_INPUT_DIR = path.join(__dirname, '..', 'backend', 'data', 'test-input
 process.env.DB_PATH = TEST_DB_PATH;
 process.env.IMAGES_DIR = TEST_IMAGES_DIR;
 
-const API_URL = 'http://127.0.0.1:3000';
+const API_URL = 'http://127.0.0.1:3999';
 
 // Create a minimal test PNG buffer
 const createTestImageBuffer = () => {

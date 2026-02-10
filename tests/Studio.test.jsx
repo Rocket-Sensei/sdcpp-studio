@@ -31,56 +31,137 @@ Object.defineProperty(global, 'localStorage', {
 global.URL.createObjectURL = vi.fn(() => 'mock-url-blob:http://test');
 global.URL.revokeObjectURL = vi.fn();
 
+// Mock the hooks before importing components
+vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
+  useImageGeneration: () => ({
+    generateQueued: vi.fn().mockResolvedValue({}),
+    isLoading: false,
+  }),
+}));
+
+vi.mock('../frontend/src/hooks/useModels', () => ({
+  useModels: () => ({
+    modelsNameMap: {},
+    models: [],
+    isLoading: false,
+  }),
+}));
+
+vi.mock('../frontend/src/hooks/useWebSocket', () => ({
+  useWebSocket: vi.fn(() => ({ isConnected: false })),
+  useDownloadProgress: vi.fn(() => {}),
+  WS_CHANNELS: {
+    QUEUE: 'queue',
+    GENERATIONS: 'generations',
+    MODELS: 'models',
+    DOWNLOAD: 'download',
+  },
+}));
+
+// Mock react-use-websocket
+vi.mock('react-use-websocket', () => ({
+  default: vi.fn(() => ({
+    sendJsonMessage: vi.fn(),
+    lastJsonMessage: null,
+    readyState: 3, // CLOSED
+    getWebSocket: vi.fn(),
+  })),
+}));
+
+// Import mock helpers
+import { createMockResponse } from './setup.js';
+
+// Mock authenticatedFetch and fetch
+vi.mock('../frontend/src/utils/api', () => ({
+  authenticatedFetch: vi.fn(),
+  getStoredApiKey: vi.fn(() => null),
+  saveApiKey: vi.fn(),
+  clearApiKey: vi.fn(),
+}));
+
+global.fetch = vi.fn((url) => {
+  if (url === '/api/models') {
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ models: [] }),
+    });
+  }
+  if (url === '/sdapi/v1/upscalers') {
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([{ name: 'RealESRGAN 4x+' }]),
+    });
+  }
+  return Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({}),
+  });
+});
+
 // Mock the child components before importing Studio
-vi.mock('../frontend/src/components/PromptBar', () => ({
-  PromptBar: ({ prompt, onPromptChange, selectedModelCount, onModelSelectorClick, onGenerate, onSettingsClick }) =>
+vi.mock('../frontend/src/components/prompt/GenerateImage', () => ({
+  GenerateImage: () => React.createElement('div', { 'data-testid': 'generate-image' }, 'Generate Image'),
+}));
+vi.mock('../frontend/src/components/prompt/EditImage', () => ({
+  EditImage: () => React.createElement('div', { 'data-testid': 'edit-image' }, 'Edit Image'),
+}));
+vi.mock('../frontend/src/components/prompt/GenerateVideo', () => ({
+  GenerateVideo: () => React.createElement('div', { 'data-testid': 'generate-video' }, 'Generate Video'),
+}));
+vi.mock('../frontend/src/components/prompt/UpscaleImage', () => ({
+  UpscaleImage: () => React.createElement('div', { 'data-testid': 'upscale-image' }, 'Upscale Image'),
+}));
+
+// Mock child components of GeneratePanel
+vi.mock('../frontend/src/components/settings/ImageSettings', () => ({
+  ImageSettings: () => React.createElement('div', { 'data-testid': 'image-settings' }, 'Image Settings'),
+}));
+vi.mock('../frontend/src/components/settings/EditSettings', () => ({
+  EditSettings: () => React.createElement('div', { 'data-testid': 'edit-settings' }, 'Edit Settings'),
+}));
+vi.mock('../frontend/src/components/settings/VideoSettings', () => ({
+  VideoSettings: () => React.createElement('div', { 'data-testid': 'video-settings' }, 'Video Settings'),
+}));
+vi.mock('../frontend/src/components/settings/UpscaleSettings', () => ({
+  UpscaleSettings: () => React.createElement('div', { 'data-testid': 'upscale-settings' }, 'Upscale Settings'),
+}));
+
+vi.mock('../frontend/src/components/prompt/PromptBar', () => ({
+  PromptBar: ({ prompt, onPromptChange, onSettingsToggle, onGenerate, settingsOpen }) =>
     React.createElement('div', { 'data-testid': 'prompt-bar' },
       React.createElement('input', {
         'data-testid': 'prompt-input',
-        value: prompt,
+        value: prompt || '',
         onChange: (e) => onPromptChange?.(e.target.value),
         placeholder: 'Enter prompt...'
       }),
-      React.createElement('div', { 'data-testid': 'selected-model-count' }, String(selectedModelCount || 0)),
       React.createElement('button', {
-        onClick: onModelSelectorClick,
-        'data-testid': 'model-selector-button'
-      }, 'Select Models'),
+        onClick: onSettingsToggle,
+        'data-testid': 'settings-button',
+        className: settingsOpen ? 'bg-primary/10 border-primary' : ''
+      }, 'Settings'),
       React.createElement('button', {
         onClick: onGenerate,
         'data-testid': 'generate-button'
-      }, 'Generate'),
-      React.createElement('button', {
-        onClick: onSettingsClick,
-        'data-testid': 'settings-button'
-      }, 'Settings')
-    ),
-}));
-
-vi.mock('../frontend/src/components/SettingsPanel', () => ({
-  SettingsPanel: ({ prompt, editImageSettings, onGenerated }) =>
-    React.createElement('div', { 'data-testid': 'settings-panel' },
-      React.createElement('div', { 'data-testid': 'settings-prompt' }, prompt || ''),
-      editImageSettings && React.createElement('div', { 'data-testid': 'edit-image-settings' }, JSON.stringify(editImageSettings)),
-      React.createElement('button', {
-        onClick: () => onGenerated && onGenerated(),
-        'data-testid': 'settings-generate-button'
       }, 'Generate')
     ),
 }));
 
-vi.mock('../frontend/src/components/model-selector/ModelSelectorModal', () => ({
-  ModelSelectorModal: ({ selectedModels, onModelsChange, onClose }) =>
-    React.createElement('div', { 'data-testid': 'model-selector-modal' },
-      React.createElement('div', { 'data-testid': 'selected-models' }, selectedModels ? selectedModels.join(',') : 'none'),
+vi.mock('../frontend/src/components/GeneratePanel', () => ({
+  GeneratePanel: ({ open, onOpenChange, editImageSettings }) =>
+    open ? React.createElement('div', { 'data-testid': 'settings-panel' },
+      editImageSettings && React.createElement('div', { 'data-testid': 'edit-image-settings' }, JSON.stringify(editImageSettings)),
       React.createElement('button', {
-        onClick: () => onModelsChange?.(['test-model']),
-        'data-testid': 'apply-models-button'
-      }, 'Apply'),
-      React.createElement('button', {
-        onClick: onClose,
-        'data-testid': 'close-modal-button'
-      }, 'Close')
+        onClick: () => onOpenChange && onOpenChange(false), // Close panel on generate
+        'data-testid': 'settings-generate-button'
+      }, 'Generate')
+    ) : null,
+}));
+
+vi.mock('../frontend/src/components/MultiModelSelector', () => ({
+  MultiModelSelector: () =>
+    React.createElement('div', { 'data-testid': 'multi-model-selector' },
+      React.createElement('div', { 'data-testid': 'models-list' }, 'Models list')
     ),
 }));
 
@@ -114,10 +195,29 @@ vi.mock('../frontend/src/components/UnifiedQueue', () => ({
 // Import Studio after mocks are set up
 const { Studio } = await import('../frontend/src/components/Studio');
 
+// Get the mocked authenticatedFetch
+const { authenticatedFetch } = await import('../frontend/src/utils/api');
+
 describe('Studio Component', () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
+
+    // Set up authenticatedFetch mock to return proper Response objects
+    authenticatedFetch.mockImplementation((url) => {
+      if (url === '/sdapi/v1/upscalers') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([{ name: 'RealESRGAN 4x+' }]),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
   });
 
   afterEach(() => {
@@ -192,24 +292,17 @@ describe('Studio Component', () => {
       expect(promptInput).toHaveProperty('value', 'test prompt');
     });
 
-    it('should open model selector when model selector button is clicked', () => {
-      render(React.createElement(Studio));
-
-      const modelSelectorButton = screen.getByTestId('model-selector-button');
-      fireEvent.click(modelSelectorButton);
-
-      // Model selector modal should be shown
-      expect(screen.getByTestId('model-selector-modal')).toBeTruthy();
-    });
-
     it('should open settings panel when settings button is clicked', () => {
       render(React.createElement(Studio));
 
-      const settingsButton = screen.getByTestId('settings-button');
+      // Find the Settings button by its accessible name
+      const settingsButton = screen.getByRole('button', { name: /settings/i });
       fireEvent.click(settingsButton);
 
       // Settings panel should be shown
       expect(screen.getByTestId('settings-panel')).toBeTruthy();
+      // Button should have active class
+      expect(settingsButton.className).toContain('bg-primary/10');
     });
   });
 
@@ -233,10 +326,9 @@ describe('Studio Component', () => {
       const createMoreButton = screen.getByTestId('create-more-button');
       fireEvent.click(createMoreButton);
 
-      // Settings panel should show the prompt from the generation
+      // Settings panel should be shown
       await waitFor(() => {
-        const settingsPrompt = screen.queryByTestId('settings-prompt');
-        expect(settingsPrompt).toBeTruthy();
+        expect(screen.getByTestId('settings-panel')).toBeTruthy();
       });
     });
   });
@@ -311,71 +403,79 @@ describe('Studio Component', () => {
       const unifiedQueue = screen.getByTestId('unified-queue');
 
       // PromptBar should come before UnifiedQueue in DOM order
-      const promptBarIndex = Array.from(container.children).indexOf(promptBar);
-      const queueIndex = Array.from(container.children).indexOf(unifiedQueue);
-
-      expect(promptBarIndex).toBeLessThan(queueIndex);
+      // Use compareDocumentPosition to check order
+      const position = promptBar.compareDocumentPosition(unifiedQueue);
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 
   describe('Settings Persistence', () => {
-    it('should persist size to localStorage', () => {
-      const { rerender } = render(React.createElement(Studio));
-
-      // Size is set to '1024x1024' by default
-      expect(localStorageMock.getItem('sd-cpp-studio-size')).toBe('1024x1024');
-    });
-
-    it('should persist imageCount to localStorage', () => {
+    it('should persist form state to localStorage', async () => {
       render(React.createElement(Studio));
 
-      // imageCount is set to 1 by default
-      expect(localStorageMock.getItem('sd-cpp-studio-image-count')).toBe('1');
+      // After initial render, localStorage should have default values
+      await waitFor(() => {
+        expect(localStorageMock.getItem('sd-cpp-studio-generate-form-state')).toBeTruthy();
+      });
     });
 
-    it('should persist strength to localStorage', () => {
+    it('should persist mode to localStorage', async () => {
       render(React.createElement(Studio));
 
-      // strength is set to 0.7 by default
-      expect(localStorageMock.getItem('sd-cpp-studio-strength')).toBe('0.7');
+      // mode is set to 'image' by default
+      await waitFor(() => {
+        const savedState = localStorageMock.getItem('sd-cpp-studio-generate-form-state');
+        expect(savedState).toBeTruthy();
+        const parsed = JSON.parse(savedState);
+        expect(parsed.mode).toBe('image');
+      });
     });
 
-    it('should persist sampleSteps to localStorage', () => {
+    it('should persist selectedModels to localStorage', async () => {
       render(React.createElement(Studio));
 
-      // sampleSteps is set to 9 by default
-      expect(localStorageMock.getItem('sd-cpp-studio-sample-steps')).toBe('9');
+      // selectedModels is set to [] by default
+      await waitFor(() => {
+        const savedState = localStorageMock.getItem('sd-cpp-studio-generate-form-state');
+        expect(savedState).toBeTruthy();
+        const parsed = JSON.parse(savedState);
+        expect(parsed.selectedModels).toEqual([]);
+      });
     });
   });
 
   describe('Modal Management', () => {
-    it('should open and close model selector modal', () => {
+    it('should toggle settings panel visibility', () => {
       render(React.createElement(Studio));
 
-      // Open modal
-      const modelSelectorButton = screen.getByTestId('model-selector-button');
-      fireEvent.click(modelSelectorButton);
-      expect(screen.getByTestId('model-selector-modal')).toBeTruthy();
+      // Find the Settings button by its accessible name
+      const settingsButton = screen.getByRole('button', { name: /settings/i });
 
-      // Close modal
-      const closeButton = screen.getByTestId('close-modal-button');
-      fireEvent.click(closeButton);
-      // Modal is removed from DOM when closed
+      // Open settings
+      fireEvent.click(settingsButton);
+      expect(screen.getByTestId('settings-panel')).toBeTruthy();
+
+      // Close settings
+      fireEvent.click(settingsButton);
+      // Settings panel should be closed (not in DOM)
+      expect(screen.queryByTestId('settings-panel')).toBeNull();
     });
 
-    it('should apply model selection when apply button is clicked', () => {
+    it('should handle generate from settings panel', async () => {
       render(React.createElement(Studio));
 
-      // Open modal
-      const modelSelectorButton = screen.getByTestId('model-selector-button');
-      fireEvent.click(modelSelectorButton);
+      // Find the Settings button by its accessible name
+      const settingsButton = screen.getByRole('button', { name: /settings/i });
+      fireEvent.click(settingsButton);
 
-      // Apply models
-      const applyButton = screen.getByTestId('apply-models-button');
-      fireEvent.click(applyButton);
+      // Click generate in settings - use testid to be specific
+      const generateButton = screen.getByTestId('settings-generate-button');
+      fireEvent.click(generateButton);
 
-      // Models should be applied (verified by the mock setting selected-models)
-      expect(screen.getByTestId('selected-models')).toBeTruthy();
+      // Panel should close after generation
+      await waitFor(() => {
+        expect(screen.queryByTestId('settings-panel')).toBeNull();
+      });
     });
   });
 });

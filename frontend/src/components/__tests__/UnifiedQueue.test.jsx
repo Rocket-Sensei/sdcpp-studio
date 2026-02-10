@@ -98,6 +98,9 @@ vi.mock('../../utils/api', () => ({
   authenticatedFetch: vi.fn(),
 }));
 
+// Import mock helper
+import { createMockResponse } from '../../../../tests/setup.js';
+
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
   observe() {}

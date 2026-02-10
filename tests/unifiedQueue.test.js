@@ -168,14 +168,14 @@ describe('UnifiedQueue - Model Display', () => {
 
     // Verify getModelName function
     expect(source).toContain('getModelName');
-    expect(source).toContain('models');
+    expect(source).toContain('modelsNameMap');
 
     // Verify model is displayed in the card
     expect(source).toContain('getModelName(generation.model)');
 
-    // Should fetch models on mount
-    expect(source).toContain('/api/models');
-    expect(source).toContain('fetchModels');
+    // Models are fetched via useModels hook
+    expect(source).toContain('useModels');
+    expect(source).toContain('modelsNameMap');
   });
 
   it('should handle null/undefined model values gracefully', () => {

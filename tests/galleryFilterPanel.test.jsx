@@ -269,9 +269,10 @@ describe('Gallery Filter Panel - Static Analysis Tests', () => {
   });
 
   describe('Total Count Display', () => {
-    it('should display total generations count via Header component', () => {
-      // Count is now passed to Header component
-      expect(source).toContain('totalGenerations={pagination?.total || 0}');
+    it('should display total generations count in footer', () => {
+      // Count is now displayed in the footer
+      expect(source).toContain('pagination?.total || 0');
+      expect(source).toContain('total generation');
     });
 
     it('should import Header component', () => {
@@ -279,8 +280,8 @@ describe('Gallery Filter Panel - Static Analysis Tests', () => {
       expect(source).toContain('from "./components/header/Header"');
     });
 
-    it('should pass totalGenerations prop to Header', () => {
-      expect(source).toContain('totalGenerations={pagination?.total || 0}');
+    it('should pass filterSheet to Header component', () => {
+      expect(source).toContain('filterSheet={filterSheet}');
     });
   });
 
