@@ -290,6 +290,37 @@ export function claimNextPendingGeneration() {
 }
 
 /**
+ * Claim next pending job for a specific model (for model affinity optimization).
+ * If no job for the specified model exists, falls back to FIFO.
+ * @param {string} preferredModel - Model ID to prioritize
+ * @returns {Object|null} The claimed generation, or null if no pending jobs exist
+ */
+export function claimNextPendingGenerationWithModelAffinity(preferredModel) {
+  const db = getDatabase();
+  
+  // First try to get a job for the preferred model
+  const preferredStmt = db.prepare(`
+    UPDATE generations
+    SET status = ?
+    WHERE id = (
+      SELECT id FROM generations
+      WHERE status = ? AND model = ?
+      ORDER BY created_at ASC
+      LIMIT 1
+    )
+    RETURNING *
+  `);
+  
+  const preferredResult = preferredStmt.get(GenerationStatus.PROCESSING, GenerationStatus.PENDING, preferredModel);
+  if (preferredResult) {
+    return preferredResult;
+  }
+  
+  // Fall back to FIFO if no job for preferred model
+  return claimNextPendingGeneration();
+}
+
+/**
  * Update generation status and related fields
  */
 export function updateGenerationStatus(id, status, additionalData = {}) {

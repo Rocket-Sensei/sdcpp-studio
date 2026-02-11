@@ -1,4 +1,4 @@
-import { claimNextPendingGeneration, updateGenerationStatus, updateGenerationProgress, deleteGeneration, GenerationStatus, createGeneratedImage } from '../db/queries.js';
+import { claimNextPendingGeneration, claimNextPendingGenerationWithModelAffinity, updateGenerationStatus, updateGenerationProgress, deleteGeneration, GenerationStatus, createGeneratedImage } from '../db/queries.js';
 import { generateImageDirect } from './imageService.js';
 import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
@@ -14,6 +14,7 @@ let isProcessing = false;
 let currentJob = null;
 let currentModelId = null; // Track the model being used for the current job
 let currentModelLoadingStartTime = null; // Track when model loading started for current job
+let lastRunningModelId = null; // Track the last successfully running model for affinity
 let pollInterval = null;
 
 // Initialize model manager singleton

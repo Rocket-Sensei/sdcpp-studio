@@ -1,0 +1,15 @@
+[
+  { "width": 512, "height": 512 },
+  { "width": 768, "height": 768 },
+  { "width": 1024, "height": 1024 },
+  { "width": 1280, "height": 720 },
+  { "width": 720, "height": 1280 },
+  { "width": 1536, "height": 1024 },
+  { "width": 1024, "height": 1536 },
+  { "width": 1820, "height": 1024 },
+  { "width": 1024, "height": 1820 },
+  { "width": 2048, "height": 1024 },
+  { "width": 1024, "height": 2048 },
+  { "width": 1536, "height": 1536 },
+  { "width": 2048, "height": 2048 }
+]
