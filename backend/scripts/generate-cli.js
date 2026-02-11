@@ -14,10 +14,16 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { AsciiTable3, AlignmentEnum } from 'ascii-table3';
+import { config } from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = resolve(__dirname, '../..');
+
+const envPath = resolve(__dirname, '../.env');
+if (existsSync(envPath)) {
+  config({ path: envPath });
+}
 
 const CONFIG = {
   backendUrl: process.env.BACKEND_URL || 'http://192.168.2.180:3000',
@@ -221,15 +227,35 @@ function buildStatusMatrix(jobs, testPrompt, models, resolutions) {
     }
   }
 
+  const promptFilter = testPrompt ? testPrompt.slice(0, 30) : null;
+
   for (const job of jobs) {
     const model = job.model;
     const size = job.size;
     
-    if (matrix[model] && matrix[model][size] && 
-        job.prompt && job.prompt.includes(testPrompt.slice(0, 30))) {
-      matrix[model][size] = { status: job.status, job };
-      stats[job.status] = (stats[job.status] || 0) + 1;
-      modelStats[model][job.status] = (modelStats[model][job.status] || 0) + 1;
+    if (matrix[model] && matrix[model][size]) {
+      if (promptFilter && (!job.prompt || !job.prompt.includes(promptFilter))) {
+        continue;
+      }
+      
+      const existing = matrix[model][size];
+      const isBetter = 
+        existing.status === 'pending' ||
+        (job.status === 'completed' && existing.status !== 'completed') ||
+        (job.status === 'failed' && existing.status !== 'completed');
+      
+      if (isBetter) {
+        matrix[model][size] = { status: job.status, job };
+      }
+    }
+  }
+
+  for (const model of models) {
+    for (const res of resolutions) {
+      const size = `${res.width}x${res.height}`;
+      const cellStatus = matrix[model][size].status;
+      stats[cellStatus]++;
+      modelStats[model][cellStatus]++;
     }
   }
 
@@ -241,11 +267,13 @@ function formatResolution(res) {
   return `${res.width}x${res.height}`;
 }
 
-function renderMatrix(matrix, modelStats, stats, models, resolutions, startTime) {
-  clearScreen();
-  
-  console.log(colors.bold + 'Resolution Test Monitor' + colors.reset);
-  console.log(colors.dim + `Started: ${new Date(startTime).toLocaleTimeString()} | Refresh: every ${CONFIG.pollInterval / 1000}s` + colors.reset);
+function renderMatrix(matrix, modelStats, stats, models, resolutions, options = {}) {
+  const { startTime = Date.now(), title = 'Resolution Test', showElapsed = true, showControls = true } = options;
+
+  console.log(colors.bold + title + colors.reset);
+  if (showElapsed && startTime) {
+    console.log(colors.dim + `Started: ${new Date(startTime).toLocaleTimeString()}` + colors.reset);
+  }
   console.log('');
 
   const resLabels = resolutions.map(r => formatResolution(r));
@@ -320,20 +348,25 @@ function renderMatrix(matrix, modelStats, stats, models, resolutions, startTime)
               `Failed: ${colors.red}${stats.failed}${colors.reset}  ` +
               `(${donePct}% done)`);
   
-  const elapsed = Math.round((Date.now() - startTime) / 1000);
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  console.log(colors.dim + `  Elapsed: ${mins}m ${secs}s` + colors.reset);
+  if (showElapsed && startTime) {
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    console.log(colors.dim + `  Elapsed: ${mins}m ${secs}s` + colors.reset);
+  }
   
   console.log('');
   console.log(colors.dim + 'Legend: ○ pending  ● completed  ✗ failed  ● processing' + colors.reset);
-  console.log(colors.dim + 'Press Ctrl+C to exit' + colors.reset);
+  if (showControls) {
+    console.log(colors.dim + 'Press Ctrl+C to exit' + colors.reset);
+  }
 }
 
 async function cmdTestResolutions(args) {
   const watchOnly = args.watch || args.w || false;
+  const summaryOnly = args.summary || args.s || false;
   const forceRegenerate = args['force-regenerate'] || args.f || false;
-  const testPrompt = args.prompt || 'a serene mountain landscape at sunset';
+  const testPrompt = args.prompt || null;
 
   if (!(await checkBackend())) {
     log('Error: Backend server not running', 'red');
@@ -344,15 +377,37 @@ async function cmdTestResolutions(args) {
   const total = models.length * resolutions.length;
   
   const startTime = Date.now();
+
+  if (summaryOnly) {
+    console.log(colors.bold + 'Resolution Test Summary' + colors.reset);
+    if (testPrompt) {
+      console.log(colors.dim + `Filter: "${testPrompt}"` + colors.reset);
+    } else {
+      console.log(colors.dim + 'Filter: all jobs' + colors.reset);
+    }
+    console.log('');
+
+    const jobs = await getAllJobs();
+    const { matrix, stats, modelStats } = buildStatusMatrix(jobs, testPrompt, models, resolutions);
+    
+    renderMatrix(matrix, modelStats, stats, models, resolutions, {
+      title: 'Resolution Summary',
+      showElapsed: false,
+      showControls: false
+    });
+    return;
+  }
+
   let queuedJobs = new Map();
 
   if (!watchOnly) {
+    const promptToUse = testPrompt || 'a serene mountain landscape at sunset';
     printHeader('Resolution Testing - Queuing Jobs');
     
     log(`Models: ${models.length}`, 'cyan');
     log(`Resolutions: ${resolutions.length}`, 'cyan');
     log(`Total combinations: ${total}`, 'cyan');
-    log(`Prompt: "${testPrompt}"`, 'cyan');
+    log(`Prompt: "${promptToUse}"`, 'cyan');
     console.log('');
 
     log('Queuing generations...', 'yellow');
@@ -366,7 +421,7 @@ async function cmdTestResolutions(args) {
         const size = `${res.width}x${res.height}`;
 
         if (!forceRegenerate) {
-          const existing = await findExistingJob(model, size, testPrompt);
+          const existing = await findExistingJob(model, size, promptToUse);
           if (existing) {
             queuedJobs.set(`${model}|${size}`, existing.id);
             skipped++;
@@ -376,7 +431,7 @@ async function cmdTestResolutions(args) {
         }
 
         try {
-          const jobId = await queueGeneration(model, testPrompt, size);
+          const jobId = await queueGeneration(model, promptToUse, size);
           queuedJobs.set(`${model}|${size}`, jobId);
           queued++;
         } catch (e) {
@@ -407,12 +462,20 @@ async function cmdTestResolutions(args) {
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
+  const promptToUse = testPrompt || 'a serene mountain landscape at sunset';
+
   while (true) {
     try {
       const jobs = await getAllJobs();
-      const { matrix, stats, modelStats } = buildStatusMatrix(jobs, testPrompt, models, resolutions);
+      const { matrix, stats, modelStats } = buildStatusMatrix(jobs, promptToUse, models, resolutions);
       
-      renderMatrix(matrix, modelStats, stats, models, resolutions, startTime);
+      clearScreen();
+      renderMatrix(matrix, modelStats, stats, models, resolutions, {
+        startTime,
+        title: 'Resolution Test Monitor',
+        showElapsed: true,
+        showControls: true
+      });
       
       const totalJobs = stats.pending + stats.processing + stats.completed + stats.failed + stats.cancelled;
       if (totalJobs > 0 && stats.pending === 0 && stats.processing === 0) {
@@ -475,11 +538,13 @@ Commands:
     --prompt <text>     Prompt text (default: "a beautiful landscape")
     --size <WxH>        Image size (default: 1024x1024)
 
-  test-resolutions      Test all models at all resolutions with live monitoring
+  test-resolutions      Test all models at all resolutions
     --watch, -w         Watch mode only (don't queue new jobs, just monitor)
+    --summary, -s       Show one-time summary of completed tests and exit
     --force-regenerate  Re-queue even if already queued
     -f                  Same as --force-regenerate
-    --prompt <text>     Custom test prompt (default: "a serene mountain landscape at sunset")
+    --prompt <text>     Filter by prompt (default: show all jobs for summary,
+                        use "a serene mountain landscape at sunset" for queue/watch)
 
   status                Show queue status
 
@@ -492,8 +557,11 @@ Examples:
   # Run resolution test (queue + monitor)
   node backend/scripts/generate-cli.js test-resolutions
 
-  # Run with custom prompt
-  node backend/scripts/generate-cli.js test-resolutions --prompt "a beautiful sunset"
+  # Show summary of all completed tests
+  node backend/scripts/generate-cli.js test-resolutions --summary
+
+  # Show summary filtered by prompt
+  node backend/scripts/generate-cli.js test-resolutions --summary --prompt "a beautiful sunset"
 
   # Watch existing queue without adding new jobs
   node backend/scripts/generate-cli.js test-resolutions --watch
