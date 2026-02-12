@@ -79,6 +79,10 @@ function App() {
   const { fetchGenerations, generations, pagination } = useGenerations();
   const { version: apiKeyVersion } = useApiKeyContext();
 
+  // Compute queue statistics for header
+  const pendingCount = generations.filter(g => g.status === 'pending').length;
+  const processingCount = generations.filter(g => g.status === 'processing' || g.status === 'model_loading').length;
+
   // Filter panel state with localStorage persistence
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(() => {
     if (typeof window !== "undefined") {
@@ -373,7 +377,8 @@ function App() {
       {/* Header */}
       <Header
         onSettingsClick={() => setIsSettingsOpen(true)}
-        filterSheet={filterSheet}
+        pendingCount={pendingCount}
+        processingCount={processingCount}
       />
 
       {/* Main Content */}
@@ -385,6 +390,7 @@ function App() {
               searchQuery={searchQuery}
               selectedStatuses={selectedStatuses}
               selectedModelsFilter={selectedModelsFilter}
+              filterSheet={filterSheet}
             />
           } />
 
@@ -398,22 +404,22 @@ function App() {
         </Routes>
       </main>
 
-          {/* Footer */}
-          <footer className="border-t border-border py-4 mt-8">
-            <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-              {pagination?.total || 0} total generation{pagination?.total !== 1 ? "s" : ""}
-            </div>
-          </footer>
-
-          {/* Toast notifications */}
-          <Toaster />
-
-          {/* Settings Modal */}
-          <SettingsModal
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-          />
+      {/* Footer */}
+      <footer className="border-t border-border py-4 mt-8">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          {pagination?.total || 0} total generation{pagination?.total !== 1 ? "s" : ""}
         </div>
+      </footer>
+
+      {/* Toast notifications */}
+      <Toaster />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+    </div>
   );
 }
 

@@ -1,11 +1,18 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { GeneratePanel } from "./GeneratePanel";
 import { UnifiedQueue } from "./UnifiedQueue";
 import { PromptBar } from "./prompt/PromptBar";
-import { useImageGeneration } from "../hooks/useImageGeneration";
+import { useImageGeneration, useGenerations } from "../hooks/useImageGeneration";
 import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { ChevronDown, ChevronUp, Sparkles, Cpu, Clock, Loader2 } from "lucide-react";
+import { cn } from "../lib/utils";
+
+// localStorage key for form state persistence
+const FORM_STATE_KEY = "sd-cpp-studio-generate-form-state";
 
 // Default editing model
 const DEFAULT_EDIT_MODEL = "qwen-image-edit";
@@ -26,9 +33,10 @@ const DEFAULT_EDIT_MODEL = "qwen-image-edit";
  * @param {Array} props.selectedStatuses - Array of selected status values for filtering
  * @param {Array} props.selectedModelsFilter - Array of selected model IDs for filtering
  */
-export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) {
+export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, filterSheet }) {
   // Use the image generation hook for quick generation from PromptBar
   const { generateQueued, isLoading: isGenerating } = useImageGeneration();
+  const { generations } = useGenerations();
 
   // Shared models data
   const { modelsNameMap } = useModels();
@@ -43,7 +51,8 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   const [sourceImagePreview, setSourceImagePreview] = useState(null);
   const [strength, setStrength] = useState(0.75);
 
-  // UI state
+  // UI state - generation panel collapsed by default
+  const [isGenerationPanelOpen, setIsGenerationPanelOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // "Create More" settings from gallery
@@ -77,6 +86,61 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     fetchUpscalers();
   }, []);
 
+  // Track if we've loaded from localStorage (to prevent saving initial empty state)
+  const hasLoadedRef = useRef(false);
+  // Store the loaded state to save on first render
+  const initialStateRef = useRef(null);
+
+  // Load form state from localStorage on mount (only once)
+  useEffect(() => {
+    if (hasLoadedRef.current) return;
+
+    try {
+      const savedState = localStorage.getItem(FORM_STATE_KEY);
+      if (savedState) {
+        const formState = JSON.parse(savedState);
+        // Store for immediate save
+        initialStateRef.current = formState;
+        // Restore from localStorage
+        setPrompt(formState.prompt ?? "");
+        setSelectedModels(formState.selectedModels ?? []);
+        setMode(formState.mode ?? "image");
+      }
+    } catch (err) {
+      console.warn('Failed to load form state from localStorage:', err);
+    }
+    hasLoadedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save form state to localStorage whenever key fields change
+  useEffect(() => {
+    // On first render after loading, save the loaded state immediately
+    if (hasLoadedRef.current && initialStateRef.current) {
+      const { prompt: initPrompt, selectedModels: initModels, mode: initMode } = initialStateRef.current;
+      localStorage.setItem(FORM_STATE_KEY, JSON.stringify({
+        prompt: initPrompt ?? "",
+        selectedModels: initModels ?? [],
+        mode: initMode ?? "image",
+      }));
+      initialStateRef.current = null;
+      return;
+    }
+
+    // Only save after initial state is set
+    if (hasLoadedRef.current && !initialStateRef.current) {
+      // Don't save if we have Create More or Edit Image settings (those are temporary)
+      if (!createMoreSettings && !editImageSettings) {
+        const formState = {
+          prompt,
+          selectedModels,
+          mode,
+        };
+        localStorage.setItem(FORM_STATE_KEY, JSON.stringify(formState));
+      }
+    }
+  }, [prompt, selectedModels, mode, createMoreSettings, editImageSettings]);
+
   // File handlers for upscale mode
   const handleFileSelect = useCallback((file) => {
     setSourceImage(file);
@@ -98,7 +162,8 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     if (generation.prompt) {
       setPrompt(generation.prompt);
     }
-    // Open settings panel to show the applied settings
+    // Open generation panel and settings to show the applied settings
+    setIsGenerationPanelOpen(true);
     setIsSettingsOpen(true);
   }, []);
 
@@ -116,6 +181,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setCreateMoreSettings(null);
     setSelectedModels([DEFAULT_EDIT_MODEL]);
     setMode('imgedit');
+    setIsGenerationPanelOpen(true);
     setIsSettingsOpen(true);
   }, []);
 
@@ -133,6 +199,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setSourceImage(imageFile);
     setSourceImagePreview(imageUrl);
     setMode('upscale');
+    setIsGenerationPanelOpen(true);
     setIsSettingsOpen(true);
   }, []);
 
@@ -150,6 +217,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setSourceImage(imageFile);
     setSourceImagePreview(imageUrl);
     setMode('video');
+    setIsGenerationPanelOpen(true);
     setIsSettingsOpen(true);
   }, []);
 
@@ -212,9 +280,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
 
       await Promise.all(promises);
       toast.success(`${selectedModels.length} job(s) added to queue!`);
-
-      // Clear prompt after successful generation
-      setPrompt("");
+      // NOTE: Prompt is NOT cleared after generation - form state persists
     } catch (err) {
       toast.error(err.message || "Failed to queue generation");
     }
@@ -224,7 +290,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
   const handleGenerated = useCallback(() => {
     setCreateMoreSettings(null);
     setEditImageSettings(null);
-    setPrompt("");
+    // NOTE: Prompt is NOT cleared - form state persists for user convenience
   }, []);
 
   // Clear settings after they've been applied
@@ -233,65 +299,138 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter }) 
     setEditImageSettings(null);
   }, []);
 
-  return (
-    <div className="container mx-auto p-4 space-y-4">
-      {/* PromptBar - Full width prompt input at top */}
-      <PromptBar
-        prompt={prompt}
-        onPromptChange={setPrompt}
-        mode={mode}
-        onModeChange={setMode}
-        selectedModels={selectedModels}
-        onModelsChange={setSelectedModels}
-        modelsMap={modelsNameMap}
-        onSettingsToggle={() => setIsSettingsOpen(!isSettingsOpen)}
-        settingsOpen={isSettingsOpen}
-        onGenerate={handleGenerate}
-        isLoading={isGenerating}
-        disabled={false}
-        sourceImagePreview={sourceImagePreview}
-        sourceImage={sourceImage}
-        onFileSelect={handleFileSelect}
-        onClearImage={handleClearImage}
-        availableUpscalers={availableUpscalers}
-        upscalerName={upscalerName}
-        onUpscalerNameChange={setUpscalerName}
-        strength={strength}
-      />
+  // Compute queue statistics
+  const pendingCount = generations.filter(g => g.status === 'pending').length;
+  const processingCount = generations.filter(g => g.status === 'processing' || g.status === 'model_loading').length;
+  const totalInQueue = pendingCount + processingCount;
 
-      {/* Settings Panel - Collapsible, shown below */}
-      <GeneratePanel
-        open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-        selectedModels={selectedModels}
-        onModelsChange={setSelectedModels}
-        settings={createMoreSettings}
-        editImageSettings={editImageSettings}
-        onGenerated={() => {
-          handleGenerated();
-          handleSettingsApplied();
-        }}
-        prompt={prompt}
-        mode={mode}
-        onModeChange={setMode}
-        // Upscale state (managed in Studio for top form access)
-        sourceImage={sourceImage}
-        sourceImagePreview={sourceImagePreview}
-        upscaleFactor={upscaleFactor}
-        onUpscaleFactorChange={setUpscaleFactor}
-        upscaleResizeMode={upscaleResizeMode}
-        onUpscaleResizeModeChange={setUpscaleResizeMode}
-        upscaleTargetWidth={upscaleTargetWidth}
-        onUpscaleTargetWidthChange={setUpscaleTargetWidth}
-        upscaleTargetHeight={upscaleTargetHeight}
-        onUpscaleTargetHeightChange={setUpscaleTargetHeight}
-        upscalerName={upscalerName}
-        onUpscalerNameChange={setUpscalerName}
-        onFileSelect={handleFileSelect}
-        onClearImage={handleClearImage}
-      />
+  // Get preview text for collapsed state
+  const getPreviewText = () => {
+    const parts = [];
+    if (selectedModels.length > 0) {
+      const modelName = modelsNameMap[selectedModels[0]] || 'Unknown';
+      parts.push(modelName.length > 20 ? modelName.slice(0, 20) + '...' : modelName);
+      if (selectedModels.length > 1) {
+        parts.push(`+${selectedModels.length - 1} more`);
+      }
+    }
+    if (prompt.trim()) {
+      parts.push(prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt);
+    }
+    return parts.join(' | ') || 'Ready to generate';
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Collapsible Generation Panel */}
+      <Card className="overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setIsGenerationPanelOpen(!isGenerationPanelOpen)}
+          className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+          aria-label="Toggle generation panel"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-medium">Generate</span>
+            </div>
+            {!isGenerationPanelOpen && (
+              <span className="text-sm text-muted-foreground truncate max-w-md">
+                {getPreviewText()}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {totalInQueue > 0 && (
+              <div className="flex items-center gap-1.5 text-sm">
+                {processingCount > 0 && (
+                  <span className="flex items-center gap-1 text-primary">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {processingCount}
+                  </span>
+                )}
+                {pendingCount > 0 && (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    {pendingCount}
+                  </span>
+                )}
+                <span className="text-muted-foreground">in queue</span>
+              </div>
+            )}
+            {isGenerationPanelOpen ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        </button>
+
+        {isGenerationPanelOpen && (
+          <CardContent className="space-y-4 pt-0 border-t">
+            {/* PromptBar - Full width prompt input */}
+            <PromptBar
+              prompt={prompt}
+              onPromptChange={setPrompt}
+              mode={mode}
+              onModeChange={setMode}
+              selectedModels={selectedModels}
+              onModelsChange={setSelectedModels}
+              modelsMap={modelsNameMap}
+              onGenerate={handleGenerate}
+              isLoading={isGenerating}
+              disabled={false}
+              sourceImagePreview={sourceImagePreview}
+              sourceImage={sourceImage}
+              onFileSelect={handleFileSelect}
+              onClearImage={handleClearImage}
+              availableUpscalers={availableUpscalers}
+              upscalerName={upscalerName}
+              onUpscalerNameChange={setUpscalerName}
+              strength={strength}
+            />
+
+            {/* Settings Panel - Collapsible, shown below PromptBar */}
+            <GeneratePanel
+              open={isSettingsOpen}
+              onOpenChange={setIsSettingsOpen}
+              selectedModels={selectedModels}
+              onModelsChange={setSelectedModels}
+              settings={createMoreSettings}
+              editImageSettings={editImageSettings}
+              onGenerated={() => {
+                handleGenerated();
+                handleSettingsApplied();
+              }}
+              prompt={prompt}
+              mode={mode}
+              onModeChange={setMode}
+              // Upscale state (managed in Studio for top form access)
+              sourceImage={sourceImage}
+              sourceImagePreview={sourceImagePreview}
+              upscaleFactor={upscaleFactor}
+              onUpscaleFactorChange={setUpscaleFactor}
+              upscaleResizeMode={upscaleResizeMode}
+              onUpscaleResizeModeChange={setUpscaleResizeMode}
+              upscaleTargetWidth={upscaleTargetWidth}
+              onUpscaleTargetWidthChange={setUpscaleTargetWidth}
+              upscaleTargetHeight={upscaleTargetHeight}
+              onUpscaleTargetHeightChange={setUpscaleTargetHeight}
+              upscalerName={upscalerName}
+              onUpscalerNameChange={setUpscalerName}
+              onFileSelect={handleFileSelect}
+              onClearImage={handleClearImage}
+            />
+          </CardContent>
+        )}
+      </Card>
 
       {/* Main content - UnifiedQueue Gallery */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Gallery</h2>
+        {filterSheet}
+      </div>
       <UnifiedQueue
         onCreateMore={handleCreateMore}
         onEditImage={handleEditImage}

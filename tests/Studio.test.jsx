@@ -37,6 +37,10 @@ vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
     generateQueued: vi.fn().mockResolvedValue({}),
     isLoading: false,
   }),
+  useGenerations: () => ({
+    generations: [],
+    fetchGenerations: vi.fn(),
+  }),
 }));
 
 vi.mock('../frontend/src/hooks/useModels', () => ({
@@ -127,7 +131,7 @@ vi.mock('../frontend/src/components/settings/UpscaleSettings', () => ({
 }));
 
 vi.mock('../frontend/src/components/prompt/PromptBar', () => ({
-  PromptBar: ({ prompt, onPromptChange, onSettingsToggle, onGenerate, settingsOpen }) =>
+  PromptBar: ({ prompt, onPromptChange, onGenerate }) =>
     React.createElement('div', { 'data-testid': 'prompt-bar' },
       React.createElement('input', {
         'data-testid': 'prompt-input',
@@ -136,26 +140,27 @@ vi.mock('../frontend/src/components/prompt/PromptBar', () => ({
         placeholder: 'Enter prompt...'
       }),
       React.createElement('button', {
-        onClick: onSettingsToggle,
-        'data-testid': 'settings-button',
-        className: settingsOpen ? 'bg-primary/10 border-primary' : ''
-      }, 'Settings'),
-      React.createElement('button', {
         onClick: onGenerate,
-        'data-testid': 'generate-button'
+        'data-testid': 'prompt-generate-button'
       }, 'Generate')
     ),
 }));
 
 vi.mock('../frontend/src/components/GeneratePanel', () => ({
   GeneratePanel: ({ open, onOpenChange, editImageSettings }) =>
-    open ? React.createElement('div', { 'data-testid': 'settings-panel' },
-      editImageSettings && React.createElement('div', { 'data-testid': 'edit-image-settings' }, JSON.stringify(editImageSettings)),
+    React.createElement('div', { 'data-testid': 'settings-panel' },
       React.createElement('button', {
-        onClick: () => onOpenChange && onOpenChange(false), // Close panel on generate
-        'data-testid': 'settings-generate-button'
-      }, 'Generate')
-    ) : null,
+        onClick: () => onOpenChange && onOpenChange(!open),
+        'aria-expanded': open,
+      }, 'Settings'),
+      open && React.createElement('div', null,
+        editImageSettings && React.createElement('div', { 'data-testid': 'edit-image-settings' }, JSON.stringify(editImageSettings)),
+        React.createElement('button', {
+          onClick: () => onOpenChange && onOpenChange(false),
+          'data-testid': 'settings-generate-button'
+        }, 'Generate')
+      )
+    ),
 }));
 
 vi.mock('../frontend/src/components/MultiModelSelector', () => ({
@@ -228,15 +233,16 @@ describe('Studio Component', () => {
     const { container } = render(React.createElement(Studio));
 
     expect(container).toBeTruthy();
-    expect(screen.getByTestId('prompt-bar')).toBeTruthy();
     expect(screen.getByTestId('unified-queue')).toBeTruthy();
   });
 
-  it('should render PromptBar and UnifiedQueue components', () => {
+  it('should render UnifiedQueue and collapsible generation panel', () => {
     render(React.createElement(Studio));
 
-    expect(screen.getByTestId('prompt-bar')).toBeTruthy();
+    // UnifiedQueue should be visible
     expect(screen.getByTestId('unified-queue')).toBeTruthy();
+    // Generation panel toggle button should be present
+    expect(screen.getByRole('button', { name: /toggle generation/i })).toBeTruthy();
   });
 
   describe('Filter Props', () => {
@@ -282,9 +288,35 @@ describe('Studio Component', () => {
     });
   });
 
-  describe('PromptBar Interaction', () => {
+  describe('Generation Panel Interaction', () => {
+    it('should have generation panel collapsed by default', () => {
+      render(React.createElement(Studio));
+
+      // Generation panel toggle should be visible
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      expect(generateToggle).toBeTruthy();
+
+      // PromptBar should NOT be visible when collapsed (it's inside the panel)
+      expect(screen.queryByTestId('prompt-bar')).toBeNull();
+    });
+
+    it('should expand generation panel when clicked', () => {
+      render(React.createElement(Studio));
+
+      // Find and click the generation panel toggle
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      fireEvent.click(generateToggle);
+
+      // Now PromptBar should be visible
+      expect(screen.getByTestId('prompt-bar')).toBeTruthy();
+    });
+
     it('should update prompt state when input changes', () => {
       render(React.createElement(Studio));
+
+      // First expand the panel
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      fireEvent.click(generateToggle);
 
       const promptInput = screen.getByTestId('prompt-input');
       fireEvent.change(promptInput, { target: { value: 'test prompt' } });
@@ -295,14 +327,16 @@ describe('Studio Component', () => {
     it('should open settings panel when settings button is clicked', () => {
       render(React.createElement(Studio));
 
+      // First expand the generation panel
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      fireEvent.click(generateToggle);
+
       // Find the Settings button by its accessible name
       const settingsButton = screen.getByRole('button', { name: /settings/i });
       fireEvent.click(settingsButton);
 
       // Settings panel should be shown
       expect(screen.getByTestId('settings-panel')).toBeTruthy();
-      // Button should have active class
-      expect(settingsButton.className).toContain('bg-primary/10');
     });
   });
 
@@ -314,8 +348,9 @@ describe('Studio Component', () => {
       const createMoreButton = screen.getByTestId('create-more-button');
       fireEvent.click(createMoreButton);
 
-      // Settings panel should open with the generation settings
+      // Generation panel should auto-expand and settings panel should be shown
       await waitFor(() => {
+        expect(screen.getByTestId('prompt-bar')).toBeTruthy();
         expect(screen.getByTestId('settings-panel')).toBeTruthy();
       });
     });
@@ -326,8 +361,9 @@ describe('Studio Component', () => {
       const createMoreButton = screen.getByTestId('create-more-button');
       fireEvent.click(createMoreButton);
 
-      // Settings panel should be shown
+      // Generation panel should auto-expand
       await waitFor(() => {
+        expect(screen.getByTestId('prompt-bar')).toBeTruthy();
         expect(screen.getByTestId('settings-panel')).toBeTruthy();
       });
     });
@@ -341,8 +377,9 @@ describe('Studio Component', () => {
       const editImageButton = screen.getByTestId('edit-image-button');
       fireEvent.click(editImageButton);
 
-      // Settings panel should open with edit image settings
+      // Generation panel should auto-expand and settings panel should open with edit image settings
       await waitFor(() => {
+        expect(screen.getByTestId('prompt-bar')).toBeTruthy();
         expect(screen.getByTestId('settings-panel')).toBeTruthy();
         expect(screen.getByTestId('edit-image-settings')).toBeTruthy();
       });
@@ -354,8 +391,9 @@ describe('Studio Component', () => {
       const editImageButton = screen.getByTestId('edit-image-button');
       fireEvent.click(editImageButton);
 
-      // Should open settings panel with edit image settings
+      // Generation panel should auto-expand with edit image settings
       await waitFor(() => {
+        expect(screen.getByTestId('prompt-bar')).toBeTruthy();
         expect(screen.getByTestId('settings-panel')).toBeTruthy();
         expect(screen.getByTestId('edit-image-settings')).toBeTruthy();
       });
@@ -369,6 +407,7 @@ describe('Studio Component', () => {
       fireEvent.click(createMoreButton);
 
       await waitFor(() => {
+        expect(screen.getByTestId('prompt-bar')).toBeTruthy();
         expect(screen.getByTestId('settings-panel')).toBeTruthy();
       });
 
@@ -379,8 +418,9 @@ describe('Studio Component', () => {
       const editImageButton = screen.getByTestId('edit-image-button');
       fireEvent.click(editImageButton);
 
-      // Edit image settings should be present
+      // Generation panel should still be expanded and edit image settings should be present
       await waitFor(() => {
+        expect(screen.getByTestId('prompt-bar')).toBeTruthy();
         expect(screen.getByTestId('edit-image-settings')).toBeTruthy();
       });
     });
@@ -390,21 +430,20 @@ describe('Studio Component', () => {
     it('should render with correct container structure', () => {
       const { container } = render(React.createElement(Studio));
 
-      const mainContainer = container.querySelector('.container');
+      // Main container should have space-y-4 class
+      const mainContainer = container.firstChild;
       expect(mainContainer).toBeTruthy();
-      expect(mainContainer.className).toContain('mx-auto');
-      expect(mainContainer.className).toContain('p-4');
+      expect(mainContainer.className).toContain('space-y-4');
     });
 
-    it('should render PromptBar before UnifiedQueue', () => {
-      const { container } = render(React.createElement(Studio));
+    it('should render generation panel toggle before UnifiedQueue', () => {
+      render(React.createElement(Studio));
 
-      const promptBar = screen.getByTestId('prompt-bar');
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
       const unifiedQueue = screen.getByTestId('unified-queue');
 
-      // PromptBar should come before UnifiedQueue in DOM order
-      // Use compareDocumentPosition to check order
-      const position = promptBar.compareDocumentPosition(unifiedQueue);
+      // Generation toggle should come before UnifiedQueue in DOM order
+      const position = generateToggle.compareDocumentPosition(unifiedQueue);
       expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
@@ -444,27 +483,54 @@ describe('Studio Component', () => {
     });
   });
 
-  describe('Modal Management', () => {
-    it('should toggle settings panel visibility', () => {
+  describe('Panel Management', () => {
+    it('should toggle generation panel visibility', () => {
       render(React.createElement(Studio));
 
-      // Find the Settings button by its accessible name
+      // Generation panel toggle should be visible
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      expect(generateToggle).toBeTruthy();
+
+      // PromptBar should NOT be visible initially (collapsed)
+      expect(screen.queryByTestId('prompt-bar')).toBeNull();
+
+      // Open generation panel
+      fireEvent.click(generateToggle);
+      expect(screen.getByTestId('prompt-bar')).toBeTruthy();
+
+      // Close generation panel
+      fireEvent.click(generateToggle);
+      expect(screen.queryByTestId('prompt-bar')).toBeNull();
+    });
+
+    it('should toggle settings panel within generation panel', async () => {
+      render(React.createElement(Studio));
+
+      // First expand the generation panel
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      fireEvent.click(generateToggle);
+
+      // Find the Settings button in the collapsible panel header
       const settingsButton = screen.getByRole('button', { name: /settings/i });
 
-      // Open settings
+      // Open settings (expand panel)
       fireEvent.click(settingsButton);
       expect(screen.getByTestId('settings-panel')).toBeTruthy();
 
-      // Close settings
+      // Close settings (collapse panel)
       fireEvent.click(settingsButton);
-      // Settings panel should be closed (not in DOM)
-      expect(screen.queryByTestId('settings-panel')).toBeNull();
+      // Settings panel should still exist but be collapsed
+      expect(screen.getByTestId('settings-panel')).toBeTruthy();
     });
 
     it('should handle generate from settings panel', async () => {
       render(React.createElement(Studio));
 
-      // Find the Settings button by its accessible name
+      // First expand the generation panel
+      const generateToggle = screen.getByRole('button', { name: /toggle generation/i });
+      fireEvent.click(generateToggle);
+
+      // Find the Settings button in the collapsible panel header
       const settingsButton = screen.getByRole('button', { name: /settings/i });
       fireEvent.click(settingsButton);
 
@@ -472,9 +538,9 @@ describe('Studio Component', () => {
       const generateButton = screen.getByTestId('settings-generate-button');
       fireEvent.click(generateButton);
 
-      // Panel should close after generation
+      // Panel should still exist (collapsible behavior)
       await waitFor(() => {
-        expect(screen.queryByTestId('settings-panel')).toBeNull();
+        expect(screen.getByTestId('settings-panel')).toBeTruthy();
       });
     });
   });
