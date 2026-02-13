@@ -5,8 +5,6 @@ import { Switch } from "../ui/switch";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Badge } from "../ui/badge";
-import { Upload, MinusCircle } from "lucide-react";
-import { useRef } from "react";
 import ImageSettings from "./ImageSettings";
 
 const SAMPLING_METHODS = [
@@ -41,13 +39,9 @@ const CLIP_SKIP_OPTIONS = [
 
 /**
  * EditSettings - Settings for image edit mode
+ * Note: Source image upload is now in PromptBar/EditImage
  *
  * @param {Object} props
- * @param {Object} props.sourceImage - Source image file
- * @param {string} props.sourceImagePreview - URL of source image preview
- * @param {function} props.onFileSelect - Callback for file selection
- * @param {function} props.onClearImage - Callback for clearing image
- * @param {function} props.fileInputRef - Ref for file input element
  * @param {string} props.negativePrompt - Negative prompt text
  * @param {function} props.onNegativePromptChange - Callback for negative prompt change
  * @param {boolean} props.supportsNegativePrompt - Whether negative prompt is supported
@@ -76,11 +70,6 @@ const CLIP_SKIP_OPTIONS = [
  * @param {boolean} props.selectedModelsMultiple - Whether multiple models are selected
  */
 export function EditSettings({
-  sourceImage = null,
-  sourceImagePreview = null,
-  onFileSelect,
-  onClearImage,
-  fileInputRef,
   negativePrompt = "",
   onNegativePromptChange,
   supportsNegativePrompt = true,
@@ -110,46 +99,6 @@ export function EditSettings({
 }) {
   return (
     <>
-      {/* Source Image Upload - Required for edit mode */}
-      <div className="space-y-2">
-        <Label>Source Image *</Label>
-        <div className="flex items-center gap-4">
-          {sourceImagePreview ? (
-            <div className="relative group">
-              <img
-                src={sourceImagePreview}
-                alt="Source"
-                className="w-32 h-32 object-cover rounded-lg border"
-              />
-              <button
-                type="button"
-                className="absolute -top-2 -right-2 h-6 w-6 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                onClick={onClearImage}
-                disabled={isLoading || isUpscaling}
-              >
-                <MinusCircle className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div
-              className="w-32 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors"
-              onClick={() => fileInputRef?.current?.click()}
-            >
-              <Upload className="h-8 w-8 text-muted-foreground mb-1" />
-              <span className="text-xs text-muted-foreground">Upload</span>
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onFileSelect}
-            className="hidden"
-            disabled={isLoading || isUpscaling}
-          />
-        </div>
-      </div>
-
       {/* Negative Prompt - Only show if supported */}
       {supportsNegativePrompt && (
         <div className="space-y-2">

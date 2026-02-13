@@ -682,13 +682,33 @@ Upscale a single image.
 - `upscaling_resize_w`: number (target width)
 - `upscaling_resize_h`: number (target height)
 
-**Response:** Upscaled image file
+**Response:**
+```json
+{
+  "image": "base64-encoded-image-data",
+  "html_info": "<div>Upscaled with RealESRGAN 4x+</div>"
+}
+```
 
 ### POST /sdapi/v1/extra-batch-images
 
 Upscale multiple images in batch.
 
-**Request:** Same format as extra-single-image but with multiple images
+**Request:** JSON with imageList array
+- `imageList`: Array of `{ data: base64-string, name: string }` (required)
+- `resize_mode`: number (0 = by factor, 1 = to size)
+- `upscaler_1`: string (upscaler name)
+- `upscaling_resize`: number (scale factor)
+- `upscaling_resize_w`: number (target width)
+- `upscaling_resize_h`: number (target height)
+
+**Response:**
+```json
+{
+  "images": ["base64-image-1", "base64-image-2"],
+  "html_info": "<div>Upscaled 2 images with RealESRGAN 4x+</div>"
+}
+```
 
 ---
 

@@ -44,7 +44,10 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
   // Minimal state for PromptBar
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState("image"); // image, imgedit, video, upscale
-  const [selectedModels, setSelectedModels] = useState([]);
+  // Separate model selection states for each mode
+  const [selectedImageModels, setSelectedImageModels] = useState([]);
+  const [selectedEditModels, setSelectedEditModels] = useState([]);
+  const [selectedVideoModels, setSelectedVideoModels] = useState([]);
 
   // Image state for Edit/Upscale modes
   const [sourceImage, setSourceImage] = useState(null);
@@ -103,7 +106,9 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
         initialStateRef.current = formState;
         // Restore from localStorage
         setPrompt(formState.prompt ?? "");
-        setSelectedModels(formState.selectedModels ?? []);
+        setSelectedImageModels(formState.selectedImageModels ?? []);
+        setSelectedEditModels(formState.selectedEditModels ?? []);
+        setSelectedVideoModels(formState.selectedVideoModels ?? []);
         setMode(formState.mode ?? "image");
       }
     } catch (err) {
@@ -117,10 +122,12 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
   useEffect(() => {
     // On first render after loading, save the loaded state immediately
     if (hasLoadedRef.current && initialStateRef.current) {
-      const { prompt: initPrompt, selectedModels: initModels, mode: initMode } = initialStateRef.current;
+      const { prompt: initPrompt, selectedImageModels: initImageModels, selectedEditModels: initEditModels, selectedVideoModels: initVideoModels, mode: initMode } = initialStateRef.current;
       localStorage.setItem(FORM_STATE_KEY, JSON.stringify({
         prompt: initPrompt ?? "",
-        selectedModels: initModels ?? [],
+        selectedImageModels: initImageModels ?? [],
+        selectedEditModels: initEditModels ?? [],
+        selectedVideoModels: initVideoModels ?? [],
         mode: initMode ?? "image",
       }));
       initialStateRef.current = null;
@@ -133,13 +140,15 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
       if (!createMoreSettings && !editImageSettings) {
         const formState = {
           prompt,
-          selectedModels,
+          selectedImageModels,
+          selectedEditModels,
+          selectedVideoModels,
           mode,
         };
         localStorage.setItem(FORM_STATE_KEY, JSON.stringify(formState));
       }
     }
-  }, [prompt, selectedModels, mode, createMoreSettings, editImageSettings]);
+  }, [prompt, selectedImageModels, selectedEditModels, selectedVideoModels, mode, createMoreSettings, editImageSettings]);
 
   // File handlers for upscale mode
   const handleFileSelect = useCallback((file) => {
@@ -157,7 +166,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
     setCreateMoreSettings(generation);
     setEditImageSettings(null);
     if (generation.model) {
-      setSelectedModels([generation.model]);
+      setSelectedImageModels([generation.model]);
     }
     if (generation.prompt) {
       setPrompt(generation.prompt);
@@ -179,7 +188,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
       size: generation.size || '1024x1024',
     });
     setCreateMoreSettings(null);
-    setSelectedModels([DEFAULT_EDIT_MODEL]);
+    setSelectedEditModels([DEFAULT_EDIT_MODEL]);
     setMode('imgedit');
     setIsGenerationPanelOpen(true);
     setIsSettingsOpen(true);
@@ -223,6 +232,22 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
 
   // Handle generate from PromptBar - queue submission
   const handleGenerate = useCallback(async () => {
+    // Get the correct selected models based on current mode
+    const getModelsForMode = (currentMode) => {
+      switch (currentMode) {
+        case 'image':
+          return selectedImageModels;
+        case 'imgedit':
+          return selectedEditModels;
+        case 'video':
+          return selectedVideoModels;
+        default:
+          return [];
+      }
+    };
+
+    const currentModels = getModelsForMode(mode);
+
     // Handle upscale mode - queue the upscale job
     if (mode === 'upscale') {
       if (!sourceImage) {
@@ -249,10 +274,8 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
       return;
     }
 
-    // For imgedit mode, user needs to use Settings panel
-    if (mode === 'imgedit') {
-      toast.error("Please open Settings panel below to configure this mode");
-      setIsSettingsOpen(true);
+    if (mode === 'imgedit' && !sourceImage) {
+      toast.error("Please select a source image to edit");
       return;
     }
 
@@ -260,7 +283,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
       toast.error("Please enter a prompt");
       return;
     }
-    if (selectedModels.length === 0) {
+    if (currentModels.length === 0) {
       toast.error("Please select at least one model");
       return;
     }
@@ -268,23 +291,37 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
     // Quick generation: queue directly with default settings
     try {
       // Build params for each selected model
-      const promises = selectedModels.map((modelId) =>
-        generateQueued({
-          mode: 'generate',
+      const promises = currentModels.map((modelId) => {
+        const baseParams = {
           model: modelId,
           prompt,
-          size: '1024x1024', // Default size
           n: 1,
-        })
-      );
+        };
+
+        // Set mode and params based on current mode
+        if (mode === 'imgedit') {
+          baseParams.mode = 'edit';
+          baseParams.image = sourceImage;
+        } else if (mode === 'video') {
+          baseParams.mode = 'generate';
+          if (sourceImage) {
+            baseParams.image = sourceImage;
+          }
+        } else {
+          baseParams.mode = 'generate';
+          baseParams.size = '1024x1024'; // Default size for image mode
+        }
+
+        return generateQueued(baseParams);
+      });
 
       await Promise.all(promises);
-      toast.success(`${selectedModels.length} job(s) added to queue!`);
+      toast.success(`${currentModels.length} job(s) added to queue!`);
       // NOTE: Prompt is NOT cleared after generation - form state persists
     } catch (err) {
       toast.error(err.message || "Failed to queue generation");
     }
-  }, [prompt, selectedModels, mode, generateQueued, sourceImage, upscalerName, upscaleResizeMode, upscaleFactor, upscaleTargetWidth, upscaleTargetHeight, handleClearImage]);
+  }, [prompt, selectedImageModels, selectedEditModels, selectedVideoModels, mode, generateQueued, sourceImage, upscalerName, upscaleResizeMode, upscaleFactor, upscaleTargetWidth, upscaleTargetHeight, handleClearImage]);
 
   // Handle generate complete
   const handleGenerated = useCallback(() => {
@@ -307,11 +344,26 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
   // Get preview text for collapsed state
   const getPreviewText = () => {
     const parts = [];
-    if (selectedModels.length > 0) {
-      const modelName = modelsNameMap[selectedModels[0]] || 'Unknown';
+    // Get the correct selected models based on current mode
+    const getModelsForMode = (currentMode) => {
+      switch (currentMode) {
+        case 'image':
+          return selectedImageModels;
+        case 'imgedit':
+          return selectedEditModels;
+        case 'video':
+          return selectedVideoModels;
+        default:
+          return [];
+      }
+    };
+
+    const currentModels = getModelsForMode(mode);
+    if (currentModels.length > 0) {
+      const modelName = modelsNameMap[currentModels[0]] || 'Unknown';
       parts.push(modelName.length > 20 ? modelName.slice(0, 20) + '...' : modelName);
-      if (selectedModels.length > 1) {
-        parts.push(`+${selectedModels.length - 1} more`);
+      if (currentModels.length > 1) {
+        parts.push(`+${currentModels.length - 1} more`);
       }
     }
     if (prompt.trim()) {
@@ -375,8 +427,16 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
               onPromptChange={setPrompt}
               mode={mode}
               onModeChange={setMode}
-              selectedModels={selectedModels}
-              onModelsChange={setSelectedModels}
+              selectedModels={
+                mode === 'image' ? selectedImageModels :
+                mode === 'imgedit' ? selectedEditModels :
+                mode === 'video' ? selectedVideoModels : []
+              }
+              onModelsChange={
+                mode === 'image' ? setSelectedImageModels :
+                mode === 'imgedit' ? setSelectedEditModels :
+                mode === 'video' ? setSelectedVideoModels : () => {}
+              }
               modelsMap={modelsNameMap}
               onGenerate={handleGenerate}
               isLoading={isGenerating}
@@ -395,8 +455,16 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
             <GeneratePanel
               open={isSettingsOpen}
               onOpenChange={setIsSettingsOpen}
-              selectedModels={selectedModels}
-              onModelsChange={setSelectedModels}
+              selectedModels={
+                mode === 'image' ? selectedImageModels :
+                mode === 'imgedit' ? selectedEditModels :
+                mode === 'video' ? selectedVideoModels : []
+              }
+              onModelsChange={
+                mode === 'image' ? setSelectedImageModels :
+                mode === 'imgedit' ? setSelectedEditModels :
+                mode === 'video' ? setSelectedVideoModels : () => {}
+              }
               settings={createMoreSettings}
               editImageSettings={editImageSettings}
               onGenerated={() => {

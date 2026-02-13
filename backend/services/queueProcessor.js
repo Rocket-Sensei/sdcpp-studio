@@ -154,83 +154,85 @@ async function processQueue() {
   genLogger.info({ prompt: job.prompt?.substring(0, 50) }, 'Starting generation');
 
   try {
-    // Get model configuration
-    // Use type-specific default if no model specified
-    let modelId = job.model;
-    if (!modelId) {
-      const defaultModel = modelManager.getDefaultModelForType(job.type);
-      modelId = defaultModel?.id || modelManager.defaultModelId;
-    }
-    if (!modelId) {
-      throw new Error('No model specified and no default model configured');
-    }
-
-    const modelConfig = modelManager.getModel(modelId);
-    if (!modelConfig) {
-      throw new Error(`Model not found: ${modelId}`);
-    }
-
-    // Track the current model ID for crash detection
-    currentModelId = modelId;
-
-    logger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
-    genLogger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
-
-    // Update to MODEL_LOADING state when starting to load the model
-    updateGenerationStatus(job.id, GenerationStatus.MODEL_LOADING, {
-      progress: 0,
-    });
-    broadcastQueueEvent({
-      ...job,
-      status: GenerationStatus.MODEL_LOADING,
-      modelId,
-      modelName: modelConfig.name
-    }, 'job_updated');
-
-    // Prepare model based on execution mode
-    if (modelConfig.exec_mode === ExecMode.SERVER) {
-      // For server mode, stop conflicting servers and start the required one
-      const prepareResult = await prepareModelForJob(modelId, job.id);
-      if (!prepareResult) {
-        throw new Error(`Failed to prepare model ${modelId}: prepareModelForJob returned undefined`);
-      }
-      modelLoadingTimeMs = prepareResult.loadingTimeMs;
-    } else if (modelConfig.exec_mode === ExecMode.CLI) {
-      // For CLI mode, stop any running servers (they're not needed)
-      await stopAllServerModels();
-      // CLI mode doesn't have model loading overhead (model loads per generation)
-      modelLoadingTimeMs = 0;
-      logger.info({ modelId }, 'Model uses CLI mode');
-      genLogger.info({ modelId }, 'Model uses CLI mode');
-    } else if (modelConfig.exec_mode === ExecMode.API) {
-      // For API mode, stop any running servers (external API is used)
-      await stopAllServerModels();
-      // API mode uses external service, no local model loading
-      modelLoadingTimeMs = 0;
-      logger.info({ modelId }, 'Model uses external API mode');
-      genLogger.info({ modelId }, 'Model uses external API mode');
-    } else {
-      throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
-    }
-
-    // Update to PROCESSING state when model is ready and we're about to generate
-    updateGenerationStatus(job.id, GenerationStatus.PROCESSING, {
-      progress: 0,
-    });
-    broadcastQueueEvent({
-      ...job,
-      status: GenerationStatus.PROCESSING,
-      modelId,
-      modelName: modelConfig.name
-    }, 'job_updated');
-
     // Process the job based on type
     let result;
 
     // Upscale jobs don't need model preparation - handle separately
     if (job.type === 'upscale') {
+      updateGenerationStatus(job.id, GenerationStatus.PROCESSING, { progress: 0 });
+      broadcastQueueEvent({ ...job, status: GenerationStatus.PROCESSING }, 'job_updated');
       result = await processUpscaleJob(job, genLogger);
     } else {
+      // Get model configuration
+      // Use type-specific default if no model specified
+      let modelId = job.model;
+      if (!modelId || modelId === 'none') {
+        const defaultModel = modelManager.getDefaultModelForType(job.type);
+        modelId = defaultModel?.id || modelManager.defaultModelId;
+      }
+      if (!modelId || modelId === 'none') {
+        throw new Error('No model specified and no default model configured');
+      }
+
+      const modelConfig = modelManager.getModel(modelId);
+      if (!modelConfig) {
+        throw new Error(`Model not found: ${modelId}`);
+      }
+
+      // Track the current model ID for crash detection
+      currentModelId = modelId;
+
+      logger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
+      genLogger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
+
+      // Update to MODEL_LOADING state when starting to load the model
+      updateGenerationStatus(job.id, GenerationStatus.MODEL_LOADING, {
+        progress: 0,
+      });
+      broadcastQueueEvent({
+        ...job,
+        status: GenerationStatus.MODEL_LOADING,
+        modelId,
+        modelName: modelConfig.name
+      }, 'job_updated');
+
+      // Prepare model based on execution mode
+      if (modelConfig.exec_mode === ExecMode.SERVER) {
+        // For server mode, stop conflicting servers and start the required one
+        const prepareResult = await prepareModelForJob(modelId, job.id);
+        if (!prepareResult) {
+          throw new Error(`Failed to prepare model ${modelId}: prepareModelForJob returned undefined`);
+        }
+        modelLoadingTimeMs = prepareResult.loadingTimeMs;
+      } else if (modelConfig.exec_mode === ExecMode.CLI) {
+        // For CLI mode, stop any running servers (they're not needed)
+        await stopAllServerModels();
+        // CLI mode doesn't have model loading overhead (model loads per generation)
+        modelLoadingTimeMs = 0;
+        logger.info({ modelId }, 'Model uses CLI mode');
+        genLogger.info({ modelId }, 'Model uses CLI mode');
+      } else if (modelConfig.exec_mode === ExecMode.API) {
+        // For API mode, stop any running servers (external API is used)
+        await stopAllServerModels();
+        // API mode uses external service, no local model loading
+        modelLoadingTimeMs = 0;
+        logger.info({ modelId }, 'Model uses external API mode');
+        genLogger.info({ modelId }, 'Model uses external API mode');
+      } else {
+        throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
+      }
+
+      // Update to PROCESSING state when model is ready and we're about to generate
+      updateGenerationStatus(job.id, GenerationStatus.PROCESSING, {
+        progress: 0,
+      });
+      broadcastQueueEvent({
+        ...job,
+        status: GenerationStatus.PROCESSING,
+        modelId,
+        modelName: modelConfig.name
+      }, 'job_updated');
+
       // For other job types, proceed with model-based generation
       switch (job.type) {
         case 'generate':

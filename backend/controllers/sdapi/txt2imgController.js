@@ -19,8 +19,8 @@ import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('controllers:txt2img');
 
-// Default timeout: 10 minutes
-const DEFAULT_TIMEOUT_MS = 600000;
+// Default timeout: 1 hour
+const DEFAULT_TIMEOUT_MS = 3600000;
 
 /**
  * Register txt2img routes

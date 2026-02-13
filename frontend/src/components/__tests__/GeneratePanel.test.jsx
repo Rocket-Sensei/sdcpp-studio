@@ -189,7 +189,7 @@ describe('GeneratePanel', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 
-    it('should not render anything when closed', () => {
+    it('should render collapsed panel header when closed', () => {
       const { container } = render(
         <GeneratePanel
           open={false}
@@ -199,10 +199,12 @@ describe('GeneratePanel', () => {
         />
       );
 
-      expect(container.firstChild).toBe(null);
+      expect(container.firstChild).not.toBe(null);
+      expect(screen.getByTestId('settings-panel')).toBeInTheDocument();
+      expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 
-    it('should render close button in header', () => {
+    it('should render collapsible header button', () => {
       render(
         <GeneratePanel
           open={true}
@@ -212,11 +214,11 @@ describe('GeneratePanel', () => {
         />
       );
 
-      const closeButton = screen.getByRole('button', { name: '✕' });
-      expect(closeButton).toBeInTheDocument();
+      const headerButton = screen.getByRole('button', { name: /settings/i });
+      expect(headerButton).toBeInTheDocument();
     });
 
-    it('should call onOpenChange with false when close button is clicked', () => {
+    it('should call onOpenChange when header is clicked', () => {
       render(
         <GeneratePanel
           open={true}
@@ -226,8 +228,8 @@ describe('GeneratePanel', () => {
         />
       );
 
-      const closeButton = screen.getByRole('button', { name: '✕' });
-      fireEvent.click(closeButton);
+      const headerButton = screen.getByRole('button', { name: /settings/i });
+      fireEvent.click(headerButton);
 
       expect(mockOnOpenChange).toHaveBeenCalledWith(false);
     });

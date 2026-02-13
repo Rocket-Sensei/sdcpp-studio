@@ -7,7 +7,7 @@
  * Usage:
  *   import { generationWaiter } from './services/generationWaiter.js';
  *   try {
- *     const generation = await generationWaiter.waitForGeneration(jobId, 600000);
+ *     const generation = await generationWaiter.waitForGeneration(jobId, 3600000);
  *     // Handle completion
  *   } catch (error) {
  *     // Handle timeout or failure
@@ -27,15 +27,14 @@ class GenerationWaiter extends EventEmitter {
     super();
     // Map of jobId -> { resolve, reject, timeout }
     this.pendingWaiters = new Map();
-    // Default timeout: 10 minutes (600000ms)
-    this.defaultTimeout = 600000;
+    // Default timeout: 1 hour (3600000ms)
+    this.defaultTimeout = 3600000;
   }
 
   /**
    * Wait for a generation to complete, fail, or be cancelled
    * @param {string} jobId - The generation ID to wait for
-   * @param {number} timeoutMs - Timeout in milliseconds (default: 10 minutes)
-   * @returns {Promise<Object>} The completed generation object
+   * @param {number} timeoutMs - Timeout in milliseconds (default: 1 hour)
    */
   waitForGeneration(jobId, timeoutMs = this.defaultTimeout) {
     return new Promise((resolve, reject) => {

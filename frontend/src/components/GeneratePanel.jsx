@@ -1,21 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useImageGeneration } from "../hooks/useImageGeneration";
 import { useModels } from "../hooks/useModels";
 import { toast } from "sonner";
 import { cn } from "../lib/utils";
 import { authenticatedFetch } from "../utils/api";
 import { MultiModelSelector } from "./MultiModelSelector";
-import { Badge } from "./ui/badge";
-import { Settings2, Loader2, Sparkles } from "lucide-react";
+import { Settings2, Loader2, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { ImageSettings } from "./settings/ImageSettings";
 import { EditSettings } from "./settings/EditSettings";
 import { VideoSettings } from "./settings/VideoSettings";
 import { UpscaleSettings } from "./settings/UpscaleSettings";
 
-// localStorage key for form state persistence
-const FORM_STATE_KEY = "sd-cpp-studio-generate-form-state";
+// localStorage key for settings form state persistence (different from Studio's key)
+const SETTINGS_STATE_KEY = "sd-cpp-studio-settings-form-state";
 
 const MODES = [
   { value: "image", label: "Image", needsImage: false, optionalImage: true, description: "Text to Image / Image to Image" },
@@ -115,12 +113,12 @@ export function GeneratePanel({
   const [hasServerModeModel, setHasServerModeModel] = useState(false);
   const [serverModeSteps, setServerModeSteps] = useState(null);
 
-  // Image-related settings (local state for edit mode, props for upscale mode)
-  const [localSourceImage, setLocalSourceImage] = useState(null);
-  const [localSourceImagePreview, setLocalSourceImagePreview] = useState(null);
-
   // Strength parameter for img2img mode
   const [strength, setStrength] = useState(0.75);
+
+  // Local image state for image mode img2img (when user adds image to image mode)
+  const [localSourceImage, setLocalSourceImage] = useState(null);
+  const [localSourceImagePreview, setLocalSourceImagePreview] = useState(null);
 
   // Upscale settings - all upscale state is managed in Studio.jsx
   const [upscaleAfterGeneration, setUpscaleAfterGeneration] = useState(false);
@@ -297,7 +295,7 @@ export function GeneratePanel({
         flowShift,
         flowShiftValue,
       };
-      localStorage.setItem(FORM_STATE_KEY, JSON.stringify(formState));
+      localStorage.setItem(SETTINGS_STATE_KEY, JSON.stringify(formState));
     }
   }, [
     localMode,
@@ -324,7 +322,7 @@ export function GeneratePanel({
   // Load form state from localStorage on mount
   useEffect(() => {
     try {
-      const savedState = localStorage.getItem(FORM_STATE_KEY);
+      const savedState = localStorage.getItem(SETTINGS_STATE_KEY);
       if (savedState) {
         const formState = JSON.parse(savedState);
         if (formState.mode) onModeChange?.(formState.mode);
@@ -373,13 +371,13 @@ export function GeneratePanel({
       return;
     }
 
-    // For upscale mode, use Studio's handler
-    if (mode === "upscale") {
+    // For upscale and edit modes, use Studio's handler
+    if (mode === "upscale" || mode === "imgedit" || mode === "video") {
       onFileSelect?.(file);
       return;
     }
 
-    // For other modes (edit), use local state
+    // For image mode with source image (img2img), use local state
     setLocalSourceImage(file);
 
     const reader = new FileReader();
@@ -390,13 +388,13 @@ export function GeneratePanel({
   };
 
   const handleClearImage = () => {
-    // For upscale mode, use Studio's handler
-    if (mode === "upscale") {
+    // For upscale and edit modes, use Studio's handler
+    if (mode === "upscale" || mode === "imgedit" || mode === "video") {
       onClearImage?.();
       return;
     }
 
-    // For other modes (edit), use local state
+    // For image mode, use local state
     setLocalSourceImage(null);
     setLocalSourceImagePreview(null);
     if (fileInputRef.current) {
@@ -521,37 +519,36 @@ export function GeneratePanel({
 
   const currentModeConfig = MODES.find(m => m.value === localMode);
 
-  // Don't render if closed
-  if (!open) {
-    return null;
-  }
-
   const selectedModelsMultiple = selectedModels.length > 1;
 
   return (
-    <>
-    <Card data-testid="settings-panel">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Settings</CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange?.(false)}>
-            ✕
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-          {/* Inline Model Selector - NOT shown for upscale mode */}
-          {localMode !== "upscale" && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium">Select Models</h3>
-              <MultiModelSelector
-                selectedModels={selectedModels}
-                onModelsChange={onModelsChange}
-                mode={localMode}
-              />
-            </div>
+    <div data-testid="settings-panel">
+      <button
+        type="button"
+        onClick={() => onOpenChange?.(!open)}
+        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Settings2 className="h-4 w-4" />
+          <span className="font-medium">Settings</span>
+          {!open && (
+            <span className="text-xs text-muted-foreground">
+              {localMode === 'image' && `${width}x${height}, CFG ${cfgScale}, ${sampleSteps} steps`}
+              {localMode === 'imgedit' && `${width}x${height}`}
+              {localMode === 'video' && `${videoFrames} frames @ ${videoFps}fps`}
+              {localMode === 'upscale' && `${upscaleFactor}x upscale`}
+            </span>
           )}
+        </div>
+        {open ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
 
+      {open && (
+        <div className="space-y-6 pt-4 border-t">
           {/* Mode-specific settings */}
           {localMode === "image" && (
             <ImageSettings
@@ -593,11 +590,6 @@ export function GeneratePanel({
 
           {localMode === "imgedit" && (
             <EditSettings
-              sourceImage={sourceImage}
-              sourceImagePreview={sourceImagePreview}
-              onFileSelect={handleFileSelect}
-              onClearImage={handleClearImage}
-              fileInputRef={fileInputRef}
               negativePrompt={negativePrompt}
               onNegativePromptChange={setNegativePrompt}
               supportsNegativePrompt={supportsNegativePrompt}
@@ -629,11 +621,6 @@ export function GeneratePanel({
 
           {localMode === "video" && (
             <VideoSettings
-              sourceImage={sourceImage}
-              sourceImagePreview={sourceImagePreview}
-              onFileSelect={handleFileSelect}
-              onClearImage={handleClearImage}
-              fileInputRef={fileInputRef}
               endImage={endImage}
               endImagePreview={endImagePreview}
               onEndImageFileSelect={handleEndImageFileSelect}
@@ -709,9 +696,9 @@ export function GeneratePanel({
               </Button>
             </div>
           )}
-        </CardContent>
-    </Card>
-    </>
+        </div>
+      )}
+    </div>
   );
 }
 

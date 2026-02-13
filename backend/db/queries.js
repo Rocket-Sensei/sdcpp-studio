@@ -44,14 +44,19 @@ export async function createGeneration(data) {
   const db = getDatabase();
 
   // Use default model if not provided
+  // Upscale jobs use a placeholder model ID since they don't actually use a model
   if (!data.model) {
-    const jobType = data.type || 'generate';
-    const defaultModel = modelManager.getDefaultModelForType(jobType);
-    if (defaultModel) {
-      data.model = defaultModel.id;
-      logger.debug({ jobType, defaultModel: data.model }, 'Using default model for generation');
+    if (data.type === 'upscale') {
+      data.model = 'none'; // Placeholder for upscale jobs
     } else {
-      throw new Error('No model specified and no default model configured. Please specify a model ID or configure a default model.');
+      const jobType = data.type || 'generate';
+      const defaultModel = modelManager.getDefaultModelForType(jobType);
+      if (defaultModel) {
+        data.model = defaultModel.id;
+        logger.debug({ jobType, defaultModel: data.model }, 'Using default model for generation');
+      } else {
+        throw new Error('No model specified and no default model configured. Please specify a model ID or configure a default model.');
+      }
     }
   }
 

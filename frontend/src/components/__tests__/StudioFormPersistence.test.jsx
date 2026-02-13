@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
 import { Studio } from '../Studio';
@@ -13,6 +13,11 @@ vi.mock('../../hooks/useImageGeneration', () => ({
     isLoading: false,
     error: null,
     result: null,
+  }),
+  useGenerations: () => ({
+    generations: [],
+    fetchGenerations: vi.fn(),
+    pagination: { total: 0, limit: 20, offset: 0, hasMore: false, totalPages: 0 },
   }),
 }));
 
@@ -47,11 +52,16 @@ vi.mock('sonner', () => ({
 
 // Mock authenticatedFetch
 vi.mock('../../utils/api', () => ({
-  authenticatedFetch: vi.fn(),
+  authenticatedFetch: vi.fn((url) => {
+    if (url === '/sdapi/v1/upscalers') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{ name: 'RealESRGAN 4x+', scale: 4 }]),
+      });
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  }),
 }));
-
-// Import mock helper
-import { createMockResponse } from '../../../../tests/setup.js';
 
 // Mock child components
 vi.mock('../UnifiedQueue', () => ({
@@ -107,33 +117,17 @@ global.ResizeObserver = class ResizeObserver {
 
 const FORM_STATE_KEY = 'sd-cpp-studio-generate-form-state';
 
+// Helper to expand the generation panel
+const expandGenerationPanel = () => {
+  const toggleButton = screen.getByRole('button', { name: /toggle generation/i });
+  fireEvent.click(toggleButton);
+};
+
 describe('Studio Form Persistence', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGenerateQueued.mockClear();
     localStorage.clear();
-
-    // Mock fetch for upscalers
-    global.fetch = vi.fn((url) => {
-      if (url === '/sdapi/v1/upscalers') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([{ name: 'RealESRGAN 4x+', scale: 4 }]),
-        });
-      }
-      if (url === '/api/models') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            models: [
-              { id: 'model1', name: 'Model 1', capabilities: ['text-to-image'], supports_negative_prompt: true },
-              { id: 'model2', name: 'Model 2', capabilities: ['text-to-image', 'image-to-image'], supports_negative_prompt: true },
-            ],
-          }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    });
   });
 
   describe('Form state saves to localStorage', () => {
@@ -141,6 +135,9 @@ describe('Studio Form Persistence', () => {
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       const promptInput = await screen.findByPlaceholderText(/A serene landscape/);
       fireEvent.change(promptInput, { target: { value: 'A beautiful sunset' } });
@@ -158,6 +155,9 @@ describe('Studio Form Persistence', () => {
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
 
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
+
       // Select model1
       const model1Button = await screen.findByTestId('select-model1');
       fireEvent.click(model1Button);
@@ -166,7 +166,7 @@ describe('Studio Form Persistence', () => {
         const savedState = localStorage.getItem(FORM_STATE_KEY);
         expect(savedState).toBeTruthy();
         const parsed = JSON.parse(savedState);
-        expect(parsed.selectedModels).toEqual(['model1']);
+        expect(parsed.selectedImageModels).toEqual(['model1']);
       });
 
       // Select model2
@@ -176,7 +176,7 @@ describe('Studio Form Persistence', () => {
       await waitFor(() => {
         const savedState = localStorage.getItem(FORM_STATE_KEY);
         const parsed = JSON.parse(savedState);
-        expect(parsed.selectedModels).toEqual(['model1', 'model2']);
+        expect(parsed.selectedImageModels).toEqual(['model1', 'model2']);
       });
     });
 
@@ -184,6 +184,9 @@ describe('Studio Form Persistence', () => {
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       // Switch to video mode
       const videoButton = await screen.findByText('Video');
@@ -203,13 +206,16 @@ describe('Studio Form Persistence', () => {
       // Set up localStorage with saved state
       localStorage.setItem(FORM_STATE_KEY, JSON.stringify({
         prompt: 'My saved prompt',
-        selectedModels: ['model1'],
+        selectedImageModels: ['model1'],
         mode: 'image',
       }));
 
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       // Wait for the prompt to be restored from localStorage
       await waitFor(() => {
@@ -222,13 +228,16 @@ describe('Studio Form Persistence', () => {
       // Set up localStorage with saved state
       localStorage.setItem(FORM_STATE_KEY, JSON.stringify({
         prompt: 'test',
-        selectedModels: ['model1', 'model2'],
+        selectedImageModels: ['model1', 'model2'],
         mode: 'image',
       }));
 
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       // Wait for both models to be selected
       await waitFor(() => {
@@ -243,13 +252,16 @@ describe('Studio Form Persistence', () => {
       // Set up localStorage with saved state
       localStorage.setItem(FORM_STATE_KEY, JSON.stringify({
         prompt: 'test',
-        selectedModels: ['model1'],
+        selectedImageModels: ['model1'],
         mode: 'video',
       }));
 
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       // Wait for video mode to be active (indicated by "lovely cat" placeholder)
       await waitFor(() => {
@@ -265,6 +277,9 @@ describe('Studio Form Persistence', () => {
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
 
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
+
       // Should not crash, should render with defaults
       const promptInput = await screen.findByPlaceholderText(/A serene landscape/);
       expect(promptInput).toHaveValue('');
@@ -278,6 +293,9 @@ describe('Studio Form Persistence', () => {
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       const promptInput = await screen.findByPlaceholderText(/A serene landscape/);
       fireEvent.change(promptInput, { target: { value: 'A test prompt' } });
@@ -308,6 +326,9 @@ describe('Studio Form Persistence', () => {
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
 
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
+
       const promptInput = await screen.findByPlaceholderText(/A serene landscape/);
       fireEvent.change(promptInput, { target: { value: 'A test prompt' } });
 
@@ -327,18 +348,20 @@ describe('Studio Form Persistence', () => {
       expect(savedState).toBeTruthy();
       const parsed = JSON.parse(savedState);
       expect(parsed.prompt).toBe('A test prompt');
-      expect(parsed.selectedModels).toEqual(['model1']);
+      expect(parsed.selectedImageModels).toEqual(['model1']);
     });
   });
 
   describe('Form submission prevention', () => {
     it('should prevent default form submission when pressing Enter in prompt', async () => {
-      const originalPreventDefault = vi.fn();
       const formSubmitSpy = vi.fn();
 
       render(
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
+
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
 
       // Override form submit if it exists
       const forms = document.querySelectorAll('form');
@@ -366,6 +389,9 @@ describe('Studio Form Persistence', () => {
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
 
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
+
       const promptInput = await screen.findByPlaceholderText(/A serene landscape/);
       fireEvent.change(promptInput, { target: { value: 'test' } });
 
@@ -390,6 +416,9 @@ describe('Studio Form Persistence', () => {
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
 
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
+
       const promptInput = await screen.findByPlaceholderText(/A serene landscape/);
       fireEvent.change(promptInput, { target: { value: 'My persistent prompt' } });
 
@@ -405,7 +434,7 @@ describe('Studio Form Persistence', () => {
         expect(savedState).toBeTruthy();
         const parsed = JSON.parse(savedState);
         expect(parsed.prompt).toBe('My persistent prompt');
-        expect(parsed.selectedModels).toEqual(['model1']);
+        expect(parsed.selectedImageModels).toEqual(['model1']);
         expect(parsed.mode).toBe('video');
       });
 
@@ -417,13 +446,17 @@ describe('Studio Form Persistence', () => {
         <Studio searchQuery="" selectedStatuses={[]} selectedModelsFilter={[]} />
       );
 
+      // First expand the generation panel (collapsed by default)
+      expandGenerationPanel();
+
       // Wait for state to be restored - check video mode is active via placeholder
       await waitFor(() => {
         // Video mode is indicated by the "lovely cat" placeholder
         const restoredPromptInput = screen.queryByPlaceholderText(/A lovely cat/);
         expect(restoredPromptInput).toBeInTheDocument();
         expect(restoredPromptInput).toHaveValue('My persistent prompt');
-        expect(screen.getByTestId('select-model1')).toHaveTextContent('✓ Model 1');
+        // Note: model selection is not checked here because video mode uses selectedVideoModels
+        // which is separate from selectedImageModels. Model persistence is tested in other tests.
       });
     });
   });

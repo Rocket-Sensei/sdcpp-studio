@@ -222,19 +222,33 @@ export const ImageCard = memo(function ImageCard({
               Cancel
             </Button>
           ) : isFailed ? (
-            // Retry button for failed
-            <Button
-              variant="default"
-              size="sm"
-              className="flex-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRetry?.(generation);
-              }}
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Retry
-            </Button>
+            // Retry and Delete buttons for failed
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetry?.(generation);
+                }}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Retry
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(generation.id);
+                }}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Delete
+              </Button>
+            </>
           ) : (
             // Action buttons for completed
             <>
@@ -360,21 +374,23 @@ export const ImageCard = memo(function ImageCard({
           )}
         </div>
 
-        {/* Model name badge */}
-        {modelName && (
-          <div className="pt-1 border-t border-border/50">
-            <p className="text-xs text-muted-foreground truncate">{modelName}</p>
-          </div>
-        )}
+        {/* Model name and resolution */}
+        <div className="pt-1 border-t border-border/50 flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground truncate">{modelName || 'Unknown'}</p>
+          {generation.size && (
+            <p className="text-xs text-muted-foreground flex-shrink-0">{generation.size}</p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
 },
-(prevProps, nextProps) => {
+ (prevProps, nextProps) => {
   return (
     prevProps.generation.id === nextProps.generation.id &&
     prevProps.generation.status === nextProps.generation.status &&
     prevProps.generation.first_image_url === nextProps.generation.first_image_url &&
+    prevProps.generation.size === nextProps.generation.size &&
     prevProps.modelName === nextProps.modelName
   );
 });

@@ -5,7 +5,7 @@ import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Badge } from "../ui/badge";
 import { Upload, MinusCircle } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useCallback } from "react";
 
 const SIZE_PRESETS = [
   { width: 256, height: 256, label: "256" },
@@ -51,13 +51,9 @@ const CLIP_SKIP_OPTIONS = [
 /**
  * VideoSettings - Settings for video generation mode
  * Note: NO duplicate prompt input - prompt is handled in PromptBar/GenerateVideo
+ * Note: Start frame upload is now in PromptBar/GenerateVideo
  *
  * @param {Object} props
- * @param {Object} props.sourceImage - Start frame image file
- * @param {string} props.sourceImagePreview - URL of start frame image preview
- * @param {function} props.onFileSelect - Callback for file selection
- * @param {function} props.onClearImage - Callback for clearing image
- * @param {function} props.fileInputRef - Ref for file input element
  * @param {Object} props.endImage - End frame image file
  * @param {string} props.endImagePreview - URL of end frame image preview
  * @param {function} props.onEndImageFileSelect - Callback for end image file selection
@@ -72,8 +68,8 @@ const CLIP_SKIP_OPTIONS = [
  * @param {number} props.flowShiftValue - Flow shift value
  * @param {function} props.onFlowShiftValueChange - Callback for flow shift value change
  * @param {number} props.width - Image width
- * @param {number} props.height - Image height
  * @param {function} props.onWidthChange - Callback for width change
+ * @param {number} props.height - Image height
  * @param {function} props.onHeightChange - Callback for height change
  * @param {number} props.cfgScale - CFG scale value
  * @param {function} props.onCfgScaleChange - Callback for CFG scale change
@@ -96,11 +92,6 @@ const CLIP_SKIP_OPTIONS = [
  * @param {boolean} props.selectedModelsMultiple - Whether multiple models are selected
  */
 export function VideoSettings({
-  sourceImage = null,
-  sourceImagePreview = null,
-  onFileSelect,
-  onClearImage,
-  fileInputRef,
   endImage = null,
   endImagePreview = null,
   onEndImageFileSelect,
@@ -142,46 +133,6 @@ export function VideoSettings({
 
   return (
     <>
-      {/* Start Frame Image (Optional) */}
-      <div className="space-y-2">
-        <Label>Start Frame Image (Optional)</Label>
-        <div className="flex items-center gap-4">
-          {sourceImagePreview ? (
-            <div className="relative group">
-              <img
-                src={sourceImagePreview}
-                alt="Start frame"
-                className="w-32 h-32 object-cover rounded-lg border"
-              />
-              <button
-                type="button"
-                className="absolute -top-2 -right-2 h-6 w-6 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                onClick={onClearImage}
-                disabled={isLoading || isUpscaling}
-              >
-                <MinusCircle className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div
-              className="w-32 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors"
-              onClick={() => fileInputRef?.current?.click()}
-            >
-              <Upload className="h-8 w-8 text-muted-foreground mb-1" />
-              <span className="text-xs text-muted-foreground">Upload</span>
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onFileSelect}
-            className="hidden"
-            disabled={isLoading || isUpscaling}
-          />
-        </div>
-      </div>
-
       {/* Video Frames */}
       <div className="space-y-2">
         <Label htmlFor="video-frames">Video Frames: {videoFrames}</Label>

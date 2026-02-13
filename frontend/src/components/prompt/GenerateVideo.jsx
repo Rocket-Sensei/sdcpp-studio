@@ -1,7 +1,8 @@
 import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Video, Sparkles, Loader2, Upload, MinusCircle } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
+import { useRef, useCallback } from "react";
 
 /**
  * GenerateVideo - Prompt input for video generation mode
@@ -11,16 +12,26 @@ import { useHotkeys } from "react-hotkeys-hook";
  * @param {function} props.onPromptChange - Callback when prompt changes
  * @param {boolean} props.isLoading - Whether generation is in progress
  * @param {boolean} props.disabled - Whether the input is disabled
+ * @param {string} props.sourceImagePreview - URL of source image preview
+ * @param {File} props.sourceImage - Source image file object
  * @param {function} props.onGenerate - Callback when generate is clicked
+ * @param {function} props.onFileSelect - Callback when file is selected
+ * @param {function} props.onClearImage - Callback to clear selected image
  */
 export function GenerateVideo({
   prompt = "",
   onPromptChange,
   isLoading = false,
   disabled = false,
+  sourceImagePreview = null,
+  sourceImage = null,
   onGenerate,
+  onFileSelect,
+  onClearImage,
 }) {
-  const requiresPrompt = true;
+  const fileInputRef = useRef(null);
+  const requiresPrompt = false; // Prompt is optional for video mode
+  const hasImage = !!sourceImagePreview;
 
   // Ctrl+Enter to generate
   useHotkeys(
@@ -34,8 +45,82 @@ export function GenerateVideo({
     { enabled: !disabled && !isLoading && prompt.trim() !== '', enableOnFormTags: true }
   );
 
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onFileSelect?.(file);
+    }
+  }, [onFileSelect]);
+
+  const handleClearImage = useCallback((e) => {
+    e.stopPropagation();
+    onClearImage?.();
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [onClearImage]);
+
   return (
     <>
+      {/* Start frame image upload or preview */}
+      <div className="mb-3">
+        {hasImage ? (
+          <div className="relative group">
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <img
+                src={sourceImagePreview}
+                alt="Start frame"
+                className="w-16 h-16 object-cover rounded border border-border"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {sourceImage?.name || "Selected image"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Start frame (optional)
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleClearImage}
+                disabled={disabled || isLoading}
+              >
+                <MinusCircle className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-3 p-4 border border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors"
+            onClick={handleUploadClick}
+          >
+            <div className="flex items-center justify-center w-10 h-10 bg-muted rounded-full">
+              <Upload className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Select a start frame (optional)</p>
+              <p className="text-xs text-muted-foreground">Click to browse or drag and drop</p>
+            </div>
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={handleFileChange}
+          className="hidden"
+          disabled={disabled || isLoading}
+        />
+      </div>
+
       {/* Prompt input - NO duplicate prompt in video settings */}
       <div className="relative mb-3">
         <Textarea

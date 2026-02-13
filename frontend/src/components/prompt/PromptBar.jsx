@@ -1,11 +1,9 @@
 import { useRef } from "react";
 import {
-  Settings2,
   Image as ImageIcon,
   Video,
 } from "lucide-react";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 import { GenerateImage } from "./GenerateImage";
 import { EditImage } from "./EditImage";
@@ -22,6 +20,13 @@ const MODES = [
 ];
 
 /**
+ * Prevent default form submission - we handle generation via onClick handlers
+ */
+function handleFormSubmit(e) {
+  e.preventDefault();
+}
+
+/**
  * PromptBar - Main generation form panel (top)
  * Mode selector and model selection are shared, prompt input is mode-specific
  *
@@ -32,8 +37,7 @@ const MODES = [
  * @param {function} props.onModeChange - Callback when mode changes
  * @param {string[]} props.selectedModels - Array of selected model IDs
  * @param {Object} props.modelsMap - Map of model ID to model name
- * @param {function} props.onSettingsToggle - Callback to toggle settings panel
- * @param {boolean} props.settingsOpen - Whether settings panel is open
+ * @param {function} props.onModelsChange - Callback when model selection changes
  * @param {function} props.onGenerate - Callback when generate is clicked
  * @param {boolean} props.isLoading - Whether generation is in progress
  * @param {boolean} props.disabled - Whether the prompt bar is disabled
@@ -54,8 +58,6 @@ export function PromptBar({
   selectedModels = [],
   onModelsChange,
   modelsMap = {},
-  onSettingsToggle,
-  settingsOpen = false,
   onGenerate,
   isLoading = false,
   disabled = false,
@@ -72,24 +74,11 @@ export function PromptBar({
   const showStrength = mode === "image" && sourceImagePreview;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 shadow-sm" data-testid="generate-panel">
-      {/* Header row with title and settings button */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Generate</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onSettingsToggle}
-          className={cn(
-            "gap-1.5",
-            settingsOpen && "bg-primary/10 border-primary"
-          )}
-        >
-          <Settings2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Settings</span>
-        </Button>
-      </div>
-
+    <form
+      className="bg-card border border-border rounded-xl p-4 shadow-sm"
+      data-testid="generate-panel"
+      onSubmit={handleFormSubmit}
+    >
       {/* Generation Mode Selector - SHARED between top and bottom panels */}
       <div className="mb-3">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -150,7 +139,10 @@ export function PromptBar({
           isLoading={isLoading}
           disabled={disabled}
           sourceImagePreview={sourceImagePreview}
+          sourceImage={sourceImage}
           onGenerate={onGenerate}
+          onFileSelect={onFileSelect}
+          onClearImage={onClearImage}
         />
       )}
 
@@ -160,7 +152,11 @@ export function PromptBar({
           onPromptChange={onPromptChange}
           isLoading={isLoading}
           disabled={disabled}
+          sourceImagePreview={sourceImagePreview}
+          sourceImage={sourceImage}
           onGenerate={onGenerate}
+          onFileSelect={onFileSelect}
+          onClearImage={onClearImage}
         />
       )}
 
@@ -178,7 +174,7 @@ export function PromptBar({
           onUpscalerNameChange={onUpscalerNameChange}
         />
       )}
-    </div>
+    </form>
   );
 }
 

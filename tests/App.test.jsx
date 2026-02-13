@@ -21,6 +21,8 @@ vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
   }),
   useGenerations: () => ({
     fetchGenerations: vi.fn(),
+    generations: [],
+    pagination: { total: 0, limit: 20, offset: 0, hasMore: false, totalPages: 0 },
   }),
 }));
 

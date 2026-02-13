@@ -473,12 +473,12 @@ describe('Studio Component', () => {
     it('should persist selectedModels to localStorage', async () => {
       render(React.createElement(Studio));
 
-      // selectedModels is set to [] by default
+      // selectedImageModels is set to [] by default
       await waitFor(() => {
         const savedState = localStorageMock.getItem('sd-cpp-studio-generate-form-state');
         expect(savedState).toBeTruthy();
         const parsed = JSON.parse(savedState);
-        expect(parsed.selectedModels).toEqual([]);
+        expect(parsed.selectedImageModels).toEqual([]);
       });
     });
   });
