@@ -58,6 +58,36 @@ vi.mock('../backend/services/websocket.js', () => ({
   },
 }));
 
+// Mock pino logger to avoid file system access during tests
+vi.mock('pino', () => {
+  const mockLogger = {
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn(),
+    child: vi.fn(() => mockLogger),
+  };
+  const mockPino = vi.fn(() => mockLogger);
+  mockPino.destination = vi.fn(() => ({}));
+  return {
+    default: mockPino,
+    destination: vi.fn(() => ({})),
+    stdSerializers: {
+      err: vi.fn(),
+      req: vi.fn(),
+      res: vi.fn(),
+    },
+    multistream: vi.fn(() => ({ write: vi.fn() })),
+  };
+});
+
+// Mock pino-pretty to avoid file system access during tests
+vi.mock('pino-pretty', () => ({
+  build: vi.fn(() => ({ write: vi.fn() })),
+}));
+
 import { ModelDownloader, DOWNLOAD_STATUS, DOWNLOAD_METHOD, formatBytes, formatTime, getHuggingFaceFileUrl } from '../backend/services/modelDownloader.js';
 import * as fs from 'fs';
 import { spawn as mockSpawn } from 'child_process';
@@ -453,10 +483,18 @@ describe('ModelDownloader - Download Method Detection', () => {
 
 describe('ModelDownloader - Download Progress', () => {
   let downloader;
+  let originalEnv;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    downloader = new ModelDownloader();
+    originalEnv = process.env.USE_PYTHON_DOWNLOADER;
+    // Force Python downloader for these tests since they mock spawn behavior
+    process.env.USE_PYTHON_DOWNLOADER = 'true';
+  });
+
+  afterEach(() => {
+    process.env.USE_PYTHON_DOWNLOADER = originalEnv;
+    vi.resetModules();
   });
 
   it('should track progress during download', async () => {
@@ -465,36 +503,69 @@ describe('ModelDownloader - Download Progress', () => {
       progressUpdates.push(update);
     });
 
-    // Mock successful Python download
-    const mockPython = {
-      stdout: {
+    // Mock spawn to handle both availability checks and download
+    mockSpawn.mockImplementation((cmd, args) => {
+      // Python version check
+      if (args && args[0] === '--version') {
+        const mockProc = {
+          on: vi.fn((event, callback) => {
+            if (event === 'close') setTimeout(() => callback(0), 5);
+            return mockProc;
+          })
+        };
+        return mockProc;
+      }
+      // HuggingFace hub check
+      if (args && args[0] === '-c' && args[1]?.includes('huggingface_hub')) {
+        const mockProc = {
+          stdout: {
+            on: vi.fn((event, callback) => {
+              if (event === 'data') setTimeout(() => callback(Buffer.from('OK\n')), 5);
+            })
+          },
+          on: vi.fn((event, callback) => {
+            if (event === 'close') setTimeout(() => callback(0), 10);
+            return mockProc;
+          })
+        };
+        return mockProc;
+      }
+      // Actual download
+      const mockPython = {
+        stdout: {
+          on: vi.fn((event, callback) => {
+            if (event === 'data') {
+              // Simulate progress messages
+              setTimeout(() => {
+                callback(Buffer.from('{"type":"start"}\n'));
+              }, 10);
+              setTimeout(() => {
+                callback(Buffer.from('{"type":"progress","data":{"current":50,"total":100}}\n'));
+              }, 20);
+              setTimeout(() => {
+                callback(Buffer.from('{"type":"complete","data":{"file_path":"/test/file.gguf","file_size":100}}\n'));
+              }, 30);
+            }
+          })
+        },
+        stderr: { on: vi.fn() },
         on: vi.fn((event, callback) => {
-          if (event === 'data') {
-            // Simulate progress messages
-            setTimeout(() => {
-              callback(Buffer.from('{"type":"start"}\n'));
-            }, 10);
-            setTimeout(() => {
-              callback(Buffer.from('{"type":"progress","data":{"current":50,"total":100}}\n'));
-            }, 20);
-            setTimeout(() => {
-              callback(Buffer.from('{"type":"complete","data":{"file_path":"/test/file.gguf","file_size":100}}\n'));
-            }, 30);
+          if (event === 'close') {
+            setTimeout(() => callback(0), 40);
           }
+          return mockPython;
         })
-      },
-      on: vi.fn((event, callback) => {
-        if (event === 'close') {
-          setTimeout(() => callback(0), 40);
-        }
-        return mockPython;
-      })
-    };
+      };
+      return mockPython;
+    });
 
-    mockSpawn.mockReturnValue(mockPython);
+    // Reset modules to clear cached availability checks
+    vi.resetModules();
+    const { ModelDownloader: FreshDownloader } = await import('../backend/services/modelDownloader.js');
+    const freshDownloader = new FreshDownloader();
 
     try {
-      await downloader.downloadModel('test/repo', [{ path: 'file.gguf' }], onProgress);
+      await freshDownloader.downloadModel('test/repo', [{ path: 'file.gguf' }], onProgress);
     } catch (e) {
       // May fail due to mocking, but we check progress
     }
@@ -505,26 +576,60 @@ describe('ModelDownloader - Download Progress', () => {
   it('should include job ID in progress updates', async () => {
     const onProgress = vi.fn();
 
-    const mockPython = {
-      stdout: {
+    // Mock spawn to handle both availability checks and download
+    mockSpawn.mockImplementation((cmd, args) => {
+      // Python version check
+      if (args && args[0] === '--version') {
+        const mockProc = {
+          on: vi.fn((event, callback) => {
+            if (event === 'close') setTimeout(() => callback(0), 5);
+            return mockProc;
+          })
+        };
+        return mockProc;
+      }
+      // HuggingFace hub check
+      if (args && args[0] === '-c' && args[1]?.includes('huggingface_hub')) {
+        const mockProc = {
+          stdout: {
+            on: vi.fn((event, callback) => {
+              if (event === 'data') setTimeout(() => callback(Buffer.from('OK\n')), 5);
+            })
+          },
+          on: vi.fn((event, callback) => {
+            if (event === 'close') setTimeout(() => callback(0), 10);
+            return mockProc;
+          })
+        };
+        return mockProc;
+      }
+      // Actual download
+      const mockPython = {
+        stdout: {
+          on: vi.fn((event, callback) => {
+            if (event === 'data') {
+              setTimeout(() => {
+                callback(Buffer.from('{"type":"start"}\n'));
+              }, 10);
+            }
+          })
+        },
+        stderr: { on: vi.fn() },
         on: vi.fn((event, callback) => {
-          if (event === 'data') {
-            setTimeout(() => {
-              callback(Buffer.from('{"type":"start"}\n'));
-            }, 10);
-          }
+          if (event === 'close') setTimeout(() => callback(0), 20);
+          return mockPython;
         })
-      },
-      on: vi.fn((event, callback) => {
-        if (event === 'close') setTimeout(() => callback(0), 20);
-        return mockPython;
-      })
-    };
+      };
+      return mockPython;
+    });
 
-    mockSpawn.mockReturnValue(mockPython);
+    // Reset modules to clear cached availability checks
+    vi.resetModules();
+    const { ModelDownloader: FreshDownloader } = await import('../backend/services/modelDownloader.js');
+    const freshDownloader = new FreshDownloader();
 
     try {
-      await downloader.downloadModel('test/repo', [{ path: 'file.gguf' }], onProgress);
+      await freshDownloader.downloadModel('test/repo', [{ path: 'file.gguf' }], onProgress);
     } catch (e) {
       // Ignore
     }
