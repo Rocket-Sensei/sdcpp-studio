@@ -9,8 +9,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, unlinkSync } from 'fs';
+import { createRequire } from 'module';
 import { startServer, stopServer } from './helpers/testServer.js';
-import { FormData, File } from 'formdata-node';
+
+// Use form-data package instead of formdata-node for Node.js 24 compatibility
+const require = createRequire(import.meta.url);
+const FormData = require('form-data');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +22,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = path.join(__dirname, '..', 'backend', 'data', 'test-api-sd-cpp-studio.db');
 process.env.DB_PATH = TEST_DB_PATH;
 
-const API_URL = 'http://127.0.0.1:3000';
+// Use the same port as the test server helper
+const API_URL = 'http://127.0.0.1:3999';
 
 // Create a minimal test PNG buffer
 const createTestImageBuffer = () => {
@@ -202,19 +207,20 @@ describe('API Endpoints (No Model Required)', () => {
     });
 
     it('POST /api/queue/edit should accept image upload', async () => {
-      // Use formdata-node's FormData with File created from buffer
+      // Use form-data package for Node.js 24 compatibility
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'edit test');
       formData.append('size', '512x512');
 
       const imageBuffer = createTestImageBuffer();
-      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
-      formData.append('image', imageFile);
+      formData.append('image', imageBuffer, { filename: 'test.png', contentType: 'image/png' });
 
+      // Use getBuffer() for Node.js 24 compatibility (stream-based body doesn't work)
       const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
-        body: formData
+        headers: formData.getHeaders(),
+        body: formData.getBuffer()
       });
 
       expect(response.ok).toBe(true);
@@ -237,19 +243,20 @@ describe('API Endpoints (No Model Required)', () => {
     });
 
     it('POST /api/queue/variation should accept image upload', async () => {
-      // Use formdata-node's FormData with File created from buffer
+      // Use form-data package for Node.js 24 compatibility
       const formData = new FormData();
       formData.append('model', 'qwen-image-edit');
       formData.append('prompt', 'variation test');
       formData.append('size', '512x512');
 
       const imageBuffer = createTestImageBuffer();
-      const imageFile = new File([imageBuffer], 'test.png', { type: 'image/png' });
-      formData.append('image', imageFile);
+      formData.append('image', imageBuffer, { filename: 'test.png', contentType: 'image/png' });
 
+      // Use getBuffer() for Node.js 24 compatibility (stream-based body doesn't work)
       const response = await fetch(`${API_URL}/api/queue/variation`, {
         method: 'POST',
-        body: formData
+        headers: formData.getHeaders(),
+        body: formData.getBuffer()
       });
 
       expect(response.ok).toBe(true);

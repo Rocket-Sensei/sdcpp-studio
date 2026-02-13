@@ -6,6 +6,12 @@
 # Models that benefit from negative prompts: SD1.5, SDXL, Pony
 supports_negative_prompt: false
 
+# Default auto-stop timeout for models
+# Format: number + unit (e.g., "10m", "1h", "30s", "500ms")
+# Models will be automatically stopped after this time of running
+# Can be overridden per-model using the 'autostop' setting in model configs
+default_autostop: "10m"
+
 default_model: qwen-image
 
 default_models:

@@ -13,8 +13,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, unlinkSync, mkdirSync, writeFileSync } from 'fs';
+import { createRequire } from 'module';
 import { startServer, stopServer } from './helpers/testServer.js';
-import { FormData, File } from 'formdata-node';
+
+// Use form-data package instead of formdata-node for Node.js 24 compatibility
+const require = createRequire(import.meta.url);
+const FormData = require('form-data');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,7 +30,7 @@ const TEST_INPUT_DIR = path.join(__dirname, '..', 'backend', 'data', 'test-input
 process.env.DB_PATH = TEST_DB_PATH;
 process.env.IMAGES_DIR = TEST_IMAGES_DIR;
 
-const API_URL = 'http://127.0.0.1:3000';
+const API_URL = 'http://127.0.0.1:3999';
 
 // Create a minimal test PNG buffer
 const createTestImageBuffer = () => {
@@ -111,12 +115,13 @@ describe('New Features Tests', () => {
       formData.append('size', '512x512');
 
       const imageBuffer = createTestImageBuffer();
-      const imageFile = new File([imageBuffer], 'test-edit.png', { type: 'image/png' });
-      formData.append('image', imageFile);
+      formData.append('image', imageBuffer, { filename: 'test-edit.png', contentType: 'image/png' });
 
+      // Use getBuffer() for Node.js 24 compatibility (stream-based body doesn't work)
       const response = await fetch(`${API_URL}/api/queue/edit`, {
         method: 'POST',
-        body: formData
+        headers: formData.getHeaders(),
+        body: formData.getBuffer()
       });
 
       expect(response.ok).toBe(true);
@@ -430,12 +435,13 @@ describe('New Features Tests', () => {
       formData.append('size', '512x512');
 
       const imageBuffer = createTestImageBuffer();
-      const imageFile = new File([imageBuffer], 'test-variation.png', { type: 'image/png' });
-      formData.append('image', imageFile);
+      formData.append('image', imageBuffer, { filename: 'test-variation.png', contentType: 'image/png' });
 
+      // Use getBuffer() for Node.js 24 compatibility (stream-based body doesn't work)
       const response = await fetch(`${API_URL}/api/queue/variation`, {
         method: 'POST',
-        body: formData
+        headers: formData.getHeaders(),
+        body: formData.getBuffer()
       });
 
       expect(response.ok).toBe(true);

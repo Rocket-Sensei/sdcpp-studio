@@ -572,7 +572,10 @@ function registerShutdownHandler() {
   const shutdownHandler = async (signal) => {
     logger.info({ signal }, 'Received signal, shutting down processes');
     shutdownProcessTracker();
-    process.exit(0);
+    // In test mode, don't call process.exit() - let the test framework control shutdown
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(0);
+    }
   };
 
   process.on('SIGTERM', shutdownHandler);

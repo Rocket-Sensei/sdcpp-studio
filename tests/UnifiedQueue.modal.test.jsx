@@ -1,81 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Note: We now use @hanakla/react-lightbox which is a headless library
 // that doesn't have React version conflicts. This allows proper testing.
-
-// Instead, we test the component structure and verify the imports are correct.
-
-// Mock the useImageGeneration hook
-const mockUseGenerations = vi.fn();
-vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
-  useGenerations: () => mockUseGenerations(),
-}));
-
-// Mock the useWebSocket hook
-vi.mock('../frontend/src/contexts/WebSocketContext', () => ({
-  useWebSocket: () => ({}),
-  WS_CHANNELS: { QUEUE: 'queue', GENERATIONS: 'generations' },
-}));
-
-// Mock authenticatedFetch
-const mockAuthenticatedFetch = vi.fn();
-vi.mock('../frontend/src/utils/api', () => ({
-  authenticatedFetch: () => mockAuthenticatedFetch(),
-}));
-
-// Mock toast
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-const mockGenerations = [
-  {
-    id: '1',
-    prompt: 'A beautiful landscape',
-    status: 'completed',
-    model: 'model1',
-    size: '512x512',
-    seed: '12345',
-    created_at: '2024-01-01T00:00:00Z',
-    first_image_url: 'http://example.com/image1.jpg',
-    image_count: 1,
-    width: 512,
-    height: 512,
-  },
-  {
-    id: '2',
-    prompt: 'Batch generation test',
-    status: 'completed',
-    model: 'model1',
-    size: '512x512',
-    seed: '54321',
-    created_at: '2024-01-01T01:00:00Z',
-    first_image_url: 'http://example.com/image2.jpg',
-    image_count: 4,
-    width: 512,
-    height: 512,
-  },
-  {
-    id: '3',
-    prompt: 'Failed generation',
-    status: 'failed',
-    model: 'model1',
-    size: '512x512',
-    error: 'Test error',
-    created_at: '2024-01-01T02:00:00Z',
-    image_count: 0,
-  },
-];
-
-const mockModels = {
-  model1: 'Test Model 1',
-  model2: 'Test Model 2',
-};
 
 describe('UnifiedQueue - Modal Image Integration', () => {
   describe('Package Installation and Imports', () => {
@@ -90,23 +17,21 @@ describe('UnifiedQueue - Modal Image Integration', () => {
 
     it('should import LightboxWithImage and LightboxGalleryWithImages components', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/Lightbox.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify the local Lightbox wrapper is imported
-      expect(componentContent).toContain('from "./Lightbox"');
-      expect(componentContent).toContain('LightboxWithImage');
-      expect(componentContent).toContain('LightboxGalleryWithImages');
+      // Verify the Lightbox wrapper exports both components
+      expect(componentContent).toContain('export function LightboxWithImage');
+      expect(componentContent).toContain('export function LightboxGalleryWithImages');
     });
 
-    it('should use LightboxWithImage in Thumbnail component', () => {
+    it('should use LightboxWithImage in ImageCard component', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify LightboxWithImage is used in the component
-      const lightboxCount = (componentContent.match(/LightboxWithImage/g) || []).length;
-      expect(lightboxCount).toBeGreaterThan(0);
+      expect(componentContent).toContain('LightboxWithImage');
     });
 
     it('should use LightboxGalleryWithImages for gallery dialog', () => {
@@ -122,28 +47,28 @@ describe('UnifiedQueue - Modal Image Integration', () => {
   describe('Component Structure', () => {
     it('should have proper props configuration for LightboxWithImage', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/Lightbox.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify key props are used
-      expect(componentContent).toContain('small=');
-      expect(componentContent).toContain('large=');
-      expect(componentContent).toContain('alt=');
-      expect(componentContent).toContain('fileName=');
-      expect(componentContent).toContain('hideDownload=');
-      expect(componentContent).toContain('hideZoom=');
-      expect(componentContent).toContain('className=');
+      expect(componentContent).toContain('small');
+      expect(componentContent).toContain('large');
+      expect(componentContent).toContain('alt');
+      expect(componentContent).toContain('fileName');
+      expect(componentContent).toContain('hideDownload');
+      expect(componentContent).toContain('hideZoom');
+      expect(componentContent).toContain('className');
     });
 
     it('should have proper props configuration for LightboxGalleryWithImages', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/Lightbox.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify gallery props are used
-      expect(componentContent).toContain('fixedWidth=');
-      expect(componentContent).toContain('maxWidthLightBox=');
-      expect(componentContent).toContain('images=');
+      expect(componentContent).toContain('images');
+      expect(componentContent).toContain('alt');
+      expect(componentContent).toContain('className');
     });
 
     it('should handle single and multiple image cases differently', () => {
@@ -151,9 +76,10 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify conditional rendering based on image count
-      expect(componentContent).toContain('imageCount === 1');
-      expect(componentContent).toContain('image_count > 1');
+      // The UnifiedQueue component uses ImageCard which handles image count
+      // Check that ImageCard is imported
+      expect(componentContent).toContain('import { ImageCard } from');
+      expect(componentContent).toContain('from "./gallery/ImageCard"');
     });
   });
 
@@ -192,19 +118,19 @@ describe('UnifiedQueue - Modal Image Integration', () => {
   });
 
   describe('Image Rendering Logic', () => {
-    it('should show badge for multiple images', () => {
+    it('should show badge for multiple images in ImageCard', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify badge rendering for multiple images
-      expect(componentContent).toContain('bg-black/70');
-      expect(componentContent).toContain('pointer-events-none');
+      // Verify image count is used
+      expect(componentContent).toContain('const imageCount = generation.image_count || 0');
+      expect(componentContent).toContain('generation.first_image_url');
     });
 
     it('should not render old Eye icon and click handlers', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify old imports are removed (Eye was removed from imports)
@@ -213,23 +139,21 @@ describe('UnifiedQueue - Modal Image Integration', () => {
 
     it('should handle failed state without LightboxWithImage', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify failed state handling
-      expect(componentContent).toContain('generation.status === GENERATION_STATUS.FAILED');
-      expect(componentContent).toContain('generation.status === GENERATION_STATUS.CANCELLED');
+      expect(componentContent).toContain('const isFailed = status === GENERATION_STATUS.FAILED || status === GENERATION_STATUS.CANCELLED');
     });
   });
 
   describe('Pending and Processing states', () => {
     it('should render loading state for pending generations', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify the component uses getStatusConfig for dynamic status labels
-      expect(componentContent).toContain('const config = getStatusConfig(generation.status)');
+      // Verify the component uses STATUS_CONFIG for dynamic status labels
       expect(componentContent).toContain('const StatusIcon = config.icon');
       expect(componentContent).toContain('{config.label}');
 
@@ -241,31 +165,28 @@ describe('UnifiedQueue - Modal Image Integration', () => {
 
     it('should show correct status for PENDING state', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify PENDING shows "Queued"
-      expect(componentContent).toContain('[GENERATION_STATUS.PENDING]: {');
       expect(componentContent).toContain('label: "Queued"');
     });
 
     it('should show correct status for MODEL_LOADING state', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify MODEL_LOADING shows "Loading Model"
-      expect(componentContent).toContain('[GENERATION_STATUS.MODEL_LOADING]: {');
       expect(componentContent).toContain('label: "Loading Model"');
     });
 
     it('should show correct status for PROCESSING state', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify PROCESSING shows "Generating"
-      expect(componentContent).toContain('[GENERATION_STATUS.PROCESSING]: {');
       expect(componentContent).toContain('label: "Generating"');
     });
   });
@@ -297,19 +218,21 @@ describe('UnifiedQueue - Modal Image Integration', () => {
       const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
-      // Verify view button for gallery
-      expect(componentContent).toContain('image_count > 1 && (');
-      expect(componentContent).toContain('handleViewImage(generation)');
+      // ImageCard handles the click and display, UnifiedQueue just passes handlers
+      // Verify that ImageCard is used for displaying generations
+      expect(componentContent).toContain('ImageCard');
+      expect(componentContent).toContain('generation={generation}');
     });
 
-    it('should keep existing Download, More, and Delete buttons', () => {
+    it('should keep existing Download, Iterate, Edit, and Delete buttons', () => {
       const fs = require('fs');
-      const componentPath = 'frontend/src/components/UnifiedQueue.jsx';
+      const componentPath = 'frontend/src/components/gallery/ImageCard.jsx';
       const componentContent = fs.readFileSync(componentPath, 'utf-8');
 
       // Verify existing buttons are still present
       expect(componentContent).toContain('Download');
-      expect(componentContent).toContain('More');
+      expect(componentContent).toContain('Sparkles');
+      expect(componentContent).toContain('Edit3');
       expect(componentContent).toContain('Trash2');
     });
   });

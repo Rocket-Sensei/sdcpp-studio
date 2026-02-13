@@ -3,10 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
 
-// Note: We now use @hanakla/react-lightbox which is a headless library
-// that doesn't have React version conflicts. No need to mock the old package.
-
-// Mock other dependencies
+// Mock the useImageGeneration hook
 vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
   useGenerations: () => ({
     fetchGenerations: vi.fn(),
@@ -20,16 +17,54 @@ vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
   }),
 }));
 
+// Mock the useWebSocket hook from WebSocketContext
 vi.mock('../frontend/src/contexts/WebSocketContext', () => ({
   useWebSocket: () => ({
     isConnected: false,
-    subscribe: vi.fn(),
+    subscribe: vi.fn(() => vi.fn()),
     unsubscribe: vi.fn(),
     broadcast: vi.fn(),
+    sendMessage: vi.fn(),
+    getWebSocket: vi.fn(),
   }),
-  WS_CHANNELS: { QUEUE: 'queue', GENERATIONS: 'generations' },
+  WS_CHANNELS: { QUEUE: 'queue', GENERATIONS: 'generations', MODELS: 'models' },
 }));
 
+// Mock UI components - use the actual paths that ImageCard uses
+vi.mock('../frontend/src/components/ui/tooltip', () => ({
+  Tooltip: ({ children }) => <div>{children}</div>,
+  TooltipTrigger: ({ children }) => <div>{children}</div>,
+  TooltipContent: ({ children }) => <div data-testid="tooltip-content">{children}</div>,
+}));
+
+vi.mock('../frontend/src/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick }) => <button onClick={onClick}>{children}</button>,
+}));
+
+// Mock the Lightbox component from @hanakla/react-lightbox
+// ImageCard (now aliased as Thumbnail) imports from ../Lightbox which uses @hanakla/react-lightbox
+vi.mock('@hanakla/react-lightbox', () => ({
+  useLightbox: () => ({
+    getOnClick: vi.fn(() => vi.fn()),
+    LightboxView: () => null,
+  }),
+  Lightbox: {
+    Root: ({ children, ...props }) => <div data-testid="lightbox-root" {...props}>{children}</div>,
+    Item: ({ children, ...props }) => <div data-testid="lightbox-item" {...props}>{children}</div>,
+    Header: ({ children, ...props }) => <div data-testid="lightbox-header" {...props}>{children}</div>,
+    Viewport: ({ children, ...props }) => <div data-testid="lightbox-viewport" {...props}>{children}</div>,
+    Close: ({ children, ...props }) => <button data-testid="lightbox-close" {...props}>{children}</button>,
+  },
+  useLightboxState: () => ({
+    currentIndex: 0,
+    close: vi.fn(),
+  }),
+}));
+
+// Mock authenticatedFetch
 vi.mock('../frontend/src/utils/api', () => ({
   authenticatedFetch: vi.fn(),
 }));
@@ -48,8 +83,12 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
-describe('Thumbnail Component - Actual Rendering', () => {
-  let Thumbnail;
+// Simple TooltipProvider wrapper for tests
+const TooltipProvider = ({ children }) => React.createElement('div', { className: 'tooltip-provider-wrapper' }, children);
+
+describe('ImageCard Component (formerly Thumbnail) - Actual Rendering', () => {
+  let ImageCard;
+  let GENERATION_STATUS;
 
   // Exact problematic data from database
   const COMPLETED_WITH_ZERO_IMAGES = {
@@ -91,17 +130,24 @@ describe('Thumbnail Component - Actual Rendering', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    // Import Thumbnail after mocks are set up
-    const module = await import('../frontend/src/components/UnifiedQueue');
-    Thumbnail = module.Thumbnail;
+    // Import ImageCard (formerly aliased as Thumbnail) after mocks are set up
+    const module = await import('../frontend/src/components/gallery/ImageCard');
+    ImageCard = module.ImageCard;
+    const constantsModule = await import('../frontend/src/components/UnifiedQueue');
+    GENERATION_STATUS = constantsModule.GENERATION_STATUS;
   });
 
   describe('Bug Case: completed with image_count=0', () => {
     it('should show placeholder for completed status with image_count=0 and first_image_url=null', () => {
-      const { container } = render(React.createElement(Thumbnail, {
-        generation: COMPLETED_WITH_ZERO_IMAGES,
-        onViewLogs: vi.fn()
-      }));
+      const { container } = render(
+        React.createElement(TooltipProvider, null,
+          React.createElement(ImageCard, {
+            generation: COMPLETED_WITH_ZERO_IMAGES,
+            modelName: 'z-image-turbo',
+            onViewLogs: vi.fn(),
+          })
+        )
+      );
 
       // Look for the placeholder div with aspect-square class
       const placeholderDiv = container.querySelector('.aspect-square');
@@ -127,22 +173,32 @@ describe('Thumbnail Component - Actual Rendering', () => {
 
   describe('Expected behaviors', () => {
     it('should render lightbox image for completed with valid image', () => {
-      const { container } = render(React.createElement(Thumbnail, {
-        generation: COMPLETED_WITH_IMAGE,
-        onViewLogs: vi.fn()
-      }));
+      const { container } = render(
+        React.createElement(TooltipProvider, null,
+          React.createElement(ImageCard, {
+            generation: COMPLETED_WITH_IMAGE,
+            modelName: 'z-image-turbo',
+            onViewLogs: vi.fn(),
+          })
+        )
+      );
 
       // Should render an img element with the src
       const img = container.querySelector('img');
       expect(img).toBeTruthy();
-      expect(img).toHaveAttribute('src', COMPLETED_WITH_IMAGE.first_image_url);
+      expect(img.src).toContain(COMPLETED_WITH_IMAGE.first_image_url);
     });
 
     it('should render error state for failed status', () => {
-      const { container } = render(React.createElement(Thumbnail, {
-        generation: FAILED_GENERATION,
-        onViewLogs: vi.fn()
-      }));
+      render(
+        React.createElement(TooltipProvider, null,
+          React.createElement(ImageCard, {
+            generation: FAILED_GENERATION,
+            modelName: 'z-image-turbo',
+            onViewLogs: vi.fn(),
+          })
+        )
+      );
 
       expect(screen.getByText('Failed')).toBeTruthy();
       expect(screen.getByText('Generation completed but no images were produced')).toBeTruthy();
@@ -153,7 +209,7 @@ describe('Thumbnail Component - Actual Rendering', () => {
   describe('Root cause analysis', () => {
     it('verifies the component logic for the bug case', async () => {
       // Import helper functions to verify logic
-      const { isPendingOrProcessing, getStatusConfig, GENERATION_STATUS } = await import('../frontend/src/components/UnifiedQueue');
+      const { isPendingOrProcessing, getStatusConfig } = await import('../frontend/src/components/UnifiedQueue');
 
       // Verify the logic flow for completed with 0 images:
       expect(isPendingOrProcessing(COMPLETED_WITH_ZERO_IMAGES.status)).toBe(false);

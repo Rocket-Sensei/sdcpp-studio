@@ -21,14 +21,19 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Read the source file for static analysis
-const getSource = () => {
+// Read the source files for static analysis
+const getUnifiedQueueSource = () => {
   const sourcePath = join(__dirname, '../frontend/src/components/UnifiedQueue.jsx');
   return readFileSync(sourcePath, 'utf-8');
 };
 
+const getImageCardSource = () => {
+  const sourcePath = join(__dirname, '../frontend/src/components/gallery/ImageCard.jsx');
+  return readFileSync(sourcePath, 'utf-8');
+};
+
 describe('UnifiedQueue - Filtering Logic Tests', () => {
-  const source = getSource();
+  const source = getUnifiedQueueSource();
 
   describe('Search Filtering', () => {
     it('should accept searchQuery prop for filtering', () => {
@@ -140,7 +145,7 @@ describe('UnifiedQueue - Filtering Logic Tests', () => {
 });
 
 describe('UnifiedQueue - Action Button Handlers', () => {
-  const source = getSource();
+  const source = getUnifiedQueueSource();
 
   describe('Cancel Handler', () => {
     it('should have handleCancel function', () => {
@@ -263,26 +268,13 @@ describe('UnifiedQueue - Action Button Handlers', () => {
       expect(source).toContain('GENERATION_STATUS.FAILED');
     });
 
-    it('should show Cancel button for pending/processing generations', () => {
-      expect(source).toContain('const canCancel = isPendingOrProcessing');
-      expect(source).toMatch(/canCancel\s*\?/);
-      expect(source).toContain('Cancel');
-    });
-
-    it('should show Download button for completed generations', () => {
-      expect(source).toContain('GENERATION_STATUS.COMPLETED');
-      expect(source).toContain('Download');
-    });
-
-    it('should show Retry button for failed/cancelled generations', () => {
-      expect(source).toContain('Retry');
-      expect(source).toContain('RefreshCw');
-    });
+    // Note: Individual card buttons (Cancel, Download, Retry) are now in ImageCard component
+    // These are tested in the "UnifiedQueue - ImageCard Component" section
   });
 });
 
 describe('UnifiedQueue - Status Display', () => {
-  const source = getSource();
+  const source = getUnifiedQueueSource();
 
   it('should have STATUS_CONFIG mapping', () => {
     expect(source).toContain('const STATUS_CONFIG = {');
@@ -325,7 +317,7 @@ describe('UnifiedQueue - Status Display', () => {
 });
 
 describe('UnifiedQueue - Pagination', () => {
-  const source = getSource();
+  const source = getUnifiedQueueSource();
 
   it('should show pagination when totalPages > 1', () => {
     expect(source).toContain('pagination.totalPages > 1');
@@ -353,11 +345,12 @@ describe('UnifiedQueue - Pagination', () => {
 });
 
 describe('UnifiedQueue - Model Display', () => {
-  const source = getSource();
+  const source = getUnifiedQueueSource();
 
   it('should fetch models on mount', () => {
-    expect(source).toContain('/api/models');
-    expect(source).toContain('fetchModels');
+    // Models are now fetched via useModels hook instead of directly
+    expect(source).toContain('useModels');
+    expect(source).toContain('modelsNameMap');
   });
 
   it('should have getModelName helper function', () => {
@@ -374,47 +367,60 @@ describe('UnifiedQueue - Model Display', () => {
   });
 });
 
-describe('UnifiedQueue - Thumbnail Component', () => {
-  const source = getSource();
+describe('UnifiedQueue - ImageCard Component', () => {
+  const source = getImageCardSource();
 
-  it('should define Thumbnail outside parent component', () => {
-    // Verify Thumbnail is defined before UnifiedQueue
-    const thumbnailIndex = source.indexOf('const Thumbnail = memo');
-    const unifiedQueueIndex = source.indexOf('export function UnifiedQueue');
-
-    expect(thumbnailIndex).toBeGreaterThan(-1);
-    expect(unifiedQueueIndex).toBeGreaterThan(-1);
-    expect(thumbnailIndex).toBeLessThan(unifiedQueueIndex);
-  });
-
-  it('should use React.memo for Thumbnail', () => {
-    expect(source).toContain('const Thumbnail = memo(function Thumbnail');
+  it('should define ImageCard as memoized component', () => {
+    // Verify ImageCard is defined and memoized
+    expect(source).toContain('export const ImageCard = memo(function ImageCard');
   });
 
   it('should use first_image_url for thumbnail source', () => {
-    expect(source).toContain('const src = generation.first_image_url');
+    expect(source).toContain('const src = generation.first_image_url || null');
   });
 
   it('should show loading state for pending/processing', () => {
-    expect(source).toContain('isPendingOrProcessing(generation.status)');
+    expect(source).toContain('const isActive = isPendingOrProcessing(status)');
     expect(source).toContain('const StatusIcon = config.icon');
     expect(source).toContain('{config.label}');
   });
 
   it('should show failed state with error', () => {
-    expect(source).toContain('generation.status === GENERATION_STATUS.FAILED');
+    expect(source).toContain('const isFailed = status === GENERATION_STATUS.FAILED || status === GENERATION_STATUS.CANCELLED');
     expect(source).toContain('{generation.error}');
   });
 
   it('should show image count badge for multiple images', () => {
-    expect(source).toContain('const imageCount = generation.image_count');
+    expect(source).toContain('const imageCount = generation.image_count || 0');
     expect(source).toContain('bg-black/70');
-    expect(source).toContain('{imageCount}');
+    expect(source).toContain('+{imageCount - 1}');
   });
 
-  it('should use LightboxWithImage for single images', () => {
-    expect(source).toContain('imageCount === 1');
-    expect(source).toContain('LightboxWithImage');
+  it('should use LightboxWithImage for completed images', () => {
+    expect(source).toContain('const isCompleted = status === GENERATION_STATUS.COMPLETED');
+    expect(source).toContain('<LightboxWithImage');
+  });
+
+  it('should show Cancel button for pending/processing generations', () => {
+    expect(source).toContain('const isActive = isPendingOrProcessing(status)');
+    expect(source).toContain('isActive ? (');
+    expect(source).toContain('Cancel');
+  });
+
+  it('should show Download button for completed generations', () => {
+    expect(source).toContain('<Download');
+    expect(source).toContain('onDownload?.(generation.id)');
+  });
+
+  it('should show Retry button for failed/cancelled generations', () => {
+    expect(source).toContain('isFailed ? (');
+    expect(source).toContain('Retry');
+    expect(source).toContain('<RefreshCw');
+  });
+
+  it('should have custom comparison function for memo', () => {
+    expect(source).toContain('(prevProps, nextProps) => {');
+    expect(source).toContain('prevProps.generation.id === nextProps.generation.id');
   });
 
   it('should have custom comparison function for memo', () => {

@@ -4,6 +4,7 @@ import { join, basename } from 'path';
 import { randomUUID } from 'crypto';
 import { createLogger } from '../utils/logger.js';
 import { modelManager } from '../services/modelManager.js';
+import { generationWaiter } from '../services/generationWaiter.js';
 
 const logger = createLogger('queries');
 
@@ -43,14 +44,19 @@ export async function createGeneration(data) {
   const db = getDatabase();
 
   // Use default model if not provided
+  // Upscale jobs use a placeholder model ID since they don't actually use a model
   if (!data.model) {
-    const jobType = data.type || 'generate';
-    const defaultModel = modelManager.getDefaultModelForType(jobType);
-    if (defaultModel) {
-      data.model = defaultModel.id;
-      logger.debug({ jobType, defaultModel: data.model }, 'Using default model for generation');
+    if (data.type === 'upscale') {
+      data.model = 'none'; // Placeholder for upscale jobs
     } else {
-      throw new Error('No model specified and no default model configured. Please specify a model ID or configure a default model.');
+      const jobType = data.type || 'generate';
+      const defaultModel = modelManager.getDefaultModelForType(jobType);
+      if (defaultModel) {
+        data.model = defaultModel.id;
+        logger.debug({ jobType, defaultModel: data.model }, 'Using default model for generation');
+      } else {
+        throw new Error('No model specified and no default model configured. Please specify a model ID or configure a default model.');
+      }
     }
   }
 
@@ -289,6 +295,37 @@ export function claimNextPendingGeneration() {
 }
 
 /**
+ * Claim next pending job for a specific model (for model affinity optimization).
+ * If no job for the specified model exists, falls back to FIFO.
+ * @param {string} preferredModel - Model ID to prioritize
+ * @returns {Object|null} The claimed generation, or null if no pending jobs exist
+ */
+export function claimNextPendingGenerationWithModelAffinity(preferredModel) {
+  const db = getDatabase();
+  
+  // First try to get a job for the preferred model
+  const preferredStmt = db.prepare(`
+    UPDATE generations
+    SET status = ?
+    WHERE id = (
+      SELECT id FROM generations
+      WHERE status = ? AND model = ?
+      ORDER BY created_at ASC
+      LIMIT 1
+    )
+    RETURNING *
+  `);
+  
+  const preferredResult = preferredStmt.get(GenerationStatus.PROCESSING, GenerationStatus.PENDING, preferredModel);
+  if (preferredResult) {
+    return preferredResult;
+  }
+  
+  // Fall back to FIFO if no job for preferred model
+  return claimNextPendingGeneration();
+}
+
+/**
  * Update generation status and related fields
  */
 export function updateGenerationStatus(id, status, additionalData = {}) {
@@ -332,7 +369,18 @@ export function updateGenerationStatus(id, status, additionalData = {}) {
   const stmt = db.prepare(query);
   stmt.run(...params);
 
-  return getGenerationById(id);
+  const updatedGeneration = getGenerationById(id);
+
+  // Notify waiters of terminal states
+  if (status === GenerationStatus.COMPLETED) {
+    generationWaiter.notifyCompleted(id, updatedGeneration);
+  } else if (status === GenerationStatus.FAILED) {
+    generationWaiter.notifyFailed(id, updatedGeneration);
+  } else if (status === GenerationStatus.CANCELLED) {
+    generationWaiter.notifyCancelled(id, updatedGeneration);
+  }
+
+  return updatedGeneration;
 }
 
 /**

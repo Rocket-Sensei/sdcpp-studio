@@ -155,6 +155,46 @@ export function registerQueueRoutes(app, upload) {
     }
   });
 
+  // Add job to queue (upscale)
+  app.post('/api/queue/upscale', authenticateRequest, upload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Image file is required' });
+      }
+
+      // Save uploaded image to disk
+      // Convert webp to PNG for sdcpp compatibility
+      const inputImagesDir = getInputImagesDir();
+      const imageFilename = `${randomUUID()}.png`;
+      const imagePath = path.join(inputImagesDir, imageFilename);
+      const pngBuffer = await ensurePngFormat(req.file.buffer, req.file.mimetype);
+      await writeFile(imagePath, pngBuffer);
+
+      const id = randomUUID();
+      const resizeMode = parseInt(req.body.resize_mode) || 0;
+      const params = {
+        id,
+        type: 'upscale',
+        status: GenerationStatus.PENDING,
+        input_image_path: imagePath,
+        input_image_mime_type: 'image/png',
+        // Upscaler settings
+        upscaler: req.body.upscaler || 'RealESRGAN 4x+',
+        resize_mode: resizeMode,
+        upscale_factor: parseFloat(req.body.upscale_factor) || 2.0,
+        // Target dimensions (for resize_mode = 1)
+        target_width: resizeMode === 1 ? parseInt(req.body.target_width) || 1024 : null,
+        target_height: resizeMode === 1 ? parseInt(req.body.target_height) || 1024 : null,
+      };
+
+      await createGeneration(params);
+      res.json({ job_id: id, status: GenerationStatus.PENDING });
+    } catch (error) {
+      logger.error({ error }, 'Error adding upscale to queue');
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get all jobs in queue (authenticated)
   app.get('/api/queue', authenticateRequest, async (req, res) => {
     try {
