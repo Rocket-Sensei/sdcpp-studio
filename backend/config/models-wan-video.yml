@@ -117,10 +117,10 @@ models:
       sample_steps: 10
       sampling_method: euler
 
-  # Wan2.2 I2V A14B - Image to Video (dual-noise)
+  # Wan2.2 I2V A14B - Image to Video (safetensors format)
   wan2.2-i2v-a14b:
-    name: "Wan2.2 I2V A14B"
-    description: "Advanced image-to-video with dual noise models"
+    name: "Wan2.2 I2V A14B (safetensors)"
+    description: "Advanced image-to-video with dual noise models (fp8 safetensors)"
     command: "./bin/sd-cli"
     args:
       - "-M"
@@ -129,6 +129,41 @@ models:
       - "../models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
       - "--high-noise-diffusion-model"
       - "../models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
+      - "--vae"
+      - "../models/wan_2.1_vae.safetensors"
+      - "--t5xxl"
+      - "../models/umt5-xxl-encoder-Q8_0.gguf"
+      - "--clip_vision"
+      - "../models/clip_vision_h.safetensors"
+      - "--sampling-method"
+      - euler
+      - "--steps"
+      - "10"
+      - "--high-noise-sampling-method"
+      - euler
+      - "--high-noise-steps"
+      - "8"
+      - "--offload-to-cpu"
+    exec_mode: cli
+    mode: on_demand
+    model_type: video
+    generation_params:
+      cfg_scale: 3.5
+      sample_steps: 10
+      sampling_method: euler
+
+  # Wan2.2 I2V A14B - Image to Video (GGUF format)
+  wan2.2-i2v-a14b-gguf:
+    name: "Wan2.2 I2V A14B (GGUF Q3_K_S)"
+    description: "Advanced image-to-video with dual noise models (quantized GGUF)"
+    command: "./bin/sd-cli"
+    args:
+      - "-M"
+      - vid_gen
+      - "--diffusion-model"
+      - "../models/Wan2.2-I2V-A14B-LowNoise-Q3_K_S.gguf"
+      - "--high-noise-diffusion-model"
+      - "../models/Wan2.2-I2V-A14B-HighNoise-Q3_K_S.gguf"
       - "--vae"
       - "../models/wan_2.1_vae.safetensors"
       - "--t5xxl"

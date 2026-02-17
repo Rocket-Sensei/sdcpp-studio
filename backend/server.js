@@ -38,6 +38,7 @@ import registerModelRoutes from './routes/models.js';
 import registerSdApiRoutes from './routes/sdapi.js';
 import registerImageRoutes from './routes/images.js';
 import registerLogRoutes from './routes/logs.js';
+import registerOpenAIRoutes from './routes/openai.js';
 
 // Create logger for server module
 const logger = createLogger('server');
@@ -108,6 +109,9 @@ registerGenerationRoutes(app, upload);
 
 // SD.next API compatibility endpoints (auth required)
 registerSdApiRoutes(app);
+
+// OpenAI-compatible API endpoints (auth required)
+registerOpenAIRoutes(app, upload);
 
 // ============================================================================
 // Frontend Fallback

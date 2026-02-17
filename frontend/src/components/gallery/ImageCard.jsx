@@ -208,19 +208,37 @@ export const ImageCard = memo(function ImageCard({
         {/* Action buttons row */}
         <div className="flex items-center gap-1">
           {isActive ? (
-            // Cancel button for active jobs
-            <Button
-              variant="destructive"
-              size="sm"
-              className="flex-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCancel?.(generation.id);
-              }}
-            >
-              <X className="h-3 w-3 mr-1" />
-              Cancel
-            </Button>
+            // Cancel and View Details buttons for active jobs
+            <>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCancel?.(generation.id);
+                }}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Cancel
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails?.(generation);
+                    }}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View details</TooltipContent>
+              </Tooltip>
+            </>
           ) : isFailed ? (
             // Retry and Delete buttons for failed
             <>

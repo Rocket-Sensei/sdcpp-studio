@@ -1,6 +1,7 @@
 # Flux Models
 models:
   persephone-11fp8:
+    enabled: false
     name: "Persephone 11FP8"
     description: "Flux NSFW/SFW Checkpoint"
     capabilities: ["text-to-image"]

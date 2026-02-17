@@ -4,14 +4,14 @@ models:
   # FluxUnchained with NF4 quantization
 
   fluxunchained-nf4:
-    name: "FluxUnchained v13"
-    description: "FluxUnchained V13"
+    name: "FluxUnchained 8 step"
+    description: "FluxUnchained HyFU-8-Step-Hybrid-v1.0"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/fluxUnchainedBySCG_schnfuV13Unet4step.safetensors"
+      - "./models/fluxUnchainedBySCG_hyfu8StepHybridV10.safetensors"
       - "--vae"
       - "./models/ae.safetensors"
       - "--clip_l"
@@ -22,7 +22,7 @@ models:
       - "--offload-to-cpu"
       - "--clip-on-cpu"
       - "--steps"
-      - "4"
+      - "8"
     mode: "on_demand"
     exec_mode: "server"
     port: 1537
@@ -31,5 +31,5 @@ models:
     startup_timeout: 120000
     generation_params:
       cfg_scale: 1.0
-      sample_steps: 4
+      sample_steps: 8
       sampling_method: "euler"

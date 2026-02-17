@@ -32,6 +32,7 @@ models:
       sampling_method: "euler"
 
   flux1-schnell-fp8-cli:
+    enabled: false
     name: "FLUX.1 Schnell FP8 - CLI mode"
     description: "FLUX.1 Schnell FP8 used via sd-cli"
     capabilities: ["text-to-image"]
@@ -89,7 +90,7 @@ models:
     default_size: "1024x1024"
     generation_params:
       sample_steps: 24
-      sampling_method: "euler"
+      sampling_method: "dpmpp_2m"
 
   fluxed-up-flux:
     name: "FluxedUp Flux"

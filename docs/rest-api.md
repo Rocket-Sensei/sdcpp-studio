@@ -10,6 +10,137 @@ http://localhost:3000/api
 
 ---
 
+## OpenAI-Compatible API
+
+These endpoints provide full OpenAI API compatibility for image generation. They internally use the queue system and wait for completion before returning (synchronous from client perspective).
+
+### POST /v1/images/generations
+
+Generate image(s) from text prompt (text-to-image). This is the primary OpenAI-compatible endpoint.
+
+**Request Body:**
+```json
+{
+  "prompt": "string (required)",
+  "model": "string (optional, uses default model if not specified)",
+  "negative_prompt": "string (optional)",
+  "size": "string (optional, default: 1024x1024)",
+  "n": "number (optional, default: 1, min: 1, max: 10)",
+  "quality": "string (optional: auto, high, medium, low, hd, standard)",
+  "style": "string (optional: vivid, natural)",
+  "seed": "number (optional, for reproducibility)",
+  "response_format": "string (optional: url or b64_json, default: url)"
+}
+```
+
+**Response (URL format - default):**
+```json
+{
+  "created": 1234567890,
+  "data": [
+    {
+      "url": "/api/images/uuid",
+      "revised_prompt": "string or null"
+    }
+  ]
+}
+```
+
+**Response (b64_json format):**
+```json
+{
+  "created": 1234567890,
+  "data": [
+    {
+      "b64_json": "base64-encoded-image-data",
+      "revised_prompt": "string or null"
+    }
+  ]
+}
+```
+
+**Example:**
+```bash
+curl http://localhost:3000/api/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "qwen-image",
+    "prompt": "A lovely cat",
+    "n": 1,
+    "size": "512x512",
+    "response_format": "b64_json"
+  }' \
+  | jq -r '.data[0].b64_json' | base64 --decode > output.png
+```
+
+**Example with SD.cpp extra args (for advanced control):**
+```bash
+curl http://localhost:3000/api/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "qwen-image",
+    "prompt": "A lovely cat<sd_cpp_extra_args>{\"seed\": 357925, \"cfg_scale\": 7.0}</sd_cpp_extra_args>",
+    "n": 1,
+    "size": "512x512",
+    "response_format": "b64_json"
+  }'
+```
+
+### POST /v1/images/edits
+
+Edit image using text prompt (image-to-image with optional mask).
+
+**Request:** `multipart/form-data`
+- `image`: File (required)
+- `prompt`: string (required)
+- `model`: string (optional)
+- `negative_prompt`: string (optional)
+- `size`: string (optional)
+- `n`: number (optional)
+- `mask`: File (optional, for inpainting)
+- `response_format`: string (optional: url or b64_json)
+
+**Response:** Same format as `/v1/images/generations`
+
+### POST /v1/images/variations
+
+Create variations of an image (img2img).
+
+**Request:** `multipart/form-data`
+- `image`: File (required)
+- `model`: string (optional)
+- `prompt`: string (optional)
+- `negative_prompt`: string (optional)
+- `size`: string (optional)
+- `n`: number (optional)
+- `strength`: number (optional, default: 0.75, img2img strength)
+- `response_format`: string (optional: url or b64_json)
+
+**Response:** Same format as `/v1/images/generations`
+
+### GET /v1/models
+
+List all available models (OpenAI-compatible).
+
+**Response:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "qwen-image",
+      "object": "model",
+      "created": 1234567890,
+      "owned_by": "sd-cpp-studio"
+    }
+  ]
+}
+```
+
+---
+
 ## Health & Configuration
 
 ### GET /health

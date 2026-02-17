@@ -794,6 +794,22 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
             </DialogHeader>
             {mobileInfoGeneration && (
               <div className="space-y-3">
+                {/* Source image for edit/variation generations */}
+                {(mobileInfoGeneration.type === 'edit' || mobileInfoGeneration.type === 'variation') && mobileInfoGeneration.input_image_path && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      <span>Source Image</span>
+                    </div>
+                    <div className="pl-6">
+                      <img
+                        src={`/static/input/${mobileInfoGeneration.input_image_path.split('/').pop()}`}
+                        alt="Source image"
+                        className="max-w-full max-h-40 rounded-md border border-border object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
                 {mobileInfoGeneration.prompt && (
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
