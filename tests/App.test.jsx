@@ -91,11 +91,12 @@ const renderAppWithRoute = async (initialEntries) => {
     }
   }, { timeout: 3000 });
 
-  // Additional wait for Studio to render after redirects
+  // Wait for Studio to render, including after async Navigate redirects.
+  // Navigate uses useEffect, so a redirect may settle one render cycle after
+  // the header appears. Waiting for unified-queue ensures the route has resolved.
   await waitFor(() => {
-    const hasStudio = container.textContent.includes('sd.cpp Studio');
-    if (!hasStudio) {
-      throw new Error('Studio not rendered yet');
+    if (!container.querySelector('[data-testid="unified-queue"]')) {
+      throw new Error('Studio content not rendered yet');
     }
   }, { timeout: 3000 });
 

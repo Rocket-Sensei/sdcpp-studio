@@ -4,6 +4,10 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Suppress pino logger stdout during tests to reduce noise.
+// Logging tests check log files directly, so this does not affect their assertions.
+process.env.LOG_TO_STDOUT = 'false';
+
 // Set test database path BEFORE importing any backend modules
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = path.join(__dirname, 'backend', 'data', 'test-sd-cpp-studio.db');
