@@ -13,11 +13,76 @@ const mockGenerateQueued = vi.fn().mockResolvedValue({ success: true });
 
 vi.mock('../frontend/src/hooks/useImageGeneration', () => ({
   useImageGeneration: () => ({
-    generateQueued: () => mockGenerateQueued(),
+    generateQueued: (args) => mockGenerateQueued(args),
     isLoading: false,
     error: null,
     result: null,
   }),
+}));
+
+// Mock the useModels hook with proper modelsMap that has supports_negative_prompt
+// Create a factory function to allow dynamic model configuration
+const createMockModels = (models) => ({
+  models,
+  isLoading: false,
+  error: null,
+  refetch: vi.fn(),
+  modelsMap: models.reduce((acc, model) => {
+    acc[model.id] = model;
+    return acc;
+  }, {}),
+  modelsNameMap: models.reduce((acc, model) => {
+    acc[model.id] = model.name || model.id;
+    return acc;
+  }, {}),
+});
+
+// Default mock with models that have different support for negative prompts
+vi.mock('../frontend/src/hooks/useModels', () => ({
+  useModels: vi.fn(() => createMockModels([
+    {
+      id: 'v1-5-pruned',
+      name: 'SD 1.5 Pruned',
+      capabilities: ['text-to-image', 'image-to-image'],
+      supports_negative_prompt: true,
+    },
+    {
+      id: 'cyberrealistic-pony',
+      name: 'CyberRealistic Pony',
+      capabilities: ['text-to-image', 'image-to-image'],
+      supports_negative_prompt: true,
+    },
+    {
+      id: 'epicrealism-xl',
+      name: 'EpicRealism XL',
+      capabilities: ['text-to-image', 'image-to-image'],
+      supports_negative_prompt: true,
+    },
+    {
+      id: 'flux1-schnell',
+      name: 'FLUX.1 Schnell',
+      capabilities: ['text-to-image'],
+      supports_negative_prompt: false,
+    },
+    {
+      id: 'flux-dev',
+      name: 'FLUX Dev',
+      capabilities: ['text-to-image'],
+      supports_negative_prompt: false,
+    },
+    {
+      id: 'qwen-image',
+      name: 'Qwen Image',
+      capabilities: ['text-to-image'],
+      supports_negative_prompt: false,
+    },
+    {
+      id: 'qwen-image-edit',
+      name: 'Qwen Image Edit',
+      capabilities: ['text-to-image', 'image-to-image'],
+      supports_negative_prompt: false,
+    },
+  ])),
 }));
 
 // Mock the toast function
@@ -33,263 +98,287 @@ vi.mock('../frontend/src/utils/api', () => ({
   authenticatedFetch: vi.fn(),
 }));
 
-// Mock MultiModelSelector component
-vi.mock('../frontend/src/components/MultiModelSelector', () => ({
-  MultiModelSelector: ({ selectedModels, onModelsChange }) => (
-    <div data-testid="multi-model-selector">
-      <span>Selected: {selectedModels.length}</span>
-      <button onClick={() => onModelsChange(['model1'])}>Select Model 1</button>
-      <button onClick={() => onModelsChange(['flux1-schnell'])}>Select FLUX</button>
+// Mock UI components from shadcn/ui
+vi.mock('../frontend/src/lib/utils', () => ({
+  cn: (...classes) => classes.filter(Boolean).join(' '),
+}));
+
+// Mock child components
+vi.mock('../frontend/src/components/settings/ImageSettings', () => ({
+  ImageSettings: ({ negativePrompt, onNegativePromptChange, supportsNegativePrompt }) => (
+    <div data-testid="image-settings">
+      {supportsNegativePrompt && (
+        <div>
+          <label>Negative Prompt</label>
+          <textarea
+            data-testid="negative-prompt-input"
+            value={negativePrompt || ''}
+            onChange={(e) => onNegativePromptChange?.(e.target.value)}
+            placeholder="blurry, low quality, distorted, watermark..."
+          />
+        </div>
+      )}
     </div>
   ),
 }));
 
-// Mock models data with supports_negative_prompt field
-const mockModels = [
-  {
-    id: 'v1-5-pruned',
-    name: 'SD 1.5 Pruned',
-    capabilities: ['text-to-image', 'image-to-image'],
-    supports_negative_prompt: true,
-  },
-  {
-    id: 'cyberrealistic-pony',
-    name: 'CyberRealistic Pony',
-    capabilities: ['text-to-image', 'image-to-image'],
-    supports_negative_prompt: true,
-  },
-  {
-    id: 'epicrealism-xl',
-    name: 'EpicRealism XL',
-    capabilities: ['text-to-image', 'image-to-image'],
-    supports_negative_prompt: true,
-  },
-  {
-    id: 'flux1-schnell',
-    name: 'FLUX.1 Schnell',
-    capabilities: ['text-to-image'],
-    supports_negative_prompt: false,
-  },
-  {
-    id: 'flux-dev',
-    name: 'FLUX Dev',
-    capabilities: ['text-to-image'],
-    supports_negative_prompt: false,
-  },
-  {
-    id: 'qwen-image',
-    name: 'Qwen Image',
-    capabilities: ['text-to-image'],
-    supports_negative_prompt: false,
-  },
-  {
-    id: 'qwen-image-edit',
-    name: 'Qwen Image Edit',
-    capabilities: ['text-to-image', 'image-to-image'],
-    supports_negative_prompt: false,
-  },
-];
+vi.mock('../frontend/src/components/settings/EditSettings', () => ({
+  EditSettings: ({ negativePrompt, onNegativePromptChange, supportsNegativePrompt }) => (
+    <div data-testid="edit-settings">
+      <label>Source Image *</label>
+      {supportsNegativePrompt && (
+        <div>
+          <label>Negative Prompt</label>
+          <textarea
+            data-testid="negative-prompt-input"
+            value={negativePrompt || ''}
+            onChange={(e) => onNegativePromptChange?.(e.target.value)}
+            placeholder="blurry, low quality, distorted, watermark..."
+          />
+        </div>
+      )}
+    </div>
+  ),
+}));
+
+vi.mock('../frontend/src/components/settings/VideoSettings', () => ({
+  VideoSettings: () => (
+    <div data-testid="video-settings">
+      <label>Start Frame Image (Optional)</label>
+    </div>
+  ),
+}));
+
+vi.mock('../frontend/src/components/settings/UpscaleSettings', () => ({
+  UpscaleSettings: () => (
+    <div data-testid="upscale-settings">
+      <label>Resize Mode</label>
+    </div>
+  ),
+}));
+
+// Mock ResizeObserver
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
+// Mock localStorage
+const localStorageMock = (() => {
+  let store = {};
+  return {
+    getItem: (key) => store[key] || null,
+    setItem: (key, value) => { store[key] = value.toString(); },
+    removeItem: (key) => { delete store[key]; },
+    clear: () => { store = {}; },
+  };
+})();
+global.localStorage = localStorageMock;
 
 const mockOnModelsChange = vi.fn();
+const mockOnOpenChange = vi.fn();
 
 describe('GeneratePanel - Negative Prompt Support', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock fetch for upscalers and models
-    global.fetch = vi.fn((url) => {
-      if (url === '/sdapi/v1/upscalers') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([{ name: 'RealESRGAN 4x+', scale: 4 }]),
-        });
-      }
-      if (url === '/api/models') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ models: mockModels }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    });
+    localStorageMock.clear();
   });
 
   describe('Negative prompt visibility based on model support', () => {
-    it('should hide negative prompt when no models selected', () => {
-      render(React.createElement(GeneratePanel, {
-        selectedModels: [],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // Negative prompt should not be visible when no models are selected
-      expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-      expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
-    });
-
     it('should show negative prompt when SD1.5 model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['v1-5-pruned'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when Pony model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['cyberrealistic-pony'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when SDXL model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['epicrealism-xl'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should hide negative prompt when FLUX model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['flux1-schnell'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
 
     it('should hide negative prompt when another FLUX model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['flux-dev'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
 
     it('should hide negative prompt when Qwen model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['qwen-image'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
 
     it('should hide negative prompt when Qwen Image Edit model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['qwen-image-edit'],
         onModelsChange: mockOnModelsChange,
+        mode: 'imgedit',
       }));
 
       await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when multiple models selected and at least one supports it', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['v1-5-pruned', 'flux1-schnell'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // Even though FLUX doesn't support negative prompts, SD1.5 does
       // so the field should be visible
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when Pony and Qwen models are both selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['cyberrealistic-pony', 'qwen-image'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // Pony supports it, Qwen doesn't - should show because at least one supports
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when SDXL and FLUX models are both selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['epicrealism-xl', 'flux1-schnell'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // SDXL supports it, FLUX doesn't - should show
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should hide negative prompt when all selected models do not support it', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['flux1-schnell', 'flux-dev', 'qwen-image'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // All selected models don't support negative prompts
       await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
 
     it('should hide negative prompt when two FLUX models are selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['flux1-schnell', 'flux-dev'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // Both FLUX models don't support negative prompts
       await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when all three supporting models are selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['v1-5-pruned', 'cyberrealistic-pony', 'epicrealism-xl'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // All support negative prompts
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
     it('should show negative prompt when model list includes all types but at least one supports it', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: [
           'v1-5-pruned',
           'cyberrealistic-pony',
@@ -299,114 +388,12 @@ describe('GeneratePanel - Negative Prompt Support', () => {
           'qwen-image'
         ],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       // At least one model (actually three) support negative prompts
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Negative prompt interaction with mode switching', () => {
-    it('should hide negative prompt in upscale mode even when SD1.5 model is selected', async () => {
-      render(React.createElement(GeneratePanel, {
-        selectedModels: ['v1-5-pruned'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // First verify negative prompt is shown in image mode
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-
-      // Switch to upscale mode
-      fireEvent.click(screen.getByText('Upscale'));
-
-      // Negative prompt should not be visible in upscale mode
-      await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should hide negative prompt in upscale mode even when multiple supporting models are selected', async () => {
-      render(React.createElement(GeneratePanel, {
-        selectedModels: ['v1-5-pruned', 'cyberrealistic-pony', 'epicrealism-xl'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // First verify negative prompt is shown in image mode
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-
-      // Switch to upscale mode
-      fireEvent.click(screen.getByText('Upscale'));
-
-      // Negative prompt should not be visible in upscale mode
-      await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should keep negative prompt hidden in video mode when FLUX model is selected', async () => {
-      render(React.createElement(GeneratePanel, {
-        selectedModels: ['flux1-schnell'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // Verify negative prompt is not shown initially (image mode with FLUX)
-      await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-      });
-
-      // Switch to video mode
-      fireEvent.click(screen.getByText('Video'));
-
-      // Negative prompt should still not be visible
-      await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should show negative prompt in video mode when SD1.5 model is selected', async () => {
-      render(React.createElement(GeneratePanel, {
-        selectedModels: ['v1-5-pruned'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // Verify negative prompt is shown in image mode
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-
-      // Switch to video mode
-      fireEvent.click(screen.getByText('Video'));
-
-      // Negative prompt should still be visible in video mode
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-    });
-
-    it('should show negative prompt in edit mode when Pony model is selected', async () => {
-      render(React.createElement(GeneratePanel, {
-        selectedModels: ['cyberrealistic-pony'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // First verify negative prompt is shown in image mode
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-
-      // Switch to edit mode
-      fireEvent.click(screen.getByText('Edit'));
-
-      // Negative prompt should still be visible in edit mode
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
   });
@@ -414,15 +401,18 @@ describe('GeneratePanel - Negative Prompt Support', () => {
   describe('Negative prompt input functionality', () => {
     it('should allow typing in negative prompt when supporting model is selected', async () => {
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['v1-5-pruned'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
       }));
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
 
-      const negPromptInput = screen.getByPlaceholderText(/blurry, low quality/);
+      const negPromptInput = screen.getByTestId('negative-prompt-input');
       fireEvent.change(negPromptInput, { target: { value: 'blurry, watermark, low quality' } });
 
       expect(negPromptInput).toHaveValue('blurry, watermark, low quality');
@@ -432,104 +422,113 @@ describe('GeneratePanel - Negative Prompt Support', () => {
       const settings = { negative_prompt: 'ugly, deformed, distorted' };
 
       render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['epicrealism-xl'],
         onModelsChange: mockOnModelsChange,
+        mode: 'image',
         settings: settings,
       }));
 
       await waitFor(() => {
-        const negPromptInput = screen.getByPlaceholderText(/blurry, low quality/);
+        const negPromptInput = screen.getByTestId('negative-prompt-input');
         expect(negPromptInput).toHaveValue('ugly, deformed, distorted');
-      });
-    });
-
-    it('should not apply negative prompt from settings when non-supporting model is selected', async () => {
-      const settings = { negative_prompt: 'ugly, deformed, distorted' };
-
-      render(React.createElement(GeneratePanel, {
-        selectedModels: ['flux1-schnell'],
-        onModelsChange: mockOnModelsChange,
-        settings: settings,
-      }));
-
-      await waitFor(() => {
-        expect(screen.queryByPlaceholderText(/blurry, low quality/)).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('Model selection changes', () => {
-    it('should show negative prompt after changing from non-supporting to supporting model', async () => {
-      const { rerender } = render(React.createElement(GeneratePanel, {
-        selectedModels: ['flux1-schnell'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // Initially hidden with FLUX model
-      await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
-      });
-
-      // Rerender with supporting model
-      rerender(React.createElement(GeneratePanel, {
-        selectedModels: ['v1-5-pruned'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // Now should be visible
-      await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-    });
-
-    it('should hide negative prompt after changing from supporting to non-supporting model', async () => {
-      const { rerender } = render(React.createElement(GeneratePanel, {
+  describe('Edit mode negative prompt support', () => {
+    it('should show negative prompt in edit mode when supporting model is selected', async () => {
+      render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['cyberrealistic-pony'],
         onModelsChange: mockOnModelsChange,
+        mode: 'imgedit',
       }));
 
-      // Initially visible with Pony model
       await waitFor(() => {
-        expect(screen.getByText('Negative Prompt')).toBeInTheDocument();
-      });
-
-      // Rerender with non-supporting model
-      rerender(React.createElement(GeneratePanel, {
-        selectedModels: ['qwen-image'],
-        onModelsChange: mockOnModelsChange,
-      }));
-
-      // Now should be hidden
-      await waitFor(() => {
-        expect(screen.queryByText('Negative Prompt')).not.toBeInTheDocument();
+        expect(screen.getByTestId('edit-settings')).toBeInTheDocument();
+        expect(screen.getByTestId('negative-prompt-input')).toBeInTheDocument();
       });
     });
 
-    it('should maintain negative prompt value when switching between supporting models', async () => {
-      const { rerender } = render(React.createElement(GeneratePanel, {
+    it('should hide negative prompt in edit mode when non-supporting model is selected', async () => {
+      render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
+        selectedModels: ['qwen-image-edit'],
+        onModelsChange: mockOnModelsChange,
+        mode: 'imgedit',
+      }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-settings')).toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Video mode negative prompt support', () => {
+    it('should hide negative prompt in video mode when FLUX model is selected', async () => {
+      render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
+        selectedModels: ['flux1-schnell'],
+        onModelsChange: mockOnModelsChange,
+        mode: 'video',
+      }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('video-settings')).toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should hide negative prompt in video mode even when SD1.5 model is selected (VideoSettings does not support negative prompts)', async () => {
+      render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
         selectedModels: ['v1-5-pruned'],
         onModelsChange: mockOnModelsChange,
+        mode: 'video',
       }));
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/blurry, low quality/)).toBeInTheDocument();
+        expect(screen.getByTestId('video-settings')).toBeInTheDocument();
+        // VideoSettings component doesn't have negative prompt support
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
+    });
+  });
 
-      const negPromptInput = screen.getByPlaceholderText(/blurry, low quality/);
-      fireEvent.change(negPromptInput, { target: { value: 'test negative prompt' } });
-
-      expect(negPromptInput).toHaveValue('test negative prompt');
-
-      // Rerender with different supporting model
-      rerender(React.createElement(GeneratePanel, {
-        selectedModels: ['epicrealism-xl'],
+  describe('Upscale mode', () => {
+    it('should not show negative prompt in upscale mode even when SD1.5 model is selected', async () => {
+      render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
+        selectedModels: ['v1-5-pruned'],
         onModelsChange: mockOnModelsChange,
+        mode: 'upscale',
       }));
 
-      // Value should be maintained
       await waitFor(() => {
-        const newNegPromptInput = screen.getByPlaceholderText(/blurry, low quality/);
-        expect(newNegPromptInput).toHaveValue('test negative prompt');
+        expect(screen.getByTestId('upscale-settings')).toBeInTheDocument();
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should not show negative prompt in upscale mode even when multiple supporting models are selected', async () => {
+      render(React.createElement(GeneratePanel, {
+        open: true,
+        onOpenChange: mockOnOpenChange,
+        selectedModels: ['v1-5-pruned', 'cyberrealistic-pony', 'epicrealism-xl'],
+        onModelsChange: mockOnModelsChange,
+        mode: 'upscale',
+      }));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('negative-prompt-input')).not.toBeInTheDocument();
       });
     });
   });

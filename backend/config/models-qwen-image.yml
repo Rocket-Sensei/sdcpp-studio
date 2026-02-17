@@ -29,6 +29,8 @@ models:
     model_type: "text-to-image"
     default_size: "1024x1024"
     startup_timeout: 150000
+    # Auto-stop after 15 minutes of inactivity (overrides global default of 10m)
+    autostop: "15m"
     generation_params:
       cfg_scale: 1.0
       sample_steps: 24

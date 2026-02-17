@@ -17,27 +17,40 @@ export function useImageGeneration() {
         ? '/api/queue/edit'
         : params.mode === 'variation'
         ? '/api/queue/variation'
+        : params.mode === 'upscale'
+        ? '/api/queue/upscale'
         : '/api/queue/generate';
 
       let body;
       let headers = {};
 
-      if ((params.mode === 'edit' || params.mode === 'variation') && params.image) {
+      if ((params.mode === 'edit' || params.mode === 'variation' || params.mode === 'upscale') && params.image) {
         const formData = new FormData();
         formData.append('image', params.image);
-        formData.append('model', params.model);
-        formData.append('prompt', params.prompt);
-        formData.append('n', params.n || 1);
-        formData.append('size', params.size || '512x512');
-        if (params.negative_prompt) {
-          formData.append('negative_prompt', params.negative_prompt);
-        }
-        if (params.quality) formData.append('quality', params.quality);
-        if (params.style) formData.append('style', params.style);
-        if (params.seed) formData.append('seed', params.seed);
-        // Add strength parameter for variation mode (img2img)
-        if (params.mode === 'variation' && params.strength !== undefined) {
-          formData.append('strength', String(params.strength));
+
+        // Upscale mode has different parameters
+        if (params.mode === 'upscale') {
+          formData.append('upscaler', params.upscaler || 'RealESRGAN 4x+');
+          formData.append('resize_mode', String(params.resize_mode || 0));
+          formData.append('upscale_factor', String(params.upscale_factor || 2.0));
+          if (params.target_width) formData.append('target_width', String(params.target_width));
+          if (params.target_height) formData.append('target_height', String(params.target_height));
+        } else {
+          // Edit and variation modes
+          formData.append('model', params.model);
+          formData.append('prompt', params.prompt);
+          formData.append('n', params.n || 1);
+          formData.append('size', params.size || '512x512');
+          if (params.negative_prompt) {
+            formData.append('negative_prompt', params.negative_prompt);
+          }
+          if (params.quality) formData.append('quality', params.quality);
+          if (params.style) formData.append('style', params.style);
+          if (params.seed) formData.append('seed', params.seed);
+          // Add strength parameter for variation mode (img2img)
+          if (params.mode === 'variation' && params.strength !== undefined) {
+            formData.append('strength', String(params.strength));
+          }
         }
 
         body = formData;

@@ -90,7 +90,7 @@ export function registerGenerationRoutes(app, upload) {
       await createGeneration(job);
 
       // Wait for completion (simple polling)
-      const MAX_WAIT = 300; // 5 minutes
+      const MAX_WAIT = 7200; // 1 hour
       const POLL_INTERVAL = 500;
       let attempts = 0;
 
@@ -202,7 +202,7 @@ export function registerGenerationRoutes(app, upload) {
       await createGeneration(job);
 
       // Wait for completion (simple polling)
-      const MAX_WAIT = 300; // 5 minutes
+      const MAX_WAIT = 7200; // 1 hour
       const POLL_INTERVAL = 500;
       let attempts = 0;
 
@@ -314,7 +314,7 @@ export function registerGenerationRoutes(app, upload) {
       await createGeneration(job);
 
       // Wait for completion (simple polling)
-      const MAX_WAIT = 300; // 5 minutes
+      const MAX_WAIT = 7200; // 1 hour
       const POLL_INTERVAL = 500;
       let attempts = 0;
 

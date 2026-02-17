@@ -38,6 +38,7 @@ import registerModelRoutes from './routes/models.js';
 import registerSdApiRoutes from './routes/sdapi.js';
 import registerImageRoutes from './routes/images.js';
 import registerLogRoutes from './routes/logs.js';
+import registerOpenAIRoutes from './routes/openai.js';
 
 // Create logger for server module
 const logger = createLogger('server');
@@ -109,6 +110,9 @@ registerGenerationRoutes(app, upload);
 // SD.next API compatibility endpoints (auth required)
 registerSdApiRoutes(app);
 
+// OpenAI-compatible API endpoints (auth required)
+registerOpenAIRoutes(app, upload);
+
 // ============================================================================
 // Frontend Fallback
 // ============================================================================
@@ -155,13 +159,18 @@ function gracefulShutdown(signal) {
       logger.error({ error }, 'Error closing database');
     }
 
-    process.exit(0);
+    // In test mode, don't call process.exit() - let the test framework control shutdown
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(0);
+    }
   });
 
   // Force close after 10 seconds
   setTimeout(() => {
     logger.error('Forced shutdown after timeout');
-    process.exit(1);
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
   }, 10000);
 }
 

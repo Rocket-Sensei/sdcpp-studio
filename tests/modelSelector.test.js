@@ -209,3 +209,88 @@ describe('ModelSelector - Excessive Fetch Prevention', () => {
     });
   });
 });
+
+/**
+ * Tests for ModelSelectorModal scroll and Studio behavior fixes
+ */
+
+const getStudioSource = () => {
+  const fs = require('fs');
+  const path = require('path');
+  const sourcePath = path.join(__dirname, '../frontend/src/components/Studio.jsx');
+  return fs.readFileSync(sourcePath, 'utf-8');
+};
+
+const getPromptBarSource = () => {
+  const fs = require('fs');
+  const path = require('path');
+  const sourcePath = path.join(__dirname, '../frontend/src/components/prompt/PromptBar.jsx');
+  return fs.readFileSync(sourcePath, 'utf-8');
+};
+
+describe('ModelSelectorModal - Scroll Issues', () => {
+  it('should have ScrollArea properly configured for scrolling', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const sourcePath = path.join(__dirname, '../frontend/src/components/model-selector/ModelSelectorModal.jsx');
+    const source = fs.readFileSync(sourcePath, 'utf-8');
+
+    // Check that ScrollArea is used
+    expect(source).toContain('ScrollArea');
+
+    // The model list container should NOT have overflow-hidden that prevents
+    // ScrollArea from working. Look for the pattern "flex-1 min-h-0 overflow-hidden"
+    // in the model list section
+    const modelListSection = source.substring(
+      source.indexOf('{/* Model list */}'),
+      source.indexOf('{isLoading ?')
+    );
+
+    // Should NOT have overflow-hidden in the model list container
+    // (it was removed to fix scroll issues)
+    expect(modelListSection).not.toContain('overflow-hidden');
+
+    // But ScrollArea should still be present
+    expect(source).toContain('<ScrollArea');
+  });
+
+  it('should have TabsContent with proper height class', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const sourcePath = path.join(__dirname, '../frontend/src/components/model-selector/ModelSelectorModal.jsx');
+    const source = fs.readFileSync(sourcePath, 'utf-8');
+
+    // TabsContent should have h-full to properly size
+    expect(source).toContain('TabsContent');
+    expect(source).toContain('h-full');
+  });
+});
+
+describe('Studio - Generate Button and Settings Panel', () => {
+  it('should have settings panel', () => {
+    const source = getStudioSource();
+
+    // Check for settings panel
+    expect(source).toContain('isSettingsOpen');
+    expect(source).toContain('GeneratePanel');
+    expect(source).toContain('PromptBar');
+  });
+
+  it('should have Generate panel title when opened', () => {
+    const source = getStudioSource();
+
+    // The title should be "Generate"
+    expect(source).toContain('Generate');
+  });
+});
+
+describe('PromptBar - Generate Button', () => {
+  it('should have generate button that triggers generation', () => {
+    const source = getPromptBarSource();
+
+    // The generate button is in the GenerateImage component, not PromptBar directly
+    // PromptBar should render GenerateImage component
+    expect(source).toContain('GenerateImage');
+    expect(source).toContain('onGenerate={onGenerate}');
+  });
+});

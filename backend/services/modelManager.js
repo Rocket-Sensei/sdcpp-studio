@@ -53,6 +53,68 @@ export const LoadMode = {
 };
 
 /**
+ * Parse timeout string to milliseconds
+ * Supports formats like "10m", "1h", "30s", "500ms"
+ * @param {string} timeoutStr - Timeout string
+ * @returns {number|null} Milliseconds or null if invalid
+ */
+export function parseTimeout(timeoutStr) {
+  if (!timeoutStr || typeof timeoutStr !== 'string') {
+    return null;
+  }
+
+  const trimmed = timeoutStr.trim().toLowerCase();
+
+  // Try parsing as a plain number (assume milliseconds)
+  const plainNumber = parseInt(trimmed, 10);
+  if (!isNaN(plainNumber) && /^\d+$/.test(trimmed)) {
+    return plainNumber;
+  }
+
+  // Parse with unit suffix
+  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*([a-z]+)?$/);
+  if (!match) {
+    return null;
+  }
+
+  const value = parseFloat(match[1]);
+  const unit = match[2] || 'ms';
+
+  if (isNaN(value) || value <= 0) {
+    return null;
+  }
+
+  const multipliers = {
+    'ms': 1,
+    'millisecond': 1,
+    'milliseconds': 1,
+    's': 1000,
+    'sec': 1000,
+    'second': 1000,
+    'seconds': 1000,
+    'm': 60 * 1000,
+    'min': 60 * 1000,
+    'minute': 60 * 1000,
+    'minutes': 60 * 1000,
+    'h': 60 * 60 * 1000,
+    'hr': 60 * 60 * 1000,
+    'hour': 60 * 60 * 1000,
+    'hours': 60 * 60 * 1000,
+    'd': 24 * 60 * 60 * 1000,
+    'day': 24 * 60 * 60 * 1000,
+    'days': 24 * 60 * 60 * 1000,
+  };
+
+  const multiplier = multipliers[unit];
+  if (!multiplier) {
+    logger.warn({ timeoutStr, unit }, 'Unknown timeout unit');
+    return null;
+  }
+
+  return Math.floor(value * multiplier);
+}
+
+/**
  * Process entry for tracking running model processes
  */
 class ProcessEntry {
@@ -70,6 +132,8 @@ class ProcessEntry {
     this.errorBuffer = [];
     this.command = options.command || '';
     this.args = options.args || [];
+    this.autoStopTimeout = null; // Timer ID for auto-stop
+    this.autoStopTimeoutMs = null; // Configured timeout in ms (for display)
   }
 
   /**
@@ -120,6 +184,30 @@ class ProcessEntry {
       }
     }
   }
+
+  /**
+   * Clear auto-stop timeout
+   */
+  clearAutoStop() {
+    if (this.autoStopTimeout !== null) {
+      clearTimeout(this.autoStopTimeout);
+      this.autoStopTimeout = null;
+      this.autoStopTimeoutMs = null;
+    }
+  }
+
+  /**
+   * Get remaining time until auto-stop (in seconds)
+   * @returns {number|null} Remaining seconds or null if no auto-stop configured
+   */
+  getAutoStopRemaining() {
+    if (this.autoStopTimeoutMs === null) {
+      return null;
+    }
+    const elapsed = Date.now() - this.startedAt;
+    const remaining = Math.max(0, this.autoStopTimeoutMs - elapsed);
+    return Math.ceil(remaining / 1000);
+  }
 }
 
 /**
@@ -142,6 +230,7 @@ export class ModelManager {
     this.processes = new Map(); // modelId -> ProcessEntry
     this.defaultModelId = null;
     this.defaultModels = null; // Map of job type to default model ID
+    this.defaultAutostop = null; // Global default auto-stop timeout (ms)
     this.configLoaded = false;
     this.isShuttingDown = false;
 
@@ -213,6 +302,11 @@ export class ModelManager {
           mergedConfig.supports_negative_prompt = config.supports_negative_prompt;
         }
 
+        // Capture global default_autostop setting
+        if (config.default_autostop) {
+          mergedConfig.default_autostop = config.default_autostop;
+        }
+
         loadedFiles.push(configPath);
         logger.debug({ configPath }, 'Loaded configuration from file');
       }
@@ -228,6 +322,18 @@ export class ModelManager {
       this.defaultModelId = mergedConfig.default_model || null;
       this.defaultModels = mergedConfig.default_models || null;
       this.defaultSupportsNegativePrompt = mergedConfig.supports_negative_prompt || false;
+
+      // Parse default autostop timeout
+      this.defaultAutostop = null;
+      if (mergedConfig.default_autostop) {
+        const parsedAutostop = parseTimeout(mergedConfig.default_autostop);
+        if (parsedAutostop !== null) {
+          this.defaultAutostop = parsedAutostop;
+          logger.info({ defaultAutostop: mergedConfig.default_autostop, ms: this.defaultAutostop }, 'Default auto-stop timeout');
+        } else {
+          logger.warn({ defaultAutostop: mergedConfig.default_autostop }, 'Invalid default autostop value, ignoring');
+        }
+      }
 
       logger.info({ defaultModel: this.defaultModelId || 'none' }, 'Default model');
       if (this.defaultModels) {
@@ -334,13 +440,30 @@ export class ModelManager {
           modelConfig.supports_negative_prompt = this.defaultSupportsNegativePrompt;
         }
 
+        // Parse autostop timeout - use model-specific value or fall back to global default
+        let autostopMs = null;
+        if (modelConfig.autostop !== undefined) {
+          const parsed = parseTimeout(modelConfig.autostop);
+          if (parsed !== null) {
+            autostopMs = parsed;
+            modelConfig.autostopMs = autostopMs;
+            logger.debug({ modelId, autostop: modelConfig.autostop, ms: autostopMs }, 'Model-specific auto-stop timeout');
+          } else {
+            logger.warn({ modelId, autostop: modelConfig.autostop }, 'Invalid model autostop value, ignoring');
+          }
+        } else if (this.defaultAutostop !== null) {
+          autostopMs = this.defaultAutostop;
+          modelConfig.autostopMs = autostopMs;
+          logger.debug({ modelId, ms: autostopMs }, 'Using default auto-stop timeout');
+        }
+
         // Store model config
         this.models.set(modelId, {
           id: modelId,
           ...modelConfig
         });
 
-        logger.debug({ modelId, name: modelConfig.name, supportsNegativePrompt: modelConfig.supports_negative_prompt }, 'Loaded model');
+        logger.debug({ modelId, name: modelConfig.name, supportsNegativePrompt: modelConfig.supports_negative_prompt, autostopMs }, 'Loaded model');
       }
 
       this.configLoaded = true;
@@ -554,6 +677,8 @@ export class ModelManager {
               execMode: model.exec_mode,
               pid: processEntry.pid,
             });
+            // Schedule auto-stop if configured
+            this._scheduleAutoStop(modelId);
           }
         }
       });
@@ -587,6 +712,8 @@ export class ModelManager {
       // For CLI mode, we expect quick exit
       if (model.exec_mode === ExecMode.CLI) {
         processEntry.status = ModelStatus.RUNNING;
+        // Schedule auto-stop if configured
+        this._scheduleAutoStop(modelId);
       }
 
       // Wait for server mode to be ready (with timeout)
@@ -620,6 +747,9 @@ export class ModelManager {
     logger.info({ modelId, pid: processEntry.pid }, 'Stopping model');
 
     try {
+      // Cancel any scheduled auto-stop
+      processEntry.clearAutoStop();
+
       processEntry.status = ModelStatus.STOPPING;
 
       const { force = false, timeout = 10000 } = options;
@@ -883,6 +1013,38 @@ export class ModelManager {
     ];
 
     return readyPatterns.some(pattern => pattern.test(output));
+  }
+
+  /**
+   * Schedule auto-stop for a model
+   * @param {string} modelId - Model ID
+   * @private
+   */
+  _scheduleAutoStop(modelId) {
+    const processEntry = this.processes.get(modelId);
+    if (!processEntry) {
+      return;
+    }
+
+    const model = this.getModel(modelId);
+    if (!model || !model.autostopMs) {
+      // No auto-stop configured for this model
+      return;
+    }
+
+    const autostopMs = model.autostopMs;
+    processEntry.autoStopTimeoutMs = autostopMs;
+
+    logger.info({ modelId, autostopMs, minutes: Math.floor(autostopMs / 60000) }, 'Scheduling auto-stop');
+
+    processEntry.autoStopTimeout = setTimeout(async () => {
+      logger.info({ modelId, uptime: processEntry.getUptime() }, 'Auto-stop timeout reached, stopping model');
+      try {
+        await this.stopModel(modelId);
+      } catch (error) {
+        logger.error({ error, modelId }, 'Error during auto-stop');
+      }
+    }, autostopMs);
   }
 
   /**

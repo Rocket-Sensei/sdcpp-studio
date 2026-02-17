@@ -269,19 +269,19 @@ describe('Gallery Filter Panel - Static Analysis Tests', () => {
   });
 
   describe('Total Count Display', () => {
-    it('should display total generations count in header', () => {
-      expect(source).toContain('{(pagination?.total || 0)} total generation');
-      expect(source).toContain('{(pagination?.total || 0) !== 1 ? \'s\' : \'\'}');
-    });
-
-    it('should show count on desktop', () => {
-      expect(source).toContain('hidden sm:flex items-center gap-3');
+    it('should display total generations count in footer', () => {
+      // Count is now displayed in the footer
+      expect(source).toContain('pagination?.total || 0');
       expect(source).toContain('total generation');
     });
 
-    it('should show count on mobile', () => {
-      expect(source).toContain('flex sm:hidden');
-      expect(source).toContain('total generation');
+    it('should import Header component', () => {
+      expect(source).toContain('import { Header }');
+      expect(source).toContain('from "./components/header/Header"');
+    });
+
+    it('should pass filterSheet to Header component', () => {
+      expect(source).toContain('filterSheet={filterSheet}');
     });
   });
 
@@ -300,13 +300,17 @@ describe('Gallery Filter Panel - Static Analysis Tests', () => {
   });
 
   describe('Responsive Design', () => {
-    it('should have desktop filter panel', () => {
-      expect(source).toContain('hidden sm:flex');
+    it('should pass filterSheet to Header component', () => {
+      // The filter sheet is created and passed to Header
+      expect(source).toContain('filterSheet={filterSheet}');
+    });
+
+    it('should have Sheet with responsive width classes', () => {
+      // The Sheet component has responsive width
       expect(source).toContain('sm:w-[500px]');
     });
 
-    it('should have mobile filter panel', () => {
-      expect(source).toContain('flex sm:hidden');
+    it('should use SheetContent with side="right"', () => {
       expect(source).toContain('SheetContent side="right"');
     });
   });

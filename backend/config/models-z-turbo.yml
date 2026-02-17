@@ -33,15 +33,36 @@ models:
       cfg_scale: 1
       sample_steps: 9  # Ultra-fast distilled model, uses 4-9 steps
       sampling_method: "euler"
-    huggingface:
-      repo: "leejet/Z-Image-Turbo-GGUF"
-      files:
-        - path: "z_image_turbo-Q8_0.gguf"
-          dest: "./models/"
-        - path: "ae.safetensors"
-          dest: "./models/"
-          # repo: "black-forest-labs/FLUX.1-schnell"  # Gated on HuggingFace, requires token
-          modelscope: "AI-ModelScope/FLUX.1-schnell"
-        - path: "Qwen3-4B-Instruct-2507-Q8_0.gguf"
-          dest: "./models/"
-          repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF"
+
+  unstable-revolution:
+    name: "unstableRevolution V2Fp16"
+    description: "unstableRevolution V2Fp16"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    port: 1238
+    args:
+      - "--diffusion-model"
+      - "./models/unstableRevolution_V2Fp16.safetensors"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--llm"
+      - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "5"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    # Model-specific default parameters for z-image-turbo
+    # These are applied when this model is selected
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 9  # Ultra-fast distilled model, uses 5-15 steps
+      sampling_method: "euler"
+
+

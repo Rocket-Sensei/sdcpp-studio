@@ -7,7 +7,7 @@ models:
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
-      - "--diffusion-model"
+      - "-m"
       - "./models/CyberRealisticPony_V12.7-q8_0.gguf"
       - "--vae"
       - "./models/CyberRealisticPony_V12.7-vae_f16-q8_0.gguf"

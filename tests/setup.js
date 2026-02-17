@@ -70,3 +70,41 @@ vi.mock('easy-dl', () => ({
 
 // Don't mock fetch globally - let individual test files decide
 // Integration tests need real fetch, unit tests can mock it locally
+
+// Helper function to create mock fetch responses for authenticatedFetch mocking
+// Supports two signatures:
+// - createMockResponse(data, status) - for passing response data
+// - createMockResponse(status, ok) - for simple status responses (legacy)
+export const createMockResponse = (...args) => {
+  // Detect signature based on first arg type
+  const firstArg = args[0];
+
+  if (typeof firstArg === 'object' && firstArg !== null) {
+    // Signature: createMockResponse(data, status = 200)
+    const [data, status = 200] = args;
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => data,
+      text: async () => JSON.stringify(data),
+    };
+  } else {
+    // Legacy signature: createMockResponse(status, ok)
+    const [status, ok] = args;
+    return {
+      ok,
+      status,
+      statusText: status === 401 ? 'Unauthorized' : 'OK',
+      json: async () => ({}),
+      text: async () => '',
+    };
+  }
+};
+
+// Helper to create a mock error response
+export const createMockErrorResponse = (error, status = 500) => ({
+  ok: false,
+  status,
+  json: async () => ({ error }),
+  text: async () => JSON.stringify({ error }),
+});

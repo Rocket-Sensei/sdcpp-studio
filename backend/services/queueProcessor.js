@@ -1,4 +1,4 @@
-import { claimNextPendingGeneration, updateGenerationStatus, updateGenerationProgress, deleteGeneration, GenerationStatus, createGeneratedImage } from '../db/queries.js';
+import { claimNextPendingGeneration, claimNextPendingGenerationWithModelAffinity, updateGenerationStatus, updateGenerationProgress, deleteGeneration, GenerationStatus, createGeneratedImage } from '../db/queries.js';
 import { generateImageDirect } from './imageService.js';
 import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
@@ -6,6 +6,7 @@ import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
 import { loggedFetch, createLogger, createGenerationLogger } from '../utils/logger.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from './websocket.js';
+import { upscaleImage } from './upscalerService.js';
 
 const logger = createLogger('queueProcessor');
 
@@ -13,6 +14,7 @@ let isProcessing = false;
 let currentJob = null;
 let currentModelId = null; // Track the model being used for the current job
 let currentModelLoadingStartTime = null; // Track when model loading started for current job
+let lastRunningModelId = null; // Track the last successfully running model for affinity
 let pollInterval = null;
 
 // Initialize model manager singleton
@@ -152,90 +154,99 @@ async function processQueue() {
   genLogger.info({ prompt: job.prompt?.substring(0, 50) }, 'Starting generation');
 
   try {
-    // Get model configuration
-    // Use type-specific default if no model specified
-    let modelId = job.model;
-    if (!modelId) {
-      const defaultModel = modelManager.getDefaultModelForType(job.type);
-      modelId = defaultModel?.id || modelManager.defaultModelId;
-    }
-    if (!modelId) {
-      throw new Error('No model specified and no default model configured');
-    }
-
-    const modelConfig = modelManager.getModel(modelId);
-    if (!modelConfig) {
-      throw new Error(`Model not found: ${modelId}`);
-    }
-
-    // Track the current model ID for crash detection
-    currentModelId = modelId;
-
-    logger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
-    genLogger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
-
-    // Update to MODEL_LOADING state when starting to load the model
-    updateGenerationStatus(job.id, GenerationStatus.MODEL_LOADING, {
-      progress: 0,
-    });
-    broadcastQueueEvent({
-      ...job,
-      status: GenerationStatus.MODEL_LOADING,
-      modelId,
-      modelName: modelConfig.name
-    }, 'job_updated');
-
-    // Prepare model based on execution mode
-    if (modelConfig.exec_mode === ExecMode.SERVER) {
-      // For server mode, stop conflicting servers and start the required one
-      const prepareResult = await prepareModelForJob(modelId, job.id);
-      if (!prepareResult) {
-        throw new Error(`Failed to prepare model ${modelId}: prepareModelForJob returned undefined`);
-      }
-      modelLoadingTimeMs = prepareResult.loadingTimeMs;
-    } else if (modelConfig.exec_mode === ExecMode.CLI) {
-      // For CLI mode, stop any running servers (they're not needed)
-      await stopAllServerModels();
-      // CLI mode doesn't have model loading overhead (model loads per generation)
-      modelLoadingTimeMs = 0;
-      logger.info({ modelId }, 'Model uses CLI mode');
-      genLogger.info({ modelId }, 'Model uses CLI mode');
-    } else if (modelConfig.exec_mode === ExecMode.API) {
-      // For API mode, stop any running servers (external API is used)
-      await stopAllServerModels();
-      // API mode uses external service, no local model loading
-      modelLoadingTimeMs = 0;
-      logger.info({ modelId }, 'Model uses external API mode');
-      genLogger.info({ modelId }, 'Model uses external API mode');
-    } else {
-      throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
-    }
-
-    // Update to PROCESSING state when model is ready and we're about to generate
-    updateGenerationStatus(job.id, GenerationStatus.PROCESSING, {
-      progress: 0,
-    });
-    broadcastQueueEvent({
-      ...job,
-      status: GenerationStatus.PROCESSING,
-      modelId,
-      modelName: modelConfig.name
-    }, 'job_updated');
-
     // Process the job based on type
     let result;
-    switch (job.type) {
-      case 'generate':
-        result = await processGenerateJob(job, modelConfig, genLogger);
-        break;
-      case 'edit':
-        result = await processEditJob(job, modelConfig, genLogger);
-        break;
-      case 'variation':
-        result = await processVariationJob(job, modelConfig, genLogger);
-        break;
-      default:
-        throw new Error(`Unknown job type: ${job.type}`);
+
+    // Upscale jobs don't need model preparation - handle separately
+    if (job.type === 'upscale') {
+      updateGenerationStatus(job.id, GenerationStatus.PROCESSING, { progress: 0 });
+      broadcastQueueEvent({ ...job, status: GenerationStatus.PROCESSING }, 'job_updated');
+      result = await processUpscaleJob(job, genLogger);
+    } else {
+      // Get model configuration
+      // Use type-specific default if no model specified
+      let modelId = job.model;
+      if (!modelId || modelId === 'none') {
+        const defaultModel = modelManager.getDefaultModelForType(job.type);
+        modelId = defaultModel?.id || modelManager.defaultModelId;
+      }
+      if (!modelId || modelId === 'none') {
+        throw new Error('No model specified and no default model configured');
+      }
+
+      const modelConfig = modelManager.getModel(modelId);
+      if (!modelConfig) {
+        throw new Error(`Model not found: ${modelId}`);
+      }
+
+      // Track the current model ID for crash detection
+      currentModelId = modelId;
+
+      logger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
+      genLogger.info({ modelId, modelName: modelConfig.name, execMode: modelConfig.exec_mode }, 'Using model');
+
+      // Update to MODEL_LOADING state when starting to load the model
+      updateGenerationStatus(job.id, GenerationStatus.MODEL_LOADING, {
+        progress: 0,
+      });
+      broadcastQueueEvent({
+        ...job,
+        status: GenerationStatus.MODEL_LOADING,
+        modelId,
+        modelName: modelConfig.name
+      }, 'job_updated');
+
+      // Prepare model based on execution mode
+      if (modelConfig.exec_mode === ExecMode.SERVER) {
+        // For server mode, stop conflicting servers and start the required one
+        const prepareResult = await prepareModelForJob(modelId, job.id);
+        if (!prepareResult) {
+          throw new Error(`Failed to prepare model ${modelId}: prepareModelForJob returned undefined`);
+        }
+        modelLoadingTimeMs = prepareResult.loadingTimeMs;
+      } else if (modelConfig.exec_mode === ExecMode.CLI) {
+        // For CLI mode, stop any running servers (they're not needed)
+        await stopAllServerModels();
+        // CLI mode doesn't have model loading overhead (model loads per generation)
+        modelLoadingTimeMs = 0;
+        logger.info({ modelId }, 'Model uses CLI mode');
+        genLogger.info({ modelId }, 'Model uses CLI mode');
+      } else if (modelConfig.exec_mode === ExecMode.API) {
+        // For API mode, stop any running servers (external API is used)
+        await stopAllServerModels();
+        // API mode uses external service, no local model loading
+        modelLoadingTimeMs = 0;
+        logger.info({ modelId }, 'Model uses external API mode');
+        genLogger.info({ modelId }, 'Model uses external API mode');
+      } else {
+        throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
+      }
+
+      // Update to PROCESSING state when model is ready and we're about to generate
+      updateGenerationStatus(job.id, GenerationStatus.PROCESSING, {
+        progress: 0,
+      });
+      broadcastQueueEvent({
+        ...job,
+        status: GenerationStatus.PROCESSING,
+        modelId,
+        modelName: modelConfig.name
+      }, 'job_updated');
+
+      // For other job types, proceed with model-based generation
+      switch (job.type) {
+        case 'generate':
+          result = await processGenerateJob(job, modelConfig, genLogger);
+          break;
+        case 'edit':
+          result = await processEditJob(job, modelConfig, genLogger);
+          break;
+        case 'variation':
+          result = await processVariationJob(job, modelConfig, genLogger);
+          break;
+        default:
+          throw new Error(`Unknown job type: ${job.type}`);
+      }
     }
 
     // Validate that images were actually generated before marking as completed
@@ -960,4 +971,61 @@ async function processVariationJob(job, modelConfig, genLogger) {
   }
 
   return { generationId, imageCount, actualSteps };
+}
+
+/**
+ * Process an upscale job
+ * Upscale jobs don't require model loading - they use the upscaler service directly
+ * @param {Object} job - Queue job object
+ * @param {Object} genLogger - Generation-specific logger
+ * @returns {Promise<Object>} Result with generationId and imageCount
+ */
+async function processUpscaleJob(job, genLogger) {
+  // Check if input image path is provided
+  if (!job.input_image_path) {
+    throw new Error('Upscale job requires input_image_path');
+  }
+
+  // Update progress
+  updateGenerationProgress(job.id, 0.1, 'Loading image for upscaling...');
+  genLogger.debug({ progress: 0.1 }, 'Loading image for upscaling');
+
+  // Load the input image from disk
+  const imageBuffer = await readFile(job.input_image_path);
+
+  updateGenerationProgress(job.id, 0.25, 'Upscaling image...');
+  genLogger.info({
+    upscaler: job.upscaler,
+    resizeMode: job.resize_mode,
+    factor: job.upscale_factor
+  }, 'Starting image upscaling');
+
+  // Call the upscaler service
+  const resultBuffer = await upscaleImage(imageBuffer, {
+    upscaler_1: job.upscaler || 'RealESRGAN 4x+',
+    resize_mode: job.resize_mode || 0,
+    upscaling_resize: job.upscale_factor || 2.0,
+    upscaling_resize_w: job.target_width,
+    upscaling_resize_h: job.target_height,
+  });
+
+  updateGenerationProgress(job.id, 0.85, 'Saving upscaled image...');
+  genLogger.debug({ progress: 0.85 }, 'Saving upscaled image');
+
+  // Save the upscaled image
+  const generationId = job.id;
+  const imageId = randomUUID();
+
+  await createGeneratedImage({
+    id: imageId,
+    generation_id: generationId,
+    index_in_batch: 0,
+    image_data: resultBuffer,
+    mime_type: 'image/png',
+    width: null,
+    height: null,
+  });
+
+  genLogger.info('Upscale completed successfully');
+  return { generationId, imageCount: 1 };
 }

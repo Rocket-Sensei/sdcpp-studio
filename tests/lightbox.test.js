@@ -1,0 +1,422 @@
+/**
+ * Vitest tests for Lightbox component
+ * Tests image modal overlay with 90% viewport sizing and mobile support
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import fs from 'fs';
+import path from 'path';
+
+// Get Lightbox source for static analysis
+const getLightboxSource = () => {
+  const sourcePath = path.join(__dirname, '../frontend/src/components/Lightbox.jsx');
+  return fs.readFileSync(sourcePath, 'utf-8');
+};
+
+describe('Lightbox - Viewport Sizing (fits with header)', () => {
+  const source = getLightboxSource();
+
+  it('should have image with max-w-full to fit within container', () => {
+    // max-w-full fits within the parent container which already has padding
+    expect(source).toContain('max-w-full');
+  });
+
+  it('should have image with max-h-full to fit within container', () => {
+    // max-h-full fits within the Viewport which accounts for header height via flex-1
+    expect(source).toContain('max-h-full');
+  });
+
+  it('should not use 90vh as it causes overflow with header', () => {
+    // 90vh of viewport + header height = overflow at bottom
+    expect(source).not.toContain('max-h-[90vh]');
+  });
+
+  it('should not use 90vw - container padding provides the margin', () => {
+    // max-w-full with parent padding is better than 90vw
+    expect(source).not.toContain('max-w-[90vw]');
+  });
+
+  it('should not have inline styles with viewport units', () => {
+    // Should not have inline styles that override Tailwind classes
+    expect(source).not.toMatch(/maxWidth:\s*['"]90vw/);
+    expect(source).not.toMatch(/maxHeight:\s*['"]90vh/);
+  });
+
+  it('should have object-contain to preserve aspect ratio', () => {
+    expect(source).toContain('object-contain');
+  });
+
+  it('should have w-auto and h-auto for proper aspect ratio', () => {
+    expect(source).toContain('w-auto');
+    expect(source).toContain('h-auto');
+  });
+});
+
+describe('Lightbox - Mobile Support', () => {
+  const source = getLightboxSource();
+
+  it('should have responsive padding on image container', () => {
+    // Should have responsive padding: p-4 sm:p-6 md:p-8
+    expect(source).toMatch(/p-4.*sm:p-6.*md:p-8/);
+  });
+
+  it('should have responsive header padding', () => {
+    // Header should have py-2 px-3 sm:px-4 md:py-3 md:px-6
+    expect(source).toMatch(/py-2.*px-3.*sm:px-4.*md:py-3.*md:px-6/);
+  });
+
+  it('should have responsive icon sizes in header buttons', () => {
+    // Icons should scale: w-5 h-5 sm:w-6 sm:h-6
+    expect(source).toMatch(/w-5 h-5.*sm:w-6 sm:h-6/);
+  });
+
+  it('should have responsive button padding for touch targets', () => {
+    // Buttons should have p-1.5 sm:p-2 for better mobile touch targets
+    expect(source).toMatch(/p-1\.5.*sm:p-2/);
+  });
+
+  it('should have responsive text size in header', () => {
+    // Title should have text-xs sm:text-sm
+    expect(source).toMatch(/text-xs.*sm:text-sm/);
+  });
+
+  it('should have responsive gap between header buttons', () => {
+    // Gap should scale: gap-1 sm:gap-2
+    expect(source).toMatch(/gap-1.*sm:gap-2/);
+  });
+
+  it('should have responsive max-width on title text', () => {
+    // Title should truncate with max-w-[60vw] sm:max-w-[70vw]
+    expect(source).toMatch(/max-w-\[60vw\].*sm:max-w-\[70vw\]/);
+  });
+});
+
+describe('Lightbox - Core Features', () => {
+  const source = getLightboxSource();
+
+  it('should use @hanakla/react-lightbox library', () => {
+    expect(source).toContain('@hanakla/react-lightbox');
+    expect(source).toContain('useLightbox');
+    expect(source).toContain('Lightbox');
+  });
+
+  it('should export LightboxWithImage component', () => {
+    expect(source).toContain('export function LightboxWithImage');
+  });
+
+  it('should export LightboxGalleryWithImages component', () => {
+    expect(source).toContain('export function LightboxGalleryWithImages');
+  });
+
+  it('should have ImageLightbox component with renderItem', () => {
+    expect(source).toContain('function ImageLightbox');
+    expect(source).toContain('renderItem');
+  });
+
+  it('should have download functionality', () => {
+    expect(source).toContain('handleDownload');
+    expect(source).toContain('Download');
+  });
+
+  it('should have close button with X icon', () => {
+    expect(source).toContain('X');
+    expect(source).toContain('Lightbox.Close');
+  });
+
+  it('should have backdrop click to close functionality', () => {
+    // We use a custom backdrop div with onClick since library's $onClose doesn't work
+    expect(source).toContain('backdrop');
+    expect(source).toContain('onClick={lbContext.close}');
+  });
+
+  it('should have pinch-to-zoom support', () => {
+    expect(source).toContain('Lightbox.Pinchable');
+  });
+
+  it('should have draggable=false on image to prevent dragging', () => {
+    expect(source).toContain('draggable={false}');
+  });
+
+  it('should have select-none to prevent text selection', () => {
+    expect(source).toContain('select-none');
+  });
+
+  it('should have proper z-index for overlay', () => {
+    expect(source).toContain('z-50');
+  });
+
+  it('should have fixed inset-0 positioning for full screen overlay', () => {
+    expect(source).toContain('fixed inset-0');
+  });
+
+  it('should have bg-black/80 for semi-transparent backdrop', () => {
+    expect(source).toContain('bg-black/80');
+  });
+});
+
+describe('Lightbox - Download Functionality', () => {
+  const source = getLightboxSource();
+
+  it('should use File System Access API (showSaveFilePicker)', () => {
+    expect(source).toContain('showSaveFilePicker');
+  });
+
+  it('should fetch image data with authenticatedFetch', () => {
+    expect(source).toContain('authenticatedFetch');
+    expect(source).toContain('res.blob()');
+  });
+
+  it('should check for browser support before downloading', () => {
+    expect(source).toContain("'showSaveFilePicker' in window");
+  });
+
+  it('should show error toast when File System Access API is not supported', () => {
+    expect(source).toContain('Download not supported');
+    expect(source).toContain('Please use Chrome or Edge to download images');
+  });
+
+  it('should create writable file handle and write blob', () => {
+    expect(source).toContain('createWritable');
+    expect(source).toContain('writable.write(blob)');
+    expect(source).toContain('writable.close()');
+  });
+
+  it('should have error handling for failed downloads', () => {
+    expect(source).toContain('Failed to fetch image');
+  });
+
+  it('should have aria-label on download button for accessibility', () => {
+    expect(source).toMatch(/aria-label=["']Download/);
+  });
+});
+
+describe('Lightbox - Accessibility', () => {
+  const source = getLightboxSource();
+
+  it('should have aria-label on download button', () => {
+    expect(source).toMatch(/aria-label=["']Download/);
+  });
+
+  it('should have aria-label on close button', () => {
+    expect(source).toMatch(/aria-label=["']Close/);
+  });
+
+  it('should have title attribute on download button', () => {
+    expect(source).toMatch(/title=["']Download["']/);
+  });
+
+  it('should have title attribute on close button', () => {
+    expect(source).toMatch(/title=["']Close["']/);
+  });
+
+  it('should have alt text on image from item prop', () => {
+    expect(source).toContain('alt={item.alt}');
+  });
+
+  it('should have data-lightbox-image-container attribute for testing', () => {
+    expect(source).toContain('data-lightbox-image-container="true"');
+  });
+});
+
+describe('Lightbox - LightboxWithImage Component', () => {
+  const source = getLightboxSource();
+
+  it('should accept small, large, alt, className, fileName props', () => {
+    expect(source).toContain('small');
+    expect(source).toContain('large');
+    expect(source).toContain('alt = ""');
+    expect(source).toContain('className');
+    expect(source).toContain('fileName');
+  });
+
+  it('should accept hideDownload and hideZoom props (for compatibility)', () => {
+    expect(source).toContain('hideDownload = false');
+    expect(source).toContain('hideZoom = false');
+  });
+
+  it('should fallback to small if large is not provided', () => {
+    expect(source).toMatch(/const src = large \|\| small/);
+  });
+
+  it('should use useLightbox hook', () => {
+    expect(source).toContain('const lb = useLightbox(');
+  });
+
+  it('should have cursor pointer on clickable image', () => {
+    expect(source).toContain('cursor: "pointer"');
+  });
+
+  it('should render LightboxView component', () => {
+    expect(source).toContain('<lb.LightboxView />');
+  });
+});
+
+describe('Lightbox - LightboxGalleryWithImages Component', () => {
+  const source = getLightboxSource();
+
+  it('should accept images array prop', () => {
+    expect(source).toMatch(/images = \[\]/);
+  });
+
+  it('should map images to lightbox items with kind, url, alt, fileName', () => {
+    expect(source).toContain('kind: "image"');
+    expect(source).toContain('url: img.large || img.small');
+    expect(source).toContain('alt: img.alt || alt');
+    expect(source).toContain('fileName: img.fileName');
+  });
+
+  it('should return null if no images provided', () => {
+    expect(source).toMatch(/if \(!firstImage\) return null/);
+  });
+
+  it('should show first image as thumbnail', () => {
+    expect(source).toContain('firstImage.small');
+  });
+
+  it('should open gallery from first image on click', () => {
+    expect(source).toContain('lb.getOnClick(items[0])');
+  });
+});
+
+describe('Lightbox - Image Styling', () => {
+  const source = getLightboxSource();
+
+  it('should have container-based sizing (max-w-full x max-h-full)', () => {
+    expect(source).toContain('max-w-full');
+    expect(source).toContain('max-h-full');
+  });
+
+  it('should preserve aspect ratio with auto dimensions', () => {
+    expect(source).toContain('w-auto');
+    expect(source).toContain('h-auto');
+  });
+
+  it('should use object-contain for proper fitting', () => {
+    expect(source).toContain('object-contain');
+  });
+
+  it('should prevent image dragging', () => {
+    expect(source).toContain('draggable={false}');
+  });
+
+  it('should prevent text selection on image', () => {
+    expect(source).toContain('select-none');
+  });
+});
+
+describe('Lightbox - Header Styling', () => {
+  const source = getLightboxSource();
+
+  it('should have dark semi-transparent background', () => {
+    expect(source).toContain('bg-black/70');
+  });
+
+  it('should have white text', () => {
+    expect(source).toContain('text-white');
+  });
+
+  it('should have flex layout for spacing', () => {
+    expect(source).toContain('flex items-center justify-between');
+  });
+
+  it('should truncate title text with max-width', () => {
+    expect(source).toContain('truncate');
+    expect(source).toMatch(/max-w-\[60vw\]/);
+  });
+
+  it('should have hover effect on buttons', () => {
+    expect(source).toContain('hover:bg-white/10');
+  });
+
+  it('should have transition on buttons', () => {
+    expect(source).toContain('transition-colors');
+  });
+
+  it('should have rounded corners on buttons', () => {
+    expect(source).toContain('rounded-md');
+  });
+});
+
+describe('Lightbox - Layout Structure', () => {
+  const source = getLightboxSource();
+
+  it('should have fixed full-screen overlay', () => {
+    expect(source).toContain('fixed inset-0');
+  });
+
+  it('should have flex column layout', () => {
+    expect(source).toContain('flex flex-col');
+  });
+
+  it('should use isolate for z-index stacking context', () => {
+    expect(source).toContain('isolate');
+  });
+
+  it('should have header and viewport sections', () => {
+    expect(source).toContain('Lightbox.Header');
+    expect(source).toContain('Lightbox.Viewport');
+  });
+
+  it('should have flex-1 on viewport to take remaining space', () => {
+    expect(source).toMatch(/Viewport.*flex-1/);
+  });
+
+  it('should have proper container with flex center for image', () => {
+    expect(source).toContain('flex items-center justify-center h-full');
+  });
+});
+
+describe('Lightbox - Backdrop Behavior', () => {
+  const source = getLightboxSource();
+
+  it('should have custom backdrop div with onClick handler', () => {
+    // A separate backdrop div that handles clicks
+    expect(source).toContain('backdrop');
+    expect(source).toContain('onClick={lbContext.close}');
+  });
+
+  it('should use pointer-events to control click-through behavior', () => {
+    // Header and Viewport should have pointer-events-none to allow clicks through to backdrop
+    // Inner content should have pointer-events-auto to be interactive
+    expect(source).toContain('pointer-events-none');
+    expect(source).toContain('pointer-events-auto');
+  });
+
+  it('should use z-index layering with backdrop at z-0 and content at z-10', () => {
+    expect(source).toContain('z-0');
+    expect(source).toContain('z-10');
+  });
+});
+
+describe('Lightbox - Component Comments', () => {
+  const source = getLightboxSource();
+
+  it('should have JSDoc comment explaining the component', () => {
+    // Should have comment block at the top
+    expect(source).toMatch(/\/\*\*[\s\S]*Lightbox wrapper/);
+  });
+
+  it('should have feature list comment for ImageLightbox', () => {
+    // Comment should list features including proper sizing and mobile support
+    expect(source).toMatch(/Features:|Custom Lightbox/);
+    expect(source).toMatch(/proper sizing/i);
+    expect(source).toMatch(/mobile/i); // Case-insensitive for mobile
+    expect(source).toMatch(/responsive/i); // Case-insensitive for responsive
+  });
+});
+
+describe('Lightbox - Integration Points', () => {
+  const source = getLightboxSource();
+
+  it('should import from lucide-react for icons', () => {
+    expect(source).toContain('from "lucide-react"');
+    expect(source).toContain('X');
+    expect(source).toContain('Download');
+  });
+
+  it('should use @hanakla/react-lightbox', () => {
+    expect(source).toContain('@hanakla/react-lightbox');
+  });
+});
