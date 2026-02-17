@@ -115,7 +115,6 @@ export function EditImage({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
           onChange={handleFileChange}
           className="hidden"
           disabled={disabled || isLoading}

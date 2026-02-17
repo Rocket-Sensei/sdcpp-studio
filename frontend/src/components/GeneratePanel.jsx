@@ -434,11 +434,19 @@ export function GeneratePanel({
   };
 
   const handleGenerate = async () => {
-    if (selectedModels.length === 0) {
+    // Validate model selection for non-upscale modes
+    if (localMode !== "upscale" && selectedModels.length === 0) {
       toast.error("Please select at least one model");
       return;
     }
 
+    // Validate upscaler selection for upscale mode
+    if (localMode === "upscale" && !upscalerName) {
+      toast.error("Please select an upscaler");
+      return;
+    }
+
+    // Validate prompt for non-upscale/video modes
     if (localMode !== "upscale" && localMode !== "video" && !prompt.trim()) {
       toast.error("Please enter a prompt");
       return;

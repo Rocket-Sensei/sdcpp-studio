@@ -256,7 +256,10 @@ describe("UpscaleImage Component", () => {
   });
 
   describe("File Input Attributes", () => {
-    it("should accept only image files", () => {
+    it("should not have accept attribute to show full file picker on mobile", () => {
+      // Note: Accept attribute removed to force mobile browsers to show
+      // full file picker instead of photo/gallery picker.
+      // JavaScript validation ensures only image files are accepted.
       render(
         <UpscaleImage
           onGenerate={mockOnGenerate}
@@ -266,7 +269,8 @@ describe("UpscaleImage Component", () => {
       );
 
       const fileInput = document.querySelector('input[type="file"]');
-      expect(fileInput).toHaveAttribute("accept", "image/png,image/jpeg,image/webp");
+      // Accept attribute should NOT be present for mobile compatibility
+      expect(fileInput).not.toHaveAttribute("accept");
     });
   });
 });

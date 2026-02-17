@@ -235,7 +235,6 @@ export function VideoSettings({
           <input
             ref={endImageInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
             onChange={onEndImageFileSelect}
             className="hidden"
             disabled={isLoading || isUpscaling}
