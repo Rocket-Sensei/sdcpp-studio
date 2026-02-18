@@ -213,6 +213,15 @@ export function initializeDatabase() {
     )
   `);
 
+  // Create config table for storing key-value configuration
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `);
+
   // Create indexes
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_generations_created_at ON generations(created_at DESC);
@@ -327,9 +336,11 @@ export function clearDatabase() {
   database.prepare('DELETE FROM model_download_files').run();
   database.prepare('DELETE FROM model_downloads').run();
   database.prepare('DELETE FROM generated_images').run();
+  database.prepare('DELETE FROM queue').run();
   database.prepare('DELETE FROM generations').run();
   database.prepare('DELETE FROM model_processes').run();
   database.prepare('DELETE FROM models').run();
+  database.prepare('DELETE FROM config').run();
 
   logger.info({ dbPath: currentDbPath }, 'Database cleared');
 }
@@ -339,4 +350,33 @@ export function clearDatabase() {
  */
 export function isDatabaseOpen() {
   return db !== null && db !== undefined;
+}
+
+/**
+ * Get a config value by key
+ * @param {string} key - Config key
+ * @returns {string|null} Config value or null if not found
+ */
+export function getConfig(key) {
+  const database = getDatabase();
+  const stmt = database.prepare('SELECT value FROM config WHERE key = ?');
+  const row = stmt.get(key);
+  return row ? row.value : null;
+}
+
+/**
+ * Set a config value
+ * @param {string} key - Config key
+ * @param {string} value - Config value
+ */
+export function setConfig(key, value) {
+  const database = getDatabase();
+  const stmt = database.prepare(`
+    INSERT INTO config (key, value, updated_at)
+    VALUES (?, ?, strftime('%s', 'now') * 1000)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = strftime('%s', 'now') * 1000
+  `);
+  stmt.run(key, value);
 }

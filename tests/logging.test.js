@@ -256,7 +256,8 @@ describe('Logger Utility', () => {
 
       expect(logEntry).toBeDefined();
       expect(logEntry.status).toBe(200);
-      expect(logEntry.responseSummary).toBe('job id=123, status=pending');
+      // New format logs response object directly instead of summary
+      expect(logEntry.response).toEqual({ id: '123', status: 'pending' });
     });
 
     it('should log error responses with error level', async () => {

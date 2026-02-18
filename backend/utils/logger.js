@@ -298,6 +298,92 @@ export function getBaseLogger() {
 }
 
 /**
+ * Check if data contains image/base64 content that should be excluded from logs
+ * @param {any} data - Data to check
+ * @returns {boolean} True if data contains image content
+ */
+function containsImageData(data) {
+  if (!data) return false;
+
+  // Check for base64 image data patterns
+  if (typeof data === 'string') {
+    return data.startsWith('data:image/') ||
+           data.includes('"b64_json"') ||
+           data.includes('"image"') && data.includes('"base64"');
+  }
+
+  if (Array.isArray(data)) {
+    return data.some(item => containsImageData(item));
+  }
+
+  if (typeof data === 'object') {
+    // Check common image response fields
+    if (data.b64_json || data.image || data.data) {
+      return true;
+    }
+    // Check for images array
+    if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].b64_json) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Sanitize response data for logging by removing/replacing large image data
+ * @param {any} data - Response data to sanitize
+ * @param {number} maxLength - Maximum string length before truncation
+ * @returns {any} Sanitized data safe for logging
+ */
+function sanitizeResponseData(data, maxLength = 500) {
+  if (!data) return data;
+
+  if (typeof data === 'string') {
+    // Check if it looks like base64 image data
+    if (data.length > maxLength && /^[A-Za-z0-9+/=]+$/.test(data.substring(0, 100))) {
+      return `<base64 data length=${data.length}>`;
+    }
+    return data.length > maxLength ? data.substring(0, maxLength) + '...' : data;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeResponseData(item, maxLength));
+  }
+
+  if (typeof data === 'object') {
+    const sanitized = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'b64_json' || key === 'image') {
+        sanitized[key] = `<base64 length=${typeof value === 'string' ? value.length : 'unknown'}>`;
+      } else if (key === 'data' && Array.isArray(value)) {
+        // Handle images array
+        if (value.length > 0 && value[0].b64_json) {
+          sanitized[key] = value.map((img, i) => ({
+            index: i,
+            b64_json: `<base64 length=${img.b64_json?.length || 'unknown'}>`
+          }));
+        } else {
+          sanitized[key] = sanitizeResponseData(value, maxLength);
+        }
+      } else if (typeof value === 'string' && value.length > maxLength) {
+        // Check for base64-like content
+        if (/^[A-Za-z0-9+/=]+$/.test(value.substring(0, 50))) {
+          sanitized[key] = `<base64 length=${value.length}>`;
+        } else {
+          sanitized[key] = value.substring(0, maxLength) + '...';
+        }
+      } else {
+        sanitized[key] = sanitizeResponseData(value, maxLength);
+      }
+    }
+    return sanitized;
+  }
+
+  return data;
+}
+
+/**
  * Log HTTP API request
  * @param {string} method - HTTP method
  * @param {string} url - Full URL
@@ -314,7 +400,7 @@ export function logApiRequest(method, url, headers = {}, body = null) {
       sanitizedHeaders[key] = '[REDACTED]';
     } else if (key.toLowerCase() === 'cookie') {
       sanitizedHeaders[key] = '[REDACTED]';
-    } else if (key.toLowerCase() !== 'content-type') {
+    } else {
       sanitizedHeaders[key] = value;
     }
   }
@@ -350,13 +436,22 @@ export function logApiRequest(method, url, headers = {}, body = null) {
       if (!isEmpty) {
         logData.contentType = headers['Content-Type'] || 'application/json';
         logData.bodyKeys = Object.keys(body);
-        // Sanitize body - redact sensitive fields
+        // Sanitize body - redact sensitive fields and large data
         const sanitizedBody = {};
         for (const [key, value] of Object.entries(body)) {
           if (key.toLowerCase() === 'password' || key.toLowerCase() === 'apikey' || key.toLowerCase() === 'api_key') {
             sanitizedBody[key] = '[REDACTED]';
-          } else if (typeof value === 'string' && value.length > 1000) {
-            sanitizedBody[key] = `<data length=${value.length}>`;
+          } else if (key === 'image' || key === 'init_images' || key === 'mask') {
+            // Handle image fields in requests
+            if (typeof value === 'string' && value.length > 100) {
+              sanitizedBody[key] = `<base64 length=${value.length}>`;
+            } else if (Array.isArray(value)) {
+              sanitizedBody[key] = value.map(v =>
+                typeof v === 'string' && v.length > 100 ? `<base64 length=${v.length}>` : v
+              );
+            } else {
+              sanitizedBody[key] = value;
+            }
           } else {
             sanitizedBody[key] = value;
           }
@@ -383,16 +478,22 @@ export async function logApiResponse(response, data = null) {
     headers: Object.fromEntries(response.headers.entries()),
   };
 
-  // Add response summary
+  // Add response data (sanitized to exclude large image data)
   if (data) {
-    if (data.data && Array.isArray(data.data)) {
-      logData.responseSummary = `${data.data.length} image(s)`;
-    } else if (data.id) {
-      logData.responseSummary = `job id=${data.id}, status=${data.status}`;
-    } else if (data.created) {
-      logData.responseSummary = `created=${data.created}`;
-    } else {
-      logData.responseSummary = '<data received>';
+    if (typeof data === 'object') {
+      // Sanitize the response to remove base64 image data
+      logData.response = sanitizeResponseData(data);
+    } else if (typeof data === 'string') {
+      // For string responses, truncate if too long or looks like base64
+      if (data.length > 500) {
+        if (/^[A-Za-z0-9+/=]+$/.test(data.substring(0, 100))) {
+          logData.response = `<base64 data length=${data.length}>`;
+        } else {
+          logData.response = data.substring(0, 500) + '...';
+        }
+      } else {
+        logData.response = data;
+      }
     }
   }
 

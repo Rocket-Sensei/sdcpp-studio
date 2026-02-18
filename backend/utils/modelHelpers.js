@@ -171,13 +171,12 @@ export function findModelIdByName(modelNameOrId, modelManager) {
   const model = modelManager.getModel(modelNameOrId);
   if (model) return modelNameOrId;
 
-  // Try to find by name match (case-insensitive, partial match)
+  // Try to find by exact name match only (case-insensitive)
+  // This ensures "Unstable Revolution FLUX.2 Klein 4B" doesn't match "FLUX.2 Klein 4B"
   const allModels = modelManager.getAllModels();
   const found = allModels.find(m =>
     m.name.toLowerCase() === modelNameOrId.toLowerCase() ||
-    m.id.toLowerCase() === modelNameOrId.toLowerCase() ||
-    m.name.toLowerCase().includes(modelNameOrId.toLowerCase()) ||
-    modelNameOrId.toLowerCase().includes(m.name.toLowerCase())
+    m.id.toLowerCase() === modelNameOrId.toLowerCase()
   );
   return found?.id || null;
 }

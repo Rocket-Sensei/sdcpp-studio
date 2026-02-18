@@ -14,10 +14,14 @@ import {
   getImagesByGenerationId,
   createGeneration
 } from '../../db/queries.js';
+import { getConfig } from '../../db/database.js';
 import { findModelIdByName } from '../../utils/modelHelpers.js';
 import { createLogger } from '../../utils/logger.js';
 
 const logger = createLogger('controllers:txt2img');
+
+// Config key for cached model selection (same as in modelsController.js)
+const CACHED_MODEL_KEY = 'sdnext_cached_model';
 
 // Default timeout: 1 hour
 const DEFAULT_TIMEOUT_MS = 3600000;
@@ -52,7 +56,7 @@ export function registerTxt2ImgRoutes(app, authenticateRequest) {
       } = req.body;
 
       // Determine model ID from request
-      // Priority: override_settings.sd_model_checkpoint > sd_model_checkpoint > running model > default
+      // Priority: override_settings.sd_model_checkpoint > sd_model_checkpoint > cached model > running model > default
       let modelId = null;
 
       // Check override_settings first (SD.next API standard for per-request override)
@@ -63,12 +67,24 @@ export function registerTxt2ImgRoutes(app, authenticateRequest) {
       else if (sd_model_checkpoint) {
         modelId = findModelIdByName(sd_model_checkpoint, modelManager);
       }
-      // Check for currently running model
+      // Check for cached model selection (set via POST /sdapi/v1/options)
       else {
-        const runningModels = modelManager.getRunningModels();
-        if (runningModels.length > 0) {
-          // getRunningModels returns objects with 'id' property
-          modelId = typeof runningModels[0] === 'string' ? runningModels[0] : runningModels[0]?.id;
+        const cachedModelId = getConfig(CACHED_MODEL_KEY);
+        if (cachedModelId) {
+          // Verify the cached model still exists
+          const cachedModel = modelManager.getModel(cachedModelId);
+          if (cachedModel) {
+            modelId = cachedModelId;
+          }
+        }
+
+        // If no cached model, check for currently running model
+        if (!modelId) {
+          const runningModels = modelManager.getRunningModels();
+          if (runningModels.length > 0) {
+            // getRunningModels returns objects with 'id' property
+            modelId = typeof runningModels[0] === 'string' ? runningModels[0] : runningModels[0]?.id;
+          }
         }
       }
 

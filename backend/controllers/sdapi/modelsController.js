@@ -8,8 +8,12 @@
 import { modelManager } from '../../services/modelManager.js';
 import { findModelIdByName } from '../../utils/modelHelpers.js';
 import { createLogger } from '../../utils/logger.js';
+import { getConfig, setConfig } from '../../db/database.js';
 
 const logger = createLogger('controllers:models');
+
+// Config key for cached model selection
+const CACHED_MODEL_KEY = 'sdnext_cached_model';
 
 /**
  * Register model-related routes
@@ -62,18 +66,30 @@ export function registerModelRoutes(app, authenticateRequest) {
    */
   app.get('/sdapi/v1/options', authenticateRequest, (req, res) => {
     try {
-      const runningModels = modelManager.getRunningModels();
-      const defaultModel = modelManager.getDefaultModel();
-
-      // Get the current model name (display name, not ID)
+      // First check for cached model selection (for SillyTavern integration)
+      const cachedModelId = getConfig(CACHED_MODEL_KEY);
       let currentModelName = '';
-      if (runningModels.length > 0) {
-        const runningModel = typeof runningModels[0] === 'string'
-          ? modelManager.getModel(runningModels[0])
-          : runningModels[0];
-        currentModelName = runningModel?.name || '';
-      } else if (defaultModel) {
-        currentModelName = defaultModel.name || '';
+
+      if (cachedModelId) {
+        const cachedModel = modelManager.getModel(cachedModelId);
+        if (cachedModel) {
+          currentModelName = cachedModel.name;
+        }
+      }
+
+      // Fall back to running model or default if no cached selection
+      if (!currentModelName) {
+        const runningModels = modelManager.getRunningModels();
+        const defaultModel = modelManager.getDefaultModel();
+
+        if (runningModels.length > 0) {
+          const runningModel = typeof runningModels[0] === 'string'
+            ? modelManager.getModel(runningModels[0])
+            : runningModels[0];
+          currentModelName = runningModel?.name || '';
+        } else if (defaultModel) {
+          currentModelName = defaultModel.name || '';
+        }
       }
 
       // Return options in SD.next format
@@ -91,6 +107,8 @@ export function registerModelRoutes(app, authenticateRequest) {
   /**
    * POST /sdapi/v1/options
    * Set options (for set-model endpoint)
+   * Caches the model selection instead of directly loading it.
+   * The queue processor will use this cached selection when processing jobs.
    */
   app.post('/sdapi/v1/options', authenticateRequest, async (req, res) => {
     try {
@@ -105,12 +123,10 @@ export function registerModelRoutes(app, authenticateRequest) {
           });
         }
 
-        // Start the model if not running
-        const model = modelManager.getModel(modelId);
-        if (model && !modelManager.isModelRunning(modelId)) {
-          await modelManager.startModel(modelId);
-          logger.info({ modelId, modelName: model.name }, 'Started model via SD.next API');
-        }
+        // Cache the model selection in the database
+        // SillyTavern expects us to remember this selection for subsequent requests
+        setConfig(CACHED_MODEL_KEY, modelId);
+        logger.info({ modelId, modelName: sd_model_checkpoint }, 'Cached model selection via SD.next API');
 
         // Return SD.next format response
         return res.json({
