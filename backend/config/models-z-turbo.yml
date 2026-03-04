@@ -3,6 +3,37 @@ models:
   # ==================== Z-Image Turbo (Server Mode) ====================
   # NOTE: Z-Image-Turbo is a distilled model that does not rely on classifier-free guidance.
   # Recommended settings: cfg_scale=0.0-1.0 (typically 0.0), steps=4-9 (typically 9)
+  z-image:
+    name: "Z-Image"
+    description: "Z-Image"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    port: 1238
+    args:
+      - "--diffusion-model"
+      - "./models/z_image-Q8_0.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--llm"
+      - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "40"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    # Model-specific default parameters for z-image-turbo
+    # These are applied when this model is selected
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 9  # Ultra-fast distilled model, uses 4-9 steps
+      sampling_method: "euler"
+
   z-image-turbo:
     name: "Z-Image Turbo"
     description: "Z-Image Turbo - fast text-to-image model with 4GB VRAM support"
@@ -35,6 +66,7 @@ models:
       sampling_method: "euler"
 
   unstable-revolution:
+    enabled: false
     name: "unstableRevolution V2Fp16"
     description: "unstableRevolution V2Fp16"
     capabilities: ["text-to-image"]

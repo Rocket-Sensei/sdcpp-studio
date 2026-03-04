@@ -1,34 +1,63 @@
 # ==================== Upscalers ====================
 # Upscaler models for image enhancement
+# Files are stored in models/upscalers/
+# SD.cpp supports ESRGAN models via --upscale-model flag
+
 upscalers:
+  # RealESRGAN models (4x upscaling)
   realesrgan-x4plus:
     name: "RealESRGAN 4x+"
-    description: "RealESRGAN x4 upscaler for general photo enhancement"
-    model_path: "./models/RealESRGAN_x4plus.pth"
+    description: "General purpose 4x upscaler, good for photos and digital art"
+    model_path: "./models/upscalers/RealESRGAN_x4plus.pth"
     model_name: "RealESRGAN"
     scale: 4
-    type: "realesrgan"
+    type: "esrgan"
 
-  resize-lanczos:
-    name: "Resize Lanczos"
-    description: "Lanczos resampling algorithm for basic upscaling"
-    model_name: "Resize"
-    scale: 1  # Variable scale
-    type: "resize"
-    method: "lanczos"
+  realesrgan-x4plus-anime:
+    name: "RealESRGAN 4x Anime"
+    description: "Optimized for anime and illustrated content"
+    model_path: "./models/upscalers/RealESRGAN_x4plus_anime_6B.pth"
+    model_name: "RealESRGAN"
+    scale: 4
+    type: "esrgan"
 
-  resize-bicubic:
-    name: "Resize Bicubic"
-    description: "Bicubic interpolation for basic upscaling"
-    model_name: "Resize"
-    scale: 1  # Variable scale
-    type: "resize"
-    method: "bicubic"
+  # Additional ESRGAN models
+  esrgan-4x:
+    name: "ESRGAN 4x"
+    description: "Original ESRGAN 4x model"
+    model_path: "./models/upscalers/ESRGAN_4x.pth"
+    model_name: "ESRGAN"
+    scale: 4
+    type: "esrgan"
 
-  resize-nearest:
-    name: "Resize Nearest"
-    description: "Nearest neighbor interpolation for pixel art upscaling"
-    model_name: "Resize"
-    scale: 1  # Variable scale
-    type: "resize"
-    method: "nearest"
+  foolhardy-remacri:
+    name: "4x Foolhardy Remacri"
+    description: "High quality 4x upscaler, good for detailed images"
+    model_path: "./models/upscalers/4x_foolhardy_Remacri.pth"
+    model_name: "ESRGAN"
+    scale: 4
+    type: "esrgan"
+
+  nickelback:
+    name: "4x Nickelback FS"
+    description: "Balanced upscaler with good detail preservation"
+    model_path: "./models/upscalers/4x_NickelbackFS_72000_G.pth"
+    model_name: "ESRGAN"
+    scale: 4
+    type: "esrgan"
+
+  nmkd-superscale:
+    name: "4x NMKD Superscale"
+    description: "Sharp details, good for photos and textures"
+    model_path: "./models/upscalers/4x_NMKD-Superscale-SP_178000_G.pth"
+    model_name: "ESRGAN"
+    scale: 4
+    type: "esrgan"
+
+  ultrasharp:
+    name: "4x UltraSharp"
+    description: "Very sharp output, good for text and fine details"
+    model_path: "./models/upscalers/4x-UltraSharp.pth"
+    model_name: "ESRGAN"
+    scale: 4
+    type: "esrgan"

@@ -9,6 +9,7 @@
 import { randomUUID } from 'crypto';
 import { modelManager } from '../../services/modelManager.js';
 import { generationWaiter } from '../../services/generationWaiter.js';
+import { upscaleImage } from '../../services/upscalerService.js';
 import {
   getGenerationById,
   getImagesByGenerationId,
@@ -52,7 +53,13 @@ export function registerTxt2ImgRoutes(app, authenticateRequest) {
         n = 1,
         // SD.next API compatibility fields (for SillyTavern integration)
         override_settings,
-        sd_model_checkpoint
+        sd_model_checkpoint,
+        // HR (High Resolution) upscaling parameters
+        enable_hr,
+        hr_upscaler,
+        hr_scale,
+        hr_second_pass_steps,
+        denoising_strength
       } = req.body;
 
       // Determine model ID from request
@@ -154,12 +161,53 @@ export function registerTxt2ImgRoutes(app, authenticateRequest) {
         }
       }));
 
-      const validImages = imagesData.filter(Boolean);
+      let validImages = imagesData.filter(Boolean);
       if (validImages.length === 0) {
         return res.status(500).json({ error: 'Failed to read generated images' });
       }
 
       logger.info({ jobId, imageCount: validImages.length }, '[txt2img] Generation completed');
+
+      // HR (High Resolution) upscaling - SD.next compatibility
+      // After generation, upscale the images if enable_hr is true
+      let hrInfo = null;
+      if (enable_hr && validImages.length > 0) {
+        const upscaleFactor = hr_scale || 2.0;
+        const upscalerName = hr_upscaler || 'RealESRGAN 4x+';
+
+        logger.info({ jobId, upscaleFactor, upscalerName }, '[txt2img] Starting HR upscale');
+
+        try {
+          // Upscale each image
+          const upscaledImages = await Promise.all(validImages.map(async (b64Image) => {
+            try {
+              const imageBuffer = Buffer.from(b64Image, 'base64');
+              const upscaledBuffer = await upscaleImage(imageBuffer, {
+                upscaler_1: upscalerName,
+                resize_mode: 0, // By factor
+                upscaling_resize: upscaleFactor,
+              });
+              return upscaledBuffer.toString('base64');
+            } catch (err) {
+              logger.error({ err, jobId }, '[txt2img] HR upscale failed for image, returning original');
+              return b64Image; // Return original on error
+            }
+          }));
+
+          validImages = upscaledImages;
+          hrInfo = {
+            enabled: true,
+            upscaler: upscalerName,
+            scale: upscaleFactor,
+            second_pass_steps: hr_second_pass_steps || 0,
+            denoising_strength: denoising_strength || 0
+          };
+          logger.info({ jobId, imageCount: validImages.length, upscaleFactor, upscalerName }, '[txt2img] HR upscale completed');
+        } catch (hrError) {
+          logger.error({ err: hrError, jobId }, '[txt2img] HR upscale failed, returning original images');
+          // Continue with non-upscaled images
+        }
+      }
 
       // Return SD.next format response
       return res.json({
@@ -174,7 +222,8 @@ export function registerTxt2ImgRoutes(app, authenticateRequest) {
           cfg_scale: job.cfg_scale,
           sampler_name: job.sampling_method,
           seed: job.seed,
-          model: job.model
+          model: job.model,
+          hr: hrInfo
         })
       });
 

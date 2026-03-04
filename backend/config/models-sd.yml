@@ -2,18 +2,18 @@
 models:
   # ==================== Stable Diffusion Models ====================
   sd15-base:
-    name: "SD 1.5 Base"
+    name: "SD 1.5"
     description: "Stable Diffusion 1.5 base model"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/v1-5-pruned.ckpt"
+      - "./models/sd1_5.ckpt"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
-      - "30"
+      - "40"
     mode: "on_demand"
     exec_mode: "server"
     port: 1235
@@ -23,7 +23,6 @@ models:
       cfg_scale: 7.0
       sample_steps: 30
       sampling_method: "euler_a"
-
 
   sdxl-turbo:
     name: "SDXL Turbo"

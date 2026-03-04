@@ -1,5 +1,6 @@
 models:
   chroma-unlocked:
+    enabled: false
     name: "chroma unlocked v10 Q8_0"
     description: "chroma unlocked v10 Q8_0"
     capabilities: ["text-to-image"]

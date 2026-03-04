@@ -3,7 +3,8 @@ models:
   # ==================== FluxUnchained Models ====================
   # FluxUnchained with NF4 quantization
 
-  fluxunchained-nf4:
+  fluxunchained-8step:
+    enabled: false
     name: "FluxUnchained 8 step"
     description: "FluxUnchained HyFU-8-Step-Hybrid-v1.0"
     capabilities: ["text-to-image"]

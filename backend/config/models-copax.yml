@@ -4,6 +4,7 @@ models:
   # NOTE: Based on Z-Image-Turbo, uses distilled settings.
   # Recommended: cfg_scale=1.0, steps=14, sampling=res_2s
   copax-timeless-xlz1:
+    enabled: true
     name: "Copax Timeless XL+Z1"
     description: "Copax Timeless XL+Z1 - SDXL/Z-Image hybrid model for high quality outputs"
     capabilities: ["text-to-image"]

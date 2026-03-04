@@ -4,6 +4,7 @@
 models:
   # Wan2.1 T2V 1.3B - Text to Video (small/fast)
   wan-t2v-1.3b:
+    enabled: false
     name: "Wan2.1 T2V 1.3B"
     description: "Fast text-to-video model for quick generations"
     command: "./bin/sd-cli"
@@ -30,6 +31,7 @@ models:
 
   # Wan2.1 T2V 14B - Text to Video (high quality)
   wan-t2v-14b:
+    enabled: false
     name: "Wan2.1 T2V 14B"
     description: "High quality text-to-video generation"
     command: "./bin/sd-cli"
@@ -57,6 +59,7 @@ models:
 
   # Wan2.1 I2V 14B 480P - Image to Video
   wan-i2v-14b-480p:
+    enabled: false
     name: "Wan2.1 I2V 14B 480P"
     description: "Image to video generation at 480p"
     command: "./bin/sd-cli"
@@ -86,6 +89,7 @@ models:
 
   # Wan2.2 T2V A14B - Text to Video (dual-noise)
   wan2.2-t2v-a14b:
+    enabled: false
     name: "Wan2.2 T2V A14B"
     description: "Advanced text-to-video with dual noise models"
     command: "./bin/sd-cli"
@@ -119,6 +123,7 @@ models:
 
   # Wan2.2 I2V A14B - Image to Video (safetensors format)
   wan2.2-i2v-a14b:
+    enabled: false
     name: "Wan2.2 I2V A14B (safetensors)"
     description: "Advanced image-to-video with dual noise models (fp8 safetensors)"
     command: "./bin/sd-cli"
@@ -154,6 +159,7 @@ models:
 
   # Wan2.2 I2V A14B - Image to Video (GGUF format)
   wan2.2-i2v-a14b-gguf:
+    enabled: false
     name: "Wan2.2 I2V A14B (GGUF Q3_K_S)"
     description: "Advanced image-to-video with dual noise models (quantized GGUF)"
     command: "./bin/sd-cli"
@@ -189,6 +195,7 @@ models:
 
   # Wan2.2 TI2V 5B - Text/Image to Video (unified)
   wan2.2-ti2v-5b:
+    enabled: false
     name: "Wan2.2 TI2V 5B"
     description: "Unified text/image-to-video model with wan2.2 VAE"
     command: "./bin/sd-cli"

@@ -68,6 +68,9 @@ const CLIP_SKIP_OPTIONS = [
  * @param {function} props.onUpscaleAfterGenerationChange - Callback for upscale toggle
  * @param {number} props.upscaleFactor - Upscale factor
  * @param {function} props.onUpscaleFactorChange - Callback for upscale factor change
+ * @param {string} props.upscalerName - Selected upscaler name
+ * @param {function} props.onUpscalerNameChange - Callback for upscaler name change
+ * @param {Array} props.availableUpscalers - List of available upscalers
  * @param {number} props.cfgScale - CFG scale value
  * @param {function} props.onCfgScaleChange - Callback for CFG scale change
  * @param {string} props.samplingMethod - Sampling method
@@ -103,6 +106,9 @@ export function ImageSettings({
   onUpscaleAfterGenerationChange,
   upscaleFactor = 2,
   onUpscaleFactorChange,
+  upscalerName = "RealESRGAN 4x+",
+  onUpscalerNameChange,
+  availableUpscalers = [],
   cfgScale = 2.5,
   onCfgScaleChange,
   samplingMethod = "euler",
@@ -190,26 +196,16 @@ export function ImageSettings({
       </div>
 
       {/* Upscale After Generation */}
-      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-        <div className="flex-1">
-          <Label htmlFor="upscale-after-gen" className="cursor-pointer">
-            Upscale After Generation
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Automatically upscale the generated image
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={String(upscaleFactor)} onValueChange={(v) => onUpscaleFactorChange?.(Number(v))} disabled={isLoading || isUpscaling || !upscaleAfterGeneration}>
-            <SelectTrigger className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2x</SelectItem>
-              <SelectItem value="4">4x</SelectItem>
-              <SelectItem value="8">8x</SelectItem>
-            </SelectContent>
-          </Select>
+      <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <Label htmlFor="upscale-after-gen" className="cursor-pointer">
+              Upscale After Generation
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Automatically upscale the generated image
+            </p>
+          </div>
           <Switch
             id="upscale-after-gen"
             checked={upscaleAfterGeneration}
@@ -217,6 +213,32 @@ export function ImageSettings({
             disabled={isLoading || isUpscaling}
           />
         </div>
+
+        {upscaleAfterGeneration && availableUpscalers.length > 0 && (
+          <div className="flex items-center gap-2 pt-2">
+            <Select value={upscalerName} onValueChange={onUpscalerNameChange} disabled={isLoading || isUpscaling}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Select upscaler" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableUpscalers.map((upscaler) => (
+                  <SelectItem key={upscaler.name} value={upscaler.name}>
+                    {upscaler.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(upscaleFactor)} onValueChange={(v) => onUpscaleFactorChange?.(Number(v))} disabled={isLoading || isUpscaling}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2">2x</SelectItem>
+                <SelectItem value="4">4x</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Advanced Settings Toggle */}

@@ -487,6 +487,7 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
               onUpscaleTargetHeightChange={setUpscaleTargetHeight}
               upscalerName={upscalerName}
               onUpscalerNameChange={setUpscalerName}
+              availableUpscalers={availableUpscalers}
               onFileSelect={handleFileSelect}
               onClearImage={handleClearImage}
             />

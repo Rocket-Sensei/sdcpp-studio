@@ -124,8 +124,8 @@ export function UpscaleImage({
         />
       </div>
 
-      {/* Upscaler Selection - show when image is selected */}
-      {hasImage && availableUpscalers.length > 0 && (
+      {/* Upscaler Selection - always show when upscalers are available */}
+      {availableUpscalers.length > 0 && (
         <div className="mb-3 space-y-2">
           <Label htmlFor="upscaler">Upscaler</Label>
           <Select value={upscalerName} onValueChange={onUpscalerNameChange} disabled={disabled || isLoading}>

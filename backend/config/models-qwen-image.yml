@@ -1,9 +1,9 @@
 # Models configuration
 models:
   # ==================== Qwen Image (Server Mode) ====================
-  qwen-image:
-    name: "Qwen Image"
-    description: "Qwen Image - advanced text-to-image model with complex text rendering and precise image editing capabilities"
+  qwen-image-2512:
+    name: "Qwen Image 2512"
+    description: "Qwen Image 2512"
     default: true
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
@@ -11,13 +11,14 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/Qwen_Image-Q4_K_M.gguf"
+      - "./models/qwen-image-2512-Q3_K_M.gguf"
       - "--vae"
       - "./models/qwen_image_vae.safetensors"
       - "--qwen2vl"
       - "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"
@@ -35,21 +36,46 @@ models:
       cfg_scale: 1.0
       sample_steps: 24
       sampling_method: "euler"
-    huggingface:
-      repo: "QuantStack/Qwen-Image-GGUF"
-      files:
-        - path: "Qwen_Image-Q4_K_M.gguf"
-          dest: "./models/"
-        - path: "qwen_image_vae.safetensors"
-          dest: "./models/"
-          repo: "Comfy-Org/Qwen-Image_ComfyUI"
-          subpath: "split_files/vae"
-        - path: "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
-          dest: "./models/"
-          repo: "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF"
+
+  qwen-image:
+    name: "Qwen Image"
+    description: "Qwen Image - advanced text-to-image model with complex text rendering and precise image editing capabilities"
+    default: true
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    # Server mode command
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/Qwen_Image-Q4_K_M.gguf"
+      - "--vae"
+      - "./models/qwen_image_vae.safetensors"
+      - "--qwen2vl"
+      - "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--flow-shift"
+      - "3"
+      - "--steps"
+      - "24"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1400
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    startup_timeout: 150000
+    # Auto-stop after 15 minutes of inactivity (overrides global default of 10m)
+    autostop: "15m"
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 24
+      sampling_method: "euler"
 
   # ==================== Qwen Image CLI Mode ====================
   qwen-image-cli:
+    enabled: false
     name: "Qwen Image - CLI mode"
     description: "Qwen Image used via sd-cli"
     capabilities: ["text-to-image"]
@@ -65,6 +91,7 @@ models:
       - "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
       - "-v"
       - "--offload-to-cpu"
+      - "--clip-on-cpu"
       - "--diffusion-fa"
       - "--flow-shift"
       - "3"

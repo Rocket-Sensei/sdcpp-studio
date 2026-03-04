@@ -33,6 +33,7 @@ models:
       sampling_method: "dpmpp_2m"
 
   persephone-10q8:
+    enabled: false
     name: "Persephone 10Q8"
     description: "Flux NSFW/SFW Checkpoint"
     capabilities: ["text-to-image"]

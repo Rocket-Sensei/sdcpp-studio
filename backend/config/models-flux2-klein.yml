@@ -29,3 +29,96 @@ models:
       cfg_scale: 1.0
       sample_steps: 4
       sampling_method: "euler"
+
+  flux2-klein-9b-q8:
+    name: "FLUX.2 Klein 9B"
+    description: " FLUX.2 [klein] 9B Q8_0 unifies generation and editing in a single compact architecture"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-2-klein-9b-Q8_0.gguf"
+      - "--vae"
+      - "./models/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen_3_8b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 2409
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 4
+      sampling_method: "euler"
+
+      
+  unstable-revolution-f2k-4b:
+    enabled: false
+    name: "Unstable Revolution FLUX.2 Klein 4B"
+    description: " Unstable Revolution FLUX.2 [klein] unifies generation and editing in a single compact architecture"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/unstableRevolutionF2K_AlphaF2K4B.safetensors"
+      - "--vae"
+      - "./models/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1409
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 4
+      sampling_method: "euler"
+
+  unstable-revolution-f2k-9b:
+    enabled: false
+    name: "Unstable Revolution FLUX.2 Klein 9B"
+    description: " Unstable Revolution FLUX.2 [klein] unifies generation and editing in a single compact architecture"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/unstableRevolutionF2K_AlphaF2K4B.safetensors"
+      - "--vae"
+      - "./models/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen_3_8b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1409
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 4
+      sampling_method: "euler"

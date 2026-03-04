@@ -50,6 +50,7 @@ const MODES = [
  * @param {function} props.onUpscaleTargetHeightChange - Callback for target height change
  * @param {string} props.upscalerName - Selected upscaler name
  * @param {function} props.onUpscalerNameChange - Callback for upscaler name change
+ * @param {Array} props.availableUpscalers - List of available upscalers
  * @param {function} props.onFileSelect - Callback for file selection
  * @param {function} props.onClearImage - Callback for clearing image
  */
@@ -77,6 +78,7 @@ export function GeneratePanel({
   onUpscaleTargetHeightChange,
   upscalerName = "",
   onUpscalerNameChange,
+  availableUpscalers = [],
   onFileSelect,
   onClearImage,
 }) {
@@ -574,6 +576,9 @@ export function GeneratePanel({
               onUpscaleAfterGenerationChange={setUpscaleAfterGeneration}
               upscaleFactor={upscaleFactor}
               onUpscaleFactorChange={onUpscaleFactorChange}
+              upscalerName={upscalerName}
+              onUpscalerNameChange={onUpscalerNameChange}
+              availableUpscalers={availableUpscalers}
               cfgScale={cfgScale}
               onCfgScaleChange={setCfgScale}
               samplingMethod={samplingMethod}

@@ -2,8 +2,9 @@ import { readFile, writeFile, unlink } from 'fs/promises';
 import { join, resolve, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { createLogger } from '../utils/logger.js';
+import yaml from 'js-yaml';
 
 const execAsync = promisify(exec);
 const logger = createLogger('upscalerService');
@@ -16,78 +17,101 @@ const logger = createLogger('upscalerService');
 
 // Get paths - backend directory is where this service runs
 const backendDir = dirname(new URL(import.meta.url).pathname);
-const projectRoot = resolve(backendDir, '../..');
+const projectRoot = resolve(backendDir, '..', '..');  // Go up from services/ to backend/ to project root
 const sdCliPath = join(projectRoot, 'sdcpp', 'bin', 'sd-cli');
+
+// Cached upscalers list
+let cachedUpscalers = null;
+
+/**
+ * Load upscalers from config file and filter to only existing files
+ */
+function loadUpscalersFromConfig() {
+  const configPath = join(backendDir, '..', 'config', 'upscalers.yml');  // Go up to backend/config/
+
+  try {
+    if (!existsSync(configPath)) {
+      logger.warn({ configPath }, 'Upscalers config file not found');
+      return [];
+    }
+
+    const configContents = readFileSync(configPath, 'utf8');
+    const config = yaml.load(configContents);
+
+    if (!config || !config.upscalers) {
+      logger.warn('No upscalers found in config file');
+      return [];
+    }
+
+    const upscalers = [];
+
+    for (const [id, upscaler] of Object.entries(config.upscalers)) {
+      // For ESRGAN models, check if the file exists
+      if (upscaler.type === 'esrgan' || upscaler.type === 'realesrgan') {
+        const fullPath = upscaler.model_path.startsWith('./')
+          ? join(projectRoot, upscaler.model_path.slice(2))
+          : upscaler.model_path;
+
+        if (!existsSync(fullPath)) {
+          logger.debug({ model: upscaler.name, path: fullPath }, 'Upscaler model file not found, skipping');
+          continue;
+        }
+
+        upscalers.push({
+          id,
+          name: upscaler.name,
+          description: upscaler.description,
+          model_name: upscaler.model_name || 'ESRGAN',
+          model_path: fullPath,
+          model_url: null,
+          scale: upscaler.scale || 4,
+          type: upscaler.type
+        });
+      } else if (upscaler.type === 'resize') {
+        // Resize options are always available
+        upscalers.push({
+          id,
+          name: upscaler.name,
+          description: upscaler.description,
+          model_name: 'Resize',
+          model_path: null,
+          model_url: null,
+          scale: upscaler.scale || 1,
+          type: 'resize',
+          method: upscaler.method || 'lanczos'
+        });
+      }
+    }
+
+    return upscalers;
+  } catch (err) {
+    logger.error({ err }, 'Failed to load upscalers config');
+    return [];
+  }
+}
 
 /**
  * Get list of available upscalers
  * Returns upscalers compatible with SD.next API format
  */
 export function getAvailableUpscalers() {
-  const upscalers = [];
-
-  // Check for RealESRGAN models in the models directory
-  const modelsDir = join(projectRoot, 'models');
-
-  // RealESRGAN_x4plus.pth - the standard 4x upscaler
-  if (existsSync(join(modelsDir, 'RealESRGAN_x4plus.pth'))) {
-    upscalers.push({
-      name: 'RealESRGAN 4x+',
-      model_name: 'RealESRGAN',
-      model_path: join(modelsDir, 'RealESRGAN_x4plus.pth'),
-      model_url: null,
-      scale: 4
-    });
+  // Return cached list if available
+  if (cachedUpscalers) {
+    return cachedUpscalers;
   }
 
-  // RealESRGAN_x2plus.pth - 2x upscaler
-  if (existsSync(join(modelsDir, 'RealESRGAN_x2plus.pth'))) {
-    upscalers.push({
-      name: 'RealESRGAN 2x+',
-      model_name: 'RealESRGAN',
-      model_path: join(modelsDir, 'RealESRGAN_x2plus.pth'),
-      model_url: null,
-      scale: 2
-    });
-  }
+  // Load from config
+  cachedUpscalers = loadUpscalersFromConfig();
 
-  // Anime upscaler
-  if (existsSync(join(modelsDir, 'RealESRGAN_x4plus_anime_6B.pth'))) {
-    upscalers.push({
-      name: 'RealESRGAN 4x Anime',
-      model_name: 'RealESRGAN',
-      model_path: join(modelsDir, 'RealESRGAN_x4plus_anime_6B.pth'),
-      model_url: null,
-      scale: 4
-    });
-  }
+  return cachedUpscalers;
+}
 
-  // Always add resize options (basic interpolation via sharp)
-  upscalers.push(
-    {
-      name: 'Resize Lanczos',
-      model_name: 'Resize',
-      model_path: null,
-      model_url: null,
-      scale: 1 // Variable scale
-    },
-    {
-      name: 'Resize Bicubic',
-      model_name: 'Resize',
-      model_path: null,
-      model_url: null,
-      scale: 1
-    },
-    {
-      name: 'Resize Nearest',
-      model_name: 'Resize',
-      model_path: null,
-      model_url: null,
-      scale: 1
-    }
-  );
-
-  return upscalers;
+/**
+ * Refresh the upscalers cache (e.g., after adding new models)
+ */
+export function refreshUpscalers() {
+  cachedUpscalers = null;
+  return getAvailableUpscalers();
 }
 
 /**
@@ -95,7 +119,7 @@ export function getAvailableUpscalers() {
  */
 export function findUpscalerByName(name) {
   const upscalers = getAvailableUpscalers();
-  return upscalers.find(u => u.name === name);
+  return upscalers.find(u => u.name === name || u.id === name);
 }
 
 /**
@@ -107,11 +131,15 @@ export function getUpscalerInfo(name) {
     return null;
   }
   return {
+    id: upscaler.id,
     name: upscaler.name,
+    description: upscaler.description,
     model_name: upscaler.model_name,
     model_path: upscaler.model_path,
     model_url: upscaler.model_url,
-    scale: upscaler.scale
+    scale: upscaler.scale,
+    type: upscaler.type,
+    method: upscaler.method
   };
 }
 
@@ -174,12 +202,10 @@ export async function upscaleImage(imageInput, options = {}) {
   // Perform upscaling based on upscaler type
   let resultBuffer;
 
-  if (upscaler1.model_name === 'RealESRGAN') {
+  if (upscaler1.type === 'esrgan' || upscaler1.type === 'realesrgan' || upscaler1.model_name === 'RealESRGAN' || upscaler1.model_name === 'ESRGAN') {
     resultBuffer = await upscaleWithSDcpp(imageBuffer, upscaler1.model_path);
-  } else if (upscaler1.model_name === 'Resize') {
-    const method = upscaler1.name.toLowerCase().includes('lanczos') ? 'lanczos'
-      : upscaler1.name.toLowerCase().includes('bicubic') ? 'bicubic'
-      : 'nearest';
+  } else if (upscaler1.type === 'resize' || upscaler1.model_name === 'Resize') {
+    const method = upscaler1.method || 'lanczos';
     resultBuffer = await resizeImage(imageBuffer, targetWidth, targetHeight, method);
   } else {
     throw new Error(`Unsupported upscaler type: ${upscaler1.model_name}`);

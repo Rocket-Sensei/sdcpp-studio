@@ -4,6 +4,7 @@ models:
   # ==================== SDXL Finetunes ====================
   # SDXL finetune models - use SDXL VAE
   epicrealism-xl:
+    enabled: false
     name: "EpicRealism XL"
     description: "SDXL architecture with pure fix - supports negative prompts"
     capabilities: ["text-to-image"]
@@ -29,6 +30,7 @@ models:
       sampling_method: "euler_a"
 
   forreal-xl:
+    enabled: false
     name: "ForReal XL"
     description: "SDXL architecture - photorealistic style"
     capabilities: ["text-to-image"]
@@ -79,6 +81,7 @@ models:
       sampling_method: "euler_a"
 
   pornmaster-pro:
+    enabled: false
     name: "PornMaster Pro"
     description: "SDXL architecture - NSFW capable model"
     capabilities: ["text-to-image"]
@@ -104,6 +107,7 @@ models:
       sampling_method: "euler_a"
 
   perfection-amateur:
+    enabled: false
     name: "Perfection Amateur"
     description: "Illustrious XL - NSFW / SFW Checkpoint"
     capabilities: ["text-to-image"]
@@ -177,6 +181,7 @@ models:
       sampling_method: "euler_a"
 
   novaAnimeXLilV160:
+    enabled: false
     name: "novaAnimeXL il V160"
     description: ""
     capabilities: ["text-to-image"]
@@ -201,8 +206,8 @@ models:
       sample_steps: 20
       sampling_method: "euler_a"
 
-  perfectdeliberate_v70:
-    name: "perfectdeliberate v70"
+  perfectdeliberate_v7:
+    name: "Perfect Deliberate v7"
     description: ""
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -226,7 +231,28 @@ models:
       sample_steps: 20
       sampling_method: "euler_a"
 
-
-
-
+  perfectdeliberate_v8:
+    name: "Perfect Deliberate v8"
+    description: ""
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: true
+    command: "./bin/sd-server"
+    args:
+      - "-m"
+      - "./models/perfectdeliberate_v8.safetensors"
+      - "--vae"
+      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--steps"
+      - "20"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1527
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 7.0
+      sample_steps: 20
+      sampling_method: "euler_a"
 

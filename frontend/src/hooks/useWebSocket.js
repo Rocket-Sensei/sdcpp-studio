@@ -69,6 +69,19 @@ export function useWebSocket(options = {}) {
 
   const subscribedChannels = useRef(new Set());
 
+  // Store callbacks in refs to avoid re-triggering effects when they change
+  const onMessageRef = useRef(onMessage);
+  const onConnectionChangeRef = useRef(onConnectionChange);
+
+  // Keep refs updated
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
+  useEffect(() => {
+    onConnectionChangeRef.current = onConnectionChange;
+  }, [onConnectionChange]);
+
   const { sendJsonMessage, lastJsonMessage, readyState, getWebSocket } = useReactWebSocket(WS_URL, {
     shouldReconnect: () => true,
     reconnectInterval,
@@ -110,15 +123,15 @@ export function useWebSocket(options = {}) {
   // Handle connection state changes
   useEffect(() => {
     const isConnected = readyState === ReadyState.OPEN;
-    onConnectionChange?.(isConnected);
-  }, [readyState, onConnectionChange]);
+    onConnectionChangeRef.current?.(isConnected);
+  }, [readyState]);
 
   // Handle incoming messages
   useEffect(() => {
     if (lastJsonMessage) {
-      onMessage?.(lastJsonMessage);
+      onMessageRef.current?.(lastJsonMessage);
     }
-  }, [lastJsonMessage, onMessage]);
+  }, [lastJsonMessage]);
 
   // Cleanup on unmount - unsubscribe from all channels
   useEffect(() => {
