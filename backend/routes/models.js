@@ -26,19 +26,30 @@ export function registerModelRoutes(app) {
 
       // Add file status to each model with HuggingFace config
       // This avoids the need for separate /api/models/:id/files/status requests
+      // Also filter out technical fields (args, exec_mode) and add computed fields
       const modelsWithFileStatus = await Promise.all(
         models.map(async (model) => {
           const fileStatus = await getModelFileStatus(model);
+          const { args, exec_mode, ...modelWithoutSensitive } = model;
           return {
-            ...model,
-            fileStatus // Add inline file status: { hasHuggingFace, allFilesExist, files[] }
+            ...modelWithoutSensitive,
+            execMode: exec_mode,
+            defaultSteps: model.generation_params?.sample_steps || null,
+            fileStatus
           };
         })
       );
 
+      const defaultModel = modelManager.getDefaultModel();
+      const filteredDefault = defaultModel ? (({ args, exec_mode, ...rest }) => ({
+        ...rest,
+        execMode: exec_mode,
+        defaultSteps: defaultModel.generation_params?.sample_steps || null
+      }))(defaultModel) : null;
+
       res.json({
         models: modelsWithFileStatus,
-        default: modelManager.getDefaultModel(),
+        default: filteredDefault,
         default_models: modelManager.defaultModels
       });
     } catch (error) {
@@ -133,10 +144,15 @@ export function registerModelRoutes(app) {
     const processInfo = isRunning ? processTracker.getProcess(modelId) : null;
     const fileStatus = await getModelFileStatus(model);
 
+    // Filter out sensitive fields
+    const { args, exec_mode, ...modelWithoutSensitive } = model;
+
     res.json({
       id: modelId,
-      ...model,
-      fileStatus, // Add inline file status: { hasHuggingFace, allFilesExist, files[] }
+      ...modelWithoutSensitive,
+      execMode: exec_mode,
+      defaultSteps: model.generation_params?.sample_steps || null,
+      fileStatus,
       running: isRunning,
       process: processInfo ? {
         pid: processInfo.pid,

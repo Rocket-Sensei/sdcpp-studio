@@ -847,16 +847,14 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
                     <Box className="h-4 w-4 flex-shrink-0" />
                     <span className="text-sm truncate" title={mobileInfoGeneration.size || "512x512"}>Size: {mobileInfoGeneration.size || "512x512"}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Box className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm">Steps: {mobileInfoGeneration.sample_steps || 0}</span>
+                  </div>
                   {mobileInfoGeneration.seed && (
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 flex-shrink-0" />
                       <span className="text-sm truncate" title={Math.floor(Number(mobileInfoGeneration.seed))}>Seed: {Math.floor(Number(mobileInfoGeneration.seed))}</span>
-                    </div>
-                  )}
-                  {mobileInfoGeneration.sample_steps && (
-                    <div className="flex items-center gap-2">
-                      <Box className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm">Steps: {mobileInfoGeneration.sample_steps}</span>
                     </div>
                   )}
                   {mobileInfoGeneration.cfg_scale && (

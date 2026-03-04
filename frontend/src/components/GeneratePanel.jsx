@@ -153,24 +153,14 @@ export function GeneratePanel({
   useEffect(() => {
     const serverModels = selectedModels
       .map(modelId => modelsMap?.[modelId])
-      .filter(m => m && m.exec_mode === 'server');
+      .filter(m => m && m.execMode === 'server');
 
     setHasServerModeModel(serverModels.length > 0);
 
     if (serverModels.length > 0) {
-      // Parse steps from command line args for server mode models
+      // Get steps from defaultSteps field (set from generation_params.sample_steps)
       const stepsValues = serverModels
-        .map(m => {
-          const stepsMatch = m.args?.find(arg => arg === '--steps' || arg.startsWith('--steps='));
-          if (stepsMatch === '--steps') {
-            const idx = m.args?.indexOf(stepsMatch);
-            return parseInt(m.args?.[idx + 1]) || null;
-          }
-          if (stepsMatch?.startsWith('--steps=')) {
-            return parseInt(stepsMatch.split('=')[1]) || null;
-          }
-          return null;
-        })
+        .map(m => m.defaultSteps)
         .filter(Boolean);
 
       if (stepsValues.length > 0) {

@@ -629,6 +629,15 @@ export class ModelManager {
       // Replace port in args if needed
       const processedArgs = this._processArgs(args, { port, model });
 
+      // Inject --steps from generation_params if not already in args (for server mode)
+      let finalArgs = processedArgs;
+      if (model.exec_mode === ExecMode.SERVER && model.generation_params?.sample_steps) {
+        const hasSteps = processedArgs.some(arg => arg === '--steps' || arg.startsWith('--steps='));
+        if (!hasSteps) {
+          finalArgs = [...processedArgs, '--steps', String(model.generation_params.sample_steps)];
+        }
+      }
+
       // Spawn process
       const processOptions = {
         cwd: options.cwd || PROJECT_ROOT,  // Default to project root so paths resolve correctly
@@ -637,19 +646,19 @@ export class ModelManager {
         detached: false
       };
 
-      logger.debug({ command, args: processedArgs }, 'Spawning process');
+      logger.debug({ command, args: finalArgs }, 'Spawning process');
 
-      const childProcess = spawn(command, processedArgs, processOptions);
+      const childProcess = spawn(command, finalArgs, processOptions);
 
       // Log the command to sdcpp.log for server mode
       if (model.exec_mode === ExecMode.SERVER) {
-        logCliCommand(command, processedArgs, { cwd: processOptions.cwd });
+        logCliCommand(command, finalArgs, { cwd: processOptions.cwd });
       }
 
       // Create process entry
       const processEntry = new ProcessEntry(modelId, childProcess, port, model.exec_mode, {
         command,
-        args: processedArgs,
+        args: finalArgs,
         status: ModelStatus.STARTING
       });
 

@@ -52,8 +52,8 @@ export function ModelCard({
   downloadProgress,
   filesStatus,
 }) {
-  const isServerMode = model.exec_mode === "server";
-  const isCliMode = model.exec_mode === "cli";
+  const isServerMode = model.execMode === "server";
+  const isCliMode = model.execMode === "cli";
   const hasMissingFiles = filesStatus && !filesStatus.allFilesExist;
   const isRunning = model.status === MODEL_STATUS.RUNNING;
   const isStarting = model.status === MODEL_STATUS.STARTING;
