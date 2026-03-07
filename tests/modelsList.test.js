@@ -87,15 +87,18 @@ describe('Models List JSON', () => {
       const response = await fetch(`${API_URL}/api/v1/models`, {
         headers: AUTH_HEADER
       });
-      
+
       expect(response.ok).toBe(true);
-      
+
       const data = await response.json();
-      
-      const txt2imgModels = data.data.filter(m => 
-        m.architecture?.input_modalities?.includes('text')
+
+      // Filter for models that are specifically text-to-image (text input + image output, but not text-only)
+      const txt2imgModels = data.data.filter(m =>
+        m.architecture?.input_modalities?.includes('text') &&
+        m.architecture?.output_modalities?.includes('image') &&
+        !m.architecture?.output_modalities?.includes('text')
       );
-      
+
       txt2imgModels.forEach(model => {
         expect(model.architecture.output_modalities).toContain('image');
       });

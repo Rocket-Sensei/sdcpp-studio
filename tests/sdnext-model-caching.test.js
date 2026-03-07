@@ -107,10 +107,10 @@ describe('SD.next API Model Caching', () => {
     });
 
     it('should match exact model name with spaces', async () => {
-      // "Unstable Revolution FLUX.2 Klein 4B" is an exact model name
+      // "Copax Timeless XL+Z1" is an exact model name with spaces
       const response = await fetchApi('/sdapi/v1/options', {
         method: 'POST',
-        body: JSON.stringify({ sd_model_checkpoint: 'Unstable Revolution FLUX.2 Klein 4B' })
+        body: JSON.stringify({ sd_model_checkpoint: 'Copax Timeless XL+Z1' })
       });
 
       expect(response.status).toBe(200);
@@ -120,21 +120,21 @@ describe('SD.next API Model Caching', () => {
       // Verify it was cached correctly
       const optionsResponse = await fetchApi('/sdapi/v1/options');
       const optionsData = await optionsResponse.json();
-      expect(optionsData.sd_model_checkpoint).toBe('Unstable Revolution FLUX.2 Klein 4B');
+      expect(optionsData.sd_model_checkpoint).toBe('Copax Timeless XL+Z1');
     });
 
     it('should preserve cached model across multiple requests', async () => {
       // Set model
       await fetchApi('/sdapi/v1/options', {
         method: 'POST',
-        body: JSON.stringify({ sd_model_checkpoint: 'FLUX.2 Klein 9B Q8_0' })
+        body: JSON.stringify({ sd_model_checkpoint: 'FLUX.2 Klein 9B' })
       });
 
       // Get options multiple times
       for (let i = 0; i < 3; i++) {
         const response = await fetchApi('/sdapi/v1/options');
         const data = await response.json();
-        expect(data.sd_model_checkpoint).toBe('FLUX.2 Klein 9B Q8_0');
+        expect(data.sd_model_checkpoint).toBe('FLUX.2 Klein 9B');
       }
     });
   });
@@ -173,13 +173,13 @@ describe('SD.next API Model Caching', () => {
       // Change to another model with more specific name to avoid partial match issues
       await fetchApi('/sdapi/v1/options', {
         method: 'POST',
-        body: JSON.stringify({ sd_model_checkpoint: 'FLUX.2 Klein 9B Q8_0' })
+        body: JSON.stringify({ sd_model_checkpoint: 'FLUX.2 Klein 9B' })
       });
 
       // Verify it changed
       const response2 = await fetchApi('/sdapi/v1/options');
       const data2 = await response2.json();
-      expect(data2.sd_model_checkpoint).toBe('FLUX.2 Klein 9B Q8_0');
+      expect(data2.sd_model_checkpoint).toBe('FLUX.2 Klein 9B');
     });
   });
 });

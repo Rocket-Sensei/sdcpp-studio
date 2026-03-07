@@ -84,10 +84,10 @@ vi.mock('../frontend/src/utils/api', () => ({
 }));
 
 global.fetch = vi.fn((url) => {
-  if (url === '/api/models') {
+  if (url === '/api/v1/models') {
     return Promise.resolve({
       ok: true,
-      json: () => Promise.resolve({ models: [] }),
+      json: () => Promise.resolve({ object: 'list', data: [] }),
     });
   }
   if (url === '/sdapi/v1/upscalers') {

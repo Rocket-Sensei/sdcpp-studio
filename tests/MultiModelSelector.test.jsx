@@ -152,13 +152,16 @@ describe('MultiModelSelector', () => {
     mockOnModelsChange = vi.fn();
     localStorageMock.clear();
 
-    // Mock fetch for models
+    // Mock fetch for models (v1 API - OpenRouter format)
     global.fetch = vi.fn((url) => {
       mockFetchCalls.push(url);
-      if (url === '/api/models') {
+      if (url === '/api/v1/models') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ models: createMockModels() }),
+          json: () => Promise.resolve({
+            object: 'list',
+            data: createMockModels()
+          }),
         });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -370,11 +373,12 @@ describe('MultiModelSelector', () => {
       const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 qwenImage: { status: 'starting' },
               }),
             }),
@@ -401,11 +405,12 @@ describe('MultiModelSelector', () => {
       const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 fluxSchnell: { status: 'stopping' },
               }),
             }),
@@ -432,11 +437,12 @@ describe('MultiModelSelector', () => {
       const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 qwenImage: { status: 'error', error: 'Failed to load model' },
               }),
             }),
@@ -658,17 +664,18 @@ describe('MultiModelSelector', () => {
 
       global.fetch = vi.fn((url, options) => {
         mockFetchCalls.push({ url, options });
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 qwenImage: { status: 'stopped' },
               }),
             }),
           });
         }
-        if (url === '/api/models/qwen-image/start') {
+        if (url === '/api/v1/models/qwen-image/start') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({}),
@@ -700,7 +707,7 @@ describe('MultiModelSelector', () => {
 
       await waitFor(() => {
         // Verify fetch was called with correct URL and POST method
-        const startCall = mockFetchCalls.find(call => call.url === '/api/models/qwen-image/start');
+        const startCall = mockFetchCalls.find(call => call.url === '/api/v1/models/qwen-image/start');
         expect(startCall).toBeDefined();
         expect(startCall.options?.method).toBe('POST');
         expect(toast.success).toHaveBeenCalled();
@@ -714,17 +721,18 @@ describe('MultiModelSelector', () => {
 
       global.fetch = vi.fn((url, options) => {
         mockFetchCalls.push({ url, options });
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 fluxSchnell: { status: 'running' },
               }),
             }),
           });
         }
-        if (url === '/api/models/flux-schnell/stop') {
+        if (url === '/api/v1/models/flux-schnell/stop') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({}),
@@ -756,7 +764,7 @@ describe('MultiModelSelector', () => {
 
       await waitFor(() => {
         // Verify fetch was called with correct URL and POST method
-        const stopCall = mockFetchCalls.find(call => call.url === '/api/models/flux-schnell/stop');
+        const stopCall = mockFetchCalls.find(call => call.url === '/api/v1/models/flux-schnell/stop');
         expect(stopCall).toBeDefined();
         expect(stopCall.options?.method).toBe('POST');
         expect(toast.success).toHaveBeenCalled();
@@ -767,11 +775,12 @@ describe('MultiModelSelector', () => {
       const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels(),
+              object: 'list',
+              data: createMockModels(),
             }),
           });
         }
@@ -936,11 +945,12 @@ describe('MultiModelSelector', () => {
       const { toast } = await import('sonner');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 qwenImage: { status: 'stopped' },
               }),
             }),
@@ -984,11 +994,12 @@ describe('MultiModelSelector', () => {
       const { toast } = await import('sonner');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 fluxSchnell: { status: 'running' },
               }),
             }),
@@ -1032,11 +1043,12 @@ describe('MultiModelSelector', () => {
       const { toast } = await import('sonner');
 
       global.fetch = vi.fn((url) => {
-        if (url === '/api/models') {
+        if (url === '/api/v1/models') {
           return Promise.resolve({
             ok: true,
             json: () => Promise.resolve({
-              models: createMockModels({
+              object: 'list',
+              data: createMockModels({
                 qwenImage: { status: 'stopped' },
               }),
             }),

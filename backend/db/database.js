@@ -333,14 +333,28 @@ export function clearDatabase() {
   }
 
   // Delete all data from tables in correct order (respecting foreign keys)
-  database.prepare('DELETE FROM model_download_files').run();
-  database.prepare('DELETE FROM model_downloads').run();
-  database.prepare('DELETE FROM generated_images').run();
-  database.prepare('DELETE FROM queue').run();
-  database.prepare('DELETE FROM generations').run();
-  database.prepare('DELETE FROM model_processes').run();
-  database.prepare('DELETE FROM models').run();
-  database.prepare('DELETE FROM config').run();
+  // Wrap each delete in try-catch to handle cases where tables don't exist yet
+  const tables = [
+    'model_download_files',
+    'model_downloads',
+    'generated_images',
+    'queue',
+    'generations',
+    'model_processes',
+    'models',
+    'config'
+  ];
+
+  for (const table of tables) {
+    try {
+      database.prepare(`DELETE FROM ${table}`).run();
+    } catch (error) {
+      // Table doesn't exist yet, which is fine during test setup
+      if (!error.message.includes('no such table')) {
+        throw error;
+      }
+    }
+  }
 
   logger.info({ dbPath: currentDbPath }, 'Database cleared');
 }
