@@ -657,6 +657,12 @@ export class ModelManager {
         port = await this._getAvailablePort();
       }
 
+      // For server mode, update the model's api field with the dynamically allocated port
+      if (model.exec_mode === ExecMode.SERVER && !model.api) {
+        model.api = `http://127.0.0.1:${port}/v1`;
+        logger.debug({ modelId, port, api: model.api }, 'Auto-generated API endpoint from dynamic port');
+      }
+
       // Build command and args
       const command = options.command || model.command;
       const args = options.args || model.args || [];
