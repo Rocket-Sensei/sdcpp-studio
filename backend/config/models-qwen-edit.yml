@@ -4,7 +4,7 @@ models:
   # NOTE: 2511 models require --qwen-image-zero-cond-t flag for proper quality
   qwen-image-edit-2511-q4-0:
     enabled: true
-    name: "Qwen Image Edit 2511 Q4_0"
+    name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
@@ -38,8 +38,8 @@ models:
 
   qwen-image-edit-2511-Q5ks:
     enabled: true
-    name: "Qwen Image Edit 2511 Q5_K_S"
-    description: "Qwen Image Edit 2511 Q5_K_S"
+    name: "Qwen Image Edit 2511"
+    description: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
@@ -73,7 +73,7 @@ models:
 
   qwen-image-edit-2511-Q5km:
     enabled: false
-    name: "Qwen Image Edit 2511 Q5_K_M"
+    name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
@@ -107,7 +107,7 @@ models:
 
   qwen-image-edit-2511-q5-0:
     enabled: true
-    name: "Qwen Image Edit 2511 Q5_0"
+    name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
@@ -140,7 +140,7 @@ models:
       sampling_method: "euler"
 
   qwen-image-edit-2511-q5-1:
-    name: "Qwen Image Edit 2511 Q5_1"
+    name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
@@ -174,8 +174,8 @@ models:
 
   qwen-image-edit-2511-q2-k:
     enabled: true
-    name: "Qwen Image Edit 2511 Q2_K"
-    description: "Qwen Image Edit 2511 Q2_K"
+    name: "Qwen Image Edit 2511"
+    description: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"

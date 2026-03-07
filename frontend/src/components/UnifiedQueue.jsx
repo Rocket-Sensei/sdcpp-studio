@@ -96,7 +96,7 @@ export { isPendingOrProcessing, getStatusConfig, GENERATION_STATUS };
 
 export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCreateVideo, searchQuery: externalSearchQuery, selectedStatuses: externalSelectedStatuses, selectedModelsFilter: externalSelectedModelsFilter }) {
   const { fetchGenerations, goToPage, nextPage, prevPage, isLoading, generations, pagination, currentPage } = useGenerations({ pageSize: 20 });
-  const { modelsNameMap } = useModels();
+  const { modelsNameMap, modelsQuantMap } = useModels();
   const [selectedImage, setSelectedImage] = useState(null);
   const [galleryImages, setGalleryImages] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
@@ -118,8 +118,13 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
   // Helper function to get model name from model ID
   const getModelName = useCallback((modelId) => {
     if (!modelId) return 'Unknown Model';
-    return modelsNameMap[modelId] || modelId;
-  }, [modelsNameMap]);
+    const name = modelsNameMap[modelId] || modelId;
+    const quant = modelsQuantMap[modelId];
+    if (quant && quant !== 'unknown') {
+      return `${name} [${quant}]`;
+    }
+    return name;
+  }, [modelsNameMap, modelsQuantMap]);
 
   // WebSocket connection for real-time updates - use ref to keep callback stable
   // This prevents constant re-subscription

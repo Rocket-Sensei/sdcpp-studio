@@ -112,6 +112,41 @@ export function getModelTypeFromFilename(filename) {
 }
 
 /**
+ * Extract quantization from model filename
+ * Supports GGUF quant types (Q2_K, Q3_K_S, Q4_K_M, Q5_0, Q5_1, Q6_K, Q8_0, etc.)
+ * and safetensors fp8/fp16 variants
+ * @param {string} filename - Model filename (e.g., "flux1-schnell-Q8_0.gguf")
+ * @returns {string|null} Quant string (e.g., "Q8_0", "fp16", "unknown")
+ */
+export function extractQuantFromFilename(filename) {
+  if (!filename) {
+    return 'unknown';
+  }
+
+  const name = path.basename(filename).toUpperCase();
+
+  const ggufQuantMatch = name.match(/-([QFP]\d+_[A-Z0-9_]+)\./i);
+  if (ggufQuantMatch) {
+    return ggufQuantMatch[1].toUpperCase();
+  }
+
+  const ggufSimpleMatch = name.match(/-([QFP]\d+)\./i);
+  if (ggufSimpleMatch) {
+    return ggufSimpleMatch[1].toUpperCase();
+  }
+
+  if (name.includes('FP16') || name.includes('F16')) {
+    return 'fp16';
+  }
+
+  if (name.includes('FP8') || name.includes('F8')) {
+    return 'fp8';
+  }
+
+  return 'unknown';
+}
+
+/**
  * Helper function to get file status for a model with HuggingFace config
  * @param {Object} model - The model object
  * @returns {Promise<Object|null>} File status object with { hasHuggingFace, allFilesExist, files[] }

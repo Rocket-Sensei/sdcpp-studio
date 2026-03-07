@@ -29,10 +29,10 @@ export function useModels() {
     setError(null);
 
     try {
-      const response = await authenticatedFetch("/api/models");
+      const response = await authenticatedFetch("/api/v1/models");
       if (response.ok) {
         const data = await response.json();
-        const modelsList = data.models || [];
+        const modelsList = data.data || [];
 
         // Update cache
         cachedModels = modelsList;
@@ -75,6 +75,15 @@ export function useModels() {
     return map;
   }, [models]);
 
+  // Create ID to quant map (memoized)
+  const modelsQuantMap = useMemo(() => {
+    const map = {};
+    models.forEach((model) => {
+      map[model.id] = model.quant || 'unknown';
+    });
+    return map;
+  }, [models]);
+
   return {
     models,
     isLoading,
@@ -82,6 +91,7 @@ export function useModels() {
     refetch: () => fetchModels(true),
     modelsMap,
     modelsNameMap,
+    modelsQuantMap,
   };
 }
 

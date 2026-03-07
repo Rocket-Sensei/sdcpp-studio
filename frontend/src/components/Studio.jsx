@@ -40,6 +40,9 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
 
   // Shared models data
   const { modelsNameMap } = useModels();
+  
+  // Config for default model
+  const [config, setConfig] = useState(null);
 
   // Minimal state for PromptBar
   const [prompt, setPrompt] = useState("");
@@ -98,6 +101,14 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
   useEffect(() => {
     if (hasLoadedRef.current) return;
 
+    // Fetch config for default model
+    authenticatedFetch('/api/config')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setConfig(data);
+      })
+      .catch(() => {});
+
     try {
       const savedState = localStorage.getItem(FORM_STATE_KEY);
       if (savedState) {
@@ -117,6 +128,17 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
     hasLoadedRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Set default model from config when no saved state exists
+  useEffect(() => {
+    if (!config || !hasLoadedRef.current) return;
+    
+    const savedState = localStorage.getItem(FORM_STATE_KEY);
+    if (!savedState && config.model) {
+      // Set default model for image mode
+      setSelectedImageModels([config.model]);
+    }
+  }, [config]);
 
   // Save form state to localStorage whenever key fields change
   useEffect(() => {

@@ -1,0 +1,38 @@
+# Models configuration
+models:
+  # ==================== Qwen Image Edit Models (Server Mode) ====================
+  # NOTE: 2511 models require --qwen-image-zero-cond-t flag for proper quality
+  fire-red-q4:
+    enabled: true
+    name: "FireRed Image Edit"
+    quant: "Q4_0"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/FireRed-Image-Edit-1.1-Q4_0.gguf"
+      - "--vae"
+      - "./models/qwen_image_vae.safetensors"
+      - "--llm"
+      - "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+      - "--llm_vision"
+      - "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--flow-shift"
+      - "3"
+      - "--steps"
+      - "24"
+      - "--qwen-image-zero-cond-t"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1401
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"

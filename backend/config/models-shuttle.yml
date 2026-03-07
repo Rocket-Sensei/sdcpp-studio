@@ -34,3 +34,33 @@ models:
       cfg_scale: 1.0
       sample_steps: 28
       sampling_method: "euler"
+  shuttle-jaguar:
+    name: "Shuttle Jaguar"
+    quant: "Q8_0"
+    description: "Shuttle Jaguar - Apache 2.0 licensed aesthetic model (Flux Schnell based)"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/shuttle-jaguar-Q8_0.gguf"
+      - "--vae"
+      - "./models/ae.safetensors"
+      - "--clip_l"
+      - "./models/clip_l.safetensors"
+      - "--t5xxl"
+      - "./models/t5xxl_fp16.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "28"
+    mode: "on_demand"
+    exec_mode: "server"
+    port: 1410
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 28
+      sampling_method: "euler"

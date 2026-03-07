@@ -394,7 +394,24 @@ export const ImageCard = memo(function ImageCard({
 
         {/* Model name and resolution */}
         <div className="pt-1 border-t border-border/50 flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground truncate">{modelName || 'Unknown'}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Display model name without quant */}
+            <p className="text-xs text-muted-foreground truncate">
+              {modelName ? modelName.replace(/\s*\[[^\]]+\]\s*$/, '') : 'Unknown'}
+            </p>
+            {/* Extract and display quant as badge if present in modelName */}
+            {modelName && modelName.match(/\[([^\]]+)\]\s*$/) && (
+              <span className="inline-flex px-1 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border flex-shrink-0"
+                style={{
+                  backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                  color: '#a78bfa',
+                  borderColor: 'rgba(139, 92, 246, 0.3)'
+                }}
+              >
+                {modelName.match(/\[([^\]]+)\]\s*$/)[1]}
+              </span>
+            )}
+          </div>
           {generation.size && (
             <p className="text-xs text-muted-foreground flex-shrink-0">{generation.size}</p>
           )}

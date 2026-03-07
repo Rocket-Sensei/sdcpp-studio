@@ -21,16 +21,10 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
 import { useDownloadProgress, useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
 
-const API_BASE = "/api/models";
+const API_V1 = "/api/v1/models";
 
 // Model status constants
-const MODEL_STATUS = {
-  STOPPED: "stopped",
-  STARTING: "starting",
-  RUNNING: "running",
-  STOPPING: "stopping",
-  ERROR: "error",
-};
+// Status is now directly from API: "stopped", "starting", "running", "stopping", "error"
 
 // Download status constants
 const DOWNLOAD_STATUS = {
@@ -50,20 +44,24 @@ const DOWNLOAD_STATUS = {
 const filterModels = (allModels, mode) => {
   switch (mode) {
     case "image":
-      // All models with text-to-image capability support both T2I and I2I (exclude video models)
-      return allModels.filter((m) =>
-        m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video")
-      );
+      return allModels.filter((m) => {
+        const input = m.architecture?.input_modalities || [];
+        const output = m.architecture?.output_modalities || [];
+        return input.includes("text") && output.includes("image") && !output.includes("video");
+      });
     case "imgedit":
-      // Only models with imagedit capability support --ref-image (exclude video models)
-      return allModels.filter((m) =>
-        m.capabilities?.includes("imgedit") && !m.capabilities?.includes("video")
-      );
+      return allModels.filter((m) => {
+        const input = m.architecture?.input_modalities || [];
+        const output = m.architecture?.output_modalities || [];
+        return input.includes("image") && output.includes("image") && !output.includes("video");
+      });
     case "video":
-      // Only models with video capability
-      return allModels.filter((m) => m.capabilities?.includes("video"));
+      return allModels.filter((m) => {
+        const output = m.architecture?.output_modalities || [];
+        return output.includes("video");
+      });
     case "upscale":
-      return null; // Return null to indicate upscale mode doesn't use models
+      return null;
     default:
       return allModels;
   }
@@ -103,17 +101,16 @@ export function MultiModelSelector({
   // Fetch all models (no filtering - filtering is done via useMemo)
   const fetchModels = useCallback(async () => {
     try {
-      const response = await authenticatedFetch(`${API_BASE}`);
+      const response = await authenticatedFetch(`${API_V1}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
       const data = await response.json();
-      const models = data.models || [];
+      const models = data.data || [];
 
       setAllModels(models);
 
-      // Extract file status from each model (now included in the API response)
-      // No separate API calls needed - fileStatus is inline in the model object
+      // Extract file status from each model (v1 doesn't have this, but keep for compatibility)
       const fileStatusMap = {};
       for (const model of models) {
         if (model.fileStatus) {
@@ -158,7 +155,7 @@ export function MultiModelSelector({
   const pollDownloadProgress = useCallback((jobId, modelId) => {
     const interval = setInterval(async () => {
       try {
-        const response = await authenticatedFetch(`${API_BASE}/download/${jobId}`);
+        const response = await authenticatedFetch(`${API_V1}/download/${jobId}`);
         if (response.ok) {
           const data = await response.json();
           setDownloadProgress({
@@ -252,7 +249,7 @@ export function MultiModelSelector({
   const startModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "starting" }));
     try {
-      const response = await authenticatedFetch(`${API_BASE}/${modelId}/start`, {
+      const response = await authenticatedFetch(`${API_V1}/${modelId}/start`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -273,7 +270,7 @@ export function MultiModelSelector({
   const stopModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "stopping" }));
     try {
-      const response = await authenticatedFetch(`${API_BASE}/${modelId}/stop`, {
+      const response = await authenticatedFetch(`${API_V1}/${modelId}/stop`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -295,7 +292,7 @@ export function MultiModelSelector({
     try {
       setDownloadProgress({ status: DOWNLOAD_STATUS.PENDING, progress: 0, modelId });
 
-      const response = await authenticatedFetch(`${API_BASE}/${modelId}/download`, {
+      const response = await authenticatedFetch(`${API_V1}/${modelId}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -362,17 +359,16 @@ export function MultiModelSelector({
 
   // Status indicator component
   const StatusIndicator = ({ status, className }) => {
-    const isRunning = status === MODEL_STATUS.RUNNING;
-    const isTransitioning =
-      status === MODEL_STATUS.STARTING || status === MODEL_STATUS.STOPPING;
-    const isError = status === MODEL_STATUS.ERROR;
+    const isRunning = status === "running";
+    const isTransitioning = status === "starting" || status === "stopping";
+    const isError = status === "error";
 
     if (isTransitioning) {
       return (
         <div className={cn("flex items-center gap-1.5", className)}>
           <Loader2 className="h-3 w-3 animate-spin text-yellow-500" />
           <span className="text-xs text-muted-foreground">
-            {status === MODEL_STATUS.STARTING ? "Starting..." : "Stopping..."}
+            {status === "starting" ? "Starting..." : "Stopping..."}
           </span>
         </div>
       );
@@ -579,8 +575,19 @@ export function MultiModelSelector({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium truncate">{model.name}</span>
+                    {model.quant && model.quant !== 'unknown' && (
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border flex-shrink-0"
+                        style={{
+                          backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                          color: '#a78bfa',
+                          borderColor: 'rgba(139, 92, 246, 0.3)'
+                        }}
+                      >
+                        {model.quant}
+                      </span>
+                    )}
                     {isCliMode && (
-                      <Badge variant="outline" className="gap-1 text-xs">
+                      <Badge variant="outline" className="gap-1 text-xs flex-shrink-0">
                         <Cpu className="h-3 w-3" />
                         CLI
                       </Badge>
@@ -609,7 +616,7 @@ export function MultiModelSelector({
 
                   {isServerMode && model.mode === "on_demand" && (
                     <>
-                      {model.status === MODEL_STATUS.RUNNING ? (
+                      {model.status === "running" ? (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -696,7 +703,7 @@ export function MultiModelSelector({
                   )}
 
                   {/* Error message */}
-                  {model.status === MODEL_STATUS.ERROR && model.error && (
+                  {model.status === "error" && model.error && (
                     <div className="text-xs text-destructive">
                       Error: {model.error}
                     </div>

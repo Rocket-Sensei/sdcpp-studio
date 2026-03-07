@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "../../utils/api";
 import { useDownloadProgress } from "../../hooks/useWebSocket";
 
-const API_BASE = "/api/models";
+const API_V1 = "/api/v1/models";
 
 // Download status constants
 const DOWNLOAD_STATUS = {
@@ -29,14 +29,18 @@ const filterModelsByCategory = (models, category) => {
   switch (category) {
     case "image":
       return models.filter(
-        (m) =>
-          m.capabilities?.includes("text-to-image") &&
-          !m.capabilities?.includes("video")
+        (m) => {
+          const input = m.architecture?.input_modalities || [];
+          const output = m.architecture?.output_modalities || [];
+          return input.includes("text") && output.includes("image") && !output.includes("video");
+        }
       );
     case "video":
-      return models.filter((m) => m.capabilities?.includes("video"));
+      return models.filter((m) => {
+        const output = m.architecture?.output_modalities || [];
+        return output.includes("video");
+      });
     case "legacy":
-      // Legacy models - could be defined by a flag or older models
       return models.filter((m) => m.isLegacy === true);
     default:
       return models;
@@ -72,16 +76,16 @@ export function ModelSelectorModal({
   // Fetch models
   const fetchModels = useCallback(async () => {
     try {
-      const response = await authenticatedFetch(`${API_BASE}`);
+      const response = await authenticatedFetch(`${API_V1}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch models: ${response.statusText}`);
       }
       const data = await response.json();
-      const allModels = data.models || [];
+      const allModels = data.data || [];
 
       setModels(allModels);
 
-      // Extract file status
+      // Extract file status (v1 doesn't have this, but keep for compatibility)
       const fileStatusMap = {};
       for (const model of allModels) {
         if (model.fileStatus) {
@@ -128,7 +132,7 @@ export function ModelSelectorModal({
       const interval = setInterval(async () => {
         try {
           const response = await authenticatedFetch(
-            `${API_BASE}/download/${jobId}`
+            `${API_V1}/download/${jobId}`
           );
           if (response.ok) {
             const data = await response.json();
@@ -193,7 +197,7 @@ export function ModelSelectorModal({
   const startModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "starting" }));
     try {
-      const response = await authenticatedFetch(`${API_BASE}/${modelId}/start`, {
+      const response = await authenticatedFetch(`${API_V1}/${modelId}/start`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -215,7 +219,7 @@ export function ModelSelectorModal({
   const stopModel = async (modelId) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "stopping" }));
     try {
-      const response = await authenticatedFetch(`${API_BASE}/${modelId}/stop`, {
+      const response = await authenticatedFetch(`${API_V1}/${modelId}/stop`, {
         method: "POST",
       });
       if (!response.ok) {
@@ -243,7 +247,7 @@ export function ModelSelectorModal({
       });
 
       const response = await authenticatedFetch(
-        `${API_BASE}/${modelId}/download`,
+        `${API_V1}/${modelId}/download`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

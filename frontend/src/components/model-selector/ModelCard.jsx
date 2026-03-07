@@ -52,13 +52,13 @@ export function ModelCard({
   downloadProgress,
   filesStatus,
 }) {
-  const isServerMode = model.execMode === "server";
-  const isCliMode = model.execMode === "cli";
+  const isServerMode = model.execMode === "server" || model.exec_mode === "server";
+  const isCliMode = model.execMode === "cli" || model.exec_mode === "cli";
   const hasMissingFiles = filesStatus && !filesStatus.allFilesExist;
-  const isRunning = model.status === MODEL_STATUS.RUNNING;
-  const isStarting = model.status === MODEL_STATUS.STARTING;
-  const isStopping = model.status === MODEL_STATUS.STOPPING;
-  const isError = model.status === MODEL_STATUS.ERROR;
+  const isRunning = model.status === "running";
+  const isStarting = model.status === "starting";
+  const isStopping = model.status === "stopping";
+  const isError = model.status === "error";
 
   // Get capability badges
   const getCapabilityBadges = () => {
@@ -120,6 +120,17 @@ export function ModelCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h4 className="font-medium truncate">{model.name}</h4>
+          {model.quant && model.quant !== 'unknown' && (
+            <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border"
+              style={{
+                backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                color: '#c4b5fd',
+                borderColor: 'rgba(139, 92, 246, 0.3)'
+              }}
+            >
+              {model.quant}
+            </span>
+          )}
           {model.isNew && (
             <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs px-1.5 py-0">
               New

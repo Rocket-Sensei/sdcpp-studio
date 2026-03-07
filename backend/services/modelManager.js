@@ -16,6 +16,7 @@ import yaml from 'js-yaml';
 import { spawn } from 'child_process';
 import { broadcastModelStatus } from './websocket.js';
 import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger, flushSdCppLogger } from '../utils/logger.js';
+import { extractFilenameFromArgs, extractQuantFromFilename } from '../utils/modelHelpers.js';
 
 const logger = createLogger('modelManager');
 
@@ -503,12 +504,16 @@ export class ModelManager {
 
     return Array.from(this.models.values()).map(model => {
       const modelStatus = this.getModelStatus(model.id);
+      const modelPath = extractFilenameFromArgs(model.args);
+      const quant = model.quant || extractQuantFromFilename(modelPath) || 'unknown';
+      
       return {
         ...model,
         isRunning: this.isModelRunning(model.id),
         status: modelStatus.status,
         pid: modelStatus.pid || null,
-        port: modelStatus.port || null
+        port: modelStatus.port || null,
+        quant
       };
     });
   }

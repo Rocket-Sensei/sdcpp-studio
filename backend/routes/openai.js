@@ -417,22 +417,129 @@ export function registerOpenAIRoutes(app, upload) {
 
   /**
    * GET /api/v1/models
-   * OpenAI-compatible models list endpoint
+   * OpenAI-compatible models list endpoint (OpenRouter-style format)
    */
   app.get('/api/v1/models', authenticateRequest, (req, res) => {
     const models = modelManager.getAllModels();
+    
+    const getModalities = (capabilities) => {
+      const inputMods = [];
+      const outputMods = ['image'];
+      
+      if (capabilities?.includes('text-to-image')) {
+        inputMods.push('text');
+      }
+      if (capabilities?.includes('image-to-image') || capabilities?.includes('imgedit')) {
+        inputMods.push('image');
+      }
+      if (capabilities?.includes('video')) {
+        inputMods.push('text');
+        outputMods.push('video');
+      }
+      
+      return {
+        modality: inputMods.length > 0 && outputMods.length > 0 
+          ? `${inputMods.join('+')}+image->${outputMods.join('+')}`
+          : 'text->image',
+        input_modalities: inputMods.length > 0 ? inputMods : ['text'],
+        output_modalities: outputMods
+      };
+    };
+
     res.json({
       object: 'list',
-      data: models.map(model => ({
-        id: model.id,
-        object: 'model',
-        created: Date.now(),
-        owned_by: 'sd-cpp-studio',
-        permission: [],
-        root: model.id,
-        parent: null,
-      }))
+      data: models
+        .filter(m => m.enabled !== false)
+        .map(model => {
+          const architecture = getModalities(model.capabilities);
+          return {
+            id: model.id,
+            object: 'model',
+            created: Date.now(),
+            name: model.name || model.id,
+            description: model.description || '',
+            quant: model.quant || 'unknown',
+            status: model.status || 'stopped',
+            architecture,
+            context_length: null,
+            supported_parameters: ['cfg_scale', 'sample_steps', 'sampling_method', 'width', 'height', 'seed'],
+            default_parameters: {
+              cfg_scale: model.generation_params?.cfg_scale ?? null,
+              sample_steps: model.generation_params?.sample_steps ?? null,
+              sampling_method: model.generation_params?.sampling_method ?? null
+            }
+          };
+        })
     });
+  });
+
+  /**
+   * POST /api/v1/models/:id/start
+   * Start a model process
+   */
+  app.post('/api/v1/models/:id/start', authenticateRequest, async (req, res) => {
+    try {
+      const modelId = req.params.id;
+      const model = modelManager.getModel(modelId);
+
+      if (!model) {
+        return res.status(404).json({ error: 'Model not found' });
+      }
+
+      if (modelManager.isModelRunning(modelId)) {
+        return res.status(409).json({
+          error: 'Model is already running',
+          status: modelManager.getModelStatus(modelId)
+        });
+      }
+
+      const process = await modelManager.startModel(modelId);
+
+      res.json({
+        success: true,
+        modelId,
+        status: 'starting',
+        pid: process.pid,
+        message: `Model ${modelId} is starting`
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error starting model');
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/v1/models/:id/stop
+   * Stop a model process
+   */
+  app.post('/api/v1/models/:id/stop', authenticateRequest, async (req, res) => {
+    try {
+      const modelId = req.params.id;
+      const model = modelManager.getModel(modelId);
+
+      if (!model) {
+        return res.status(404).json({ error: 'Model not found' });
+      }
+
+      if (!modelManager.isModelRunning(modelId)) {
+        return res.status(409).json({
+          error: 'Model is not running',
+          status: modelManager.getModelStatus(modelId)
+        });
+      }
+
+      await modelManager.stopModel(modelId);
+
+      res.json({
+        success: true,
+        modelId,
+        status: 'stopping',
+        message: `Model ${modelId} is stopping`
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error stopping model');
+      res.status(500).json({ error: error.message });
+    }
   });
 }
 
