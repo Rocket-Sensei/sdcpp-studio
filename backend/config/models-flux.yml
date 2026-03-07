@@ -22,7 +22,7 @@ models:
       - "4"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1409
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     startup_timeout: 120000
@@ -86,7 +86,7 @@ models:
       - "24"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1234
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -116,7 +116,7 @@ models:
       - "24"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1412
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -146,7 +146,7 @@ models:
       - "24"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1235
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     startup_timeout: 240000
@@ -176,7 +176,7 @@ models:
       - "20"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1413
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     startup_timeout: 120000

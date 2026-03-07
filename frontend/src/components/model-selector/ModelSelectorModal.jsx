@@ -24,21 +24,39 @@ const DOWNLOAD_STATUS = {
 
 /**
  * Filter models based on category tab
+ * Supports both new architecture-based filtering and legacy capabilities-based filtering
  */
 const filterModelsByCategory = (models, category) => {
   switch (category) {
     case "image":
-      return models.filter(
-        (m) => {
-          const input = m.architecture?.input_modalities || [];
-          const output = m.architecture?.output_modalities || [];
+      return models.filter((m) => {
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          const input = m.architecture.input_modalities || [];
+          const output = m.architecture.output_modalities || [];
           return input.includes("text") && output.includes("image") && !output.includes("video");
         }
-      );
+        // Legacy: use capabilities
+        return m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video");
+      });
     case "video":
       return models.filter((m) => {
-        const output = m.architecture?.output_modalities || [];
-        return output.includes("video");
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          return m.architecture.output_modalities.includes("video");
+        }
+        // Legacy: use capabilities
+        return m.capabilities?.includes("video");
+      });
+    case "text":
+      return models.filter((m) => {
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          const output = m.architecture.output_modalities || [];
+          return output.includes("text") && !output.includes("image") && !output.includes("video");
+        }
+        // Legacy: use capabilities
+        return m.capabilities?.includes("text-generation");
       });
     case "legacy":
       return models.filter((m) => m.isLegacy === true);
@@ -330,6 +348,7 @@ export function ModelSelectorModal({
             <TabsList className="w-full justify-start">
               <TabsTrigger value="image">Image</TabsTrigger>
               <TabsTrigger value="video">Video</TabsTrigger>
+              <TabsTrigger value="text">Text</TabsTrigger>
               <TabsTrigger value="legacy">Legacy</TabsTrigger>
             </TabsList>
           </div>

@@ -16,6 +16,25 @@ const logger = createLogger('routes:models');
 
 export function registerModelRoutes(app) {
   /**
+   * GET /api/settings
+   * Get global settings including backend enablement
+   */
+  app.get('/api/settings', authenticateRequest, async (req, res) => {
+    try {
+      res.json({
+        backend_settings: modelManager.backendSettings || {},
+        default_autostop: modelManager.defaultAutostop,
+        supports_negative_prompt: modelManager.defaultSupportsNegativePrompt,
+        default_model: modelManager.defaultModelId,
+        default_models: modelManager.defaultModels
+      });
+    } catch (error) {
+      logger.error({ error }, 'Error fetching settings');
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
    * GET /api/models
    * List all available models (authenticated - sensitive configuration data)
    * Now includes file status for each model to avoid separate API calls
@@ -50,7 +69,8 @@ export function registerModelRoutes(app) {
       res.json({
         models: modelsWithFileStatus,
         default: filteredDefault,
-        default_models: modelManager.defaultModels
+        default_models: modelManager.defaultModels,
+        backend_settings: modelManager.backendSettings || {}
       });
     } catch (error) {
       logger.error({ error }, 'Error fetching models');

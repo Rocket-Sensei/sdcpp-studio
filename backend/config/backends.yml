@@ -1,0 +1,81 @@
+# Backend Presets Configuration
+# 
+# Define reusable backend configurations here.
+# Models can reference these backends using the 'backend' field.
+#
+# Example model using a backend:
+# models:
+#   my-model:
+#     name: "My Model"
+#     backend: "sd-server"
+#     model_file: "./models/my-model.gguf"
+#     capabilities: ["text-to-image"]
+
+backends:
+  # ==================== SD Server (Image Generation) ====================
+  sd-server:
+    command: "./bin/sd-server"
+    exec_mode: "server"
+    mode: "on_demand"
+    base_args:
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+    description: "Stable Diffusion server for image generation"
+    
+  sd-server-flux:
+    command: "./bin/sd-server"
+    exec_mode: "server"
+    mode: "on_demand"
+    base_args:
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+    description: "Stable Diffusion server optimized for FLUX models"
+    
+  sd-cli:
+    command: "./bin/sd-cli"
+    exec_mode: "cli"
+    mode: "on_demand"
+    base_args:
+      - "-v"
+      - "--offload-to-cpu"
+    description: "Stable Diffusion CLI for one-shot generation"
+
+  # ==================== Llama Server (Text Generation) ====================
+  llama-server:
+    command: "./bin/llama-server"
+    exec_mode: "server"
+    mode: "on_demand"
+    base_args:
+      - "--host"
+      - "127.0.0.1"
+      - "--port"
+      - "8080"
+    description: "Llama.cpp server for text generation"
+    
+  llama-server-multi:
+    command: "./bin/llama-server"
+    exec_mode: "server"
+    mode: "on_demand"
+    config_file: "./config/llm-models.ini"
+    description: "Llama.cpp server with multi-model preset support"
+
+  # ==================== Wan2GP (Video Generation) ====================
+  wan2gp:
+    command: "python"
+    exec_mode: "cli"
+    mode: "on_demand"
+    working_dir: "./Wan2GP"
+    base_args:
+      - "wgp.py"
+    env:
+      PYENV_VERSION: "wan"
+    description: "Wan2GP for text-to-video and image-to-video generation"
+
+  # ==================== External API Backends ====================
+  openai-api:
+    exec_mode: "api"
+    mode: "on_demand"
+    api_url: "https://api.openai.com/v1"
+    description: "OpenAI API for image generation"

@@ -29,7 +29,7 @@ models:
       - "20"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1411
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"
     startup_timeout: 120000

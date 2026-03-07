@@ -38,27 +38,51 @@ const DOWNLOAD_STATUS = {
 /**
  * Filter models based on mode
  * @param {Array} allModels - All models from API
- * @param {string} mode - Mode to filter by ('image', 'imgedit', 'video', 'upscale')
+ * @param {string} mode - Mode to filter by ('image', 'imgedit', 'video', 'text', 'upscale')
  * @returns {Array} Filtered models
  */
 const filterModels = (allModels, mode) => {
   switch (mode) {
     case "image":
       return allModels.filter((m) => {
-        const input = m.architecture?.input_modalities || [];
-        const output = m.architecture?.output_modalities || [];
-        return input.includes("text") && output.includes("image") && !output.includes("video");
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          const input = m.architecture.input_modalities || [];
+          const output = m.architecture.output_modalities || [];
+          return input.includes("text") && output.includes("image") && !output.includes("video");
+        }
+        // Legacy: use capabilities
+        return m.capabilities?.includes("text-to-image") && !m.capabilities?.includes("video");
       });
     case "imgedit":
       return allModels.filter((m) => {
-        const input = m.architecture?.input_modalities || [];
-        const output = m.architecture?.output_modalities || [];
-        return input.includes("image") && output.includes("image") && !output.includes("video");
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          const input = m.architecture.input_modalities || [];
+          const output = m.architecture.output_modalities || [];
+          return input.includes("image") && output.includes("image") && !output.includes("video");
+        }
+        // Legacy: use capabilities
+        return m.capabilities?.includes("image-to-image") || m.capabilities?.includes("imgedit");
       });
     case "video":
       return allModels.filter((m) => {
-        const output = m.architecture?.output_modalities || [];
-        return output.includes("video");
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          return m.architecture.output_modalities.includes("video");
+        }
+        // Legacy: use capabilities
+        return m.capabilities?.includes("video");
+      });
+    case "text":
+      return allModels.filter((m) => {
+        // New format: use architecture
+        if (m.architecture?.output_modalities) {
+          const output = m.architecture.output_modalities || [];
+          return output.includes("text") && !output.includes("image") && !output.includes("video");
+        }
+        // Legacy: use capabilities
+        return m.capabilities?.includes("text-generation");
       });
     case "upscale":
       return null;

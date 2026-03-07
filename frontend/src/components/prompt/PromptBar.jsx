@@ -2,12 +2,14 @@ import { useRef } from "react";
 import {
   Image as ImageIcon,
   Video,
+  Type,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 import { GenerateImage } from "./GenerateImage";
 import { EditImage } from "./EditImage";
 import { GenerateVideo } from "./GenerateVideo";
+import { GenerateText } from "./GenerateText";
 import { UpscaleImage } from "./UpscaleImage";
 import { MultiModelSelector } from "../MultiModelSelector";
 
@@ -16,6 +18,7 @@ const MODES = [
   { value: "image", label: "Image", icon: ImageIcon, description: "Text to Image / Image to Image" },
   { value: "imgedit", label: "Edit", icon: ImageIcon, description: "Image Edit" },
   { value: "video", label: "Video", icon: Video, description: "Text/Image to Video" },
+  { value: "text", label: "Text", icon: Type, description: "Text Generation (LLM)" },
   { value: "upscale", label: "Upscale", icon: ImageIcon, description: "Upscale" },
 ];
 
@@ -81,7 +84,7 @@ export function PromptBar({
     >
       {/* Generation Mode Selector - SHARED between top and bottom panels */}
       <div className="mb-3">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {MODES.map((modeOption) => {
             const Icon = modeOption.icon;
             return (
@@ -157,6 +160,16 @@ export function PromptBar({
           onGenerate={onGenerate}
           onFileSelect={onFileSelect}
           onClearImage={onClearImage}
+        />
+      )}
+
+      {mode === "text" && (
+        <GenerateText
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+          isLoading={isLoading}
+          disabled={disabled}
+          onGenerate={onGenerate}
         />
       )}
 

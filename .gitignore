@@ -61,5 +61,7 @@ coverage/
 /bin
 /models
 /sdcpp
+/Wan2GP
+/llama.cpp
 /tests/backend/data/*
 /backend/data/*

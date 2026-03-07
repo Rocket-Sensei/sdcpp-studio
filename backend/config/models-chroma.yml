@@ -23,7 +23,7 @@ models:
       - "--chroma-disable-dit-mask"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1409
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     startup_timeout: 120000

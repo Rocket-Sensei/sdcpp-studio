@@ -12,6 +12,16 @@ supports_negative_prompt: false
 # Can be overridden per-model using the 'autostop' setting in model configs
 default_autostop: "10m"
 
+# Backend enablement toggles
+# Set to false to completely disable all models from these backends
+backend_settings:
+  wan2gp:
+    enabled: true
+    description: "Wan2GP video generation models (Wan2.1 and Wan2.2)"
+  llama:
+    enabled: true
+    description: "LLM text generation models via llama.cpp"
+
 default_model: qwen-image
 
 default_models:

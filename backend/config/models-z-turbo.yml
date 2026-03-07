@@ -10,7 +10,7 @@ models:
     supports_negative_prompt: false
     mode: "on_demand"
     command: "./bin/sd-server"
-    port: 1238
+    # Port is dynamically allocated (40000-49000 range)
     args:
       - "--diffusion-model"
       - "./models/z_image-Q8_0.gguf"
@@ -41,7 +41,7 @@ models:
     supports_negative_prompt: false
     mode: "on_demand"
     command: "./bin/sd-server"
-    port: 1238
+    # Port is dynamically allocated (40000-49000 range)
     args:
       - "--diffusion-model"
       - "./models/z_image_turbo-Q8_0.gguf"
@@ -73,7 +73,7 @@ models:
     supports_negative_prompt: false
     mode: "on_demand"
     command: "./bin/sd-server"
-    port: 1238
+    # Port is dynamically allocated (40000-49000 range)
     args:
       - "--diffusion-model"
       - "./models/unstableRevolution_V2Fp16.safetensors"

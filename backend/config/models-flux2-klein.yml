@@ -21,7 +21,7 @@ models:
       - "--diffusion-fa"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1409
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"
     startup_timeout: 120000
@@ -51,7 +51,7 @@ models:
       - "--diffusion-fa"
     mode: "on_demand"
     exec_mode: "server"
-    port: 2409
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"
     startup_timeout: 120000
@@ -83,7 +83,7 @@ models:
       - "--diffusion-fa"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1409
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"
     startup_timeout: 120000
@@ -114,7 +114,7 @@ models:
       - "--diffusion-fa"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1409
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"
     startup_timeout: 120000

@@ -21,7 +21,7 @@ models:
       - "30"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1521
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -47,7 +47,7 @@ models:
       - "30"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1522
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -72,7 +72,7 @@ models:
       - "24"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1525
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -98,7 +98,7 @@ models:
       - "30"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1526
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -124,7 +124,7 @@ models:
       - "30"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1528
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -149,7 +149,7 @@ models:
       - "20"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1527
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -172,7 +172,7 @@ models:
       - "30"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1527
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -198,7 +198,7 @@ models:
       - "20"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1527
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -223,7 +223,7 @@ models:
       - "20"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1527
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:
@@ -248,7 +248,7 @@ models:
       - "20"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1527
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
     generation_params:

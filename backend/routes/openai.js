@@ -422,7 +422,23 @@ export function registerOpenAIRoutes(app, upload) {
   app.get('/api/v1/models', authenticateRequest, (req, res) => {
     const models = modelManager.getAllModels();
     
-    const getModalities = (capabilities) => {
+    const getModalities = (model) => {
+      // Use model's architecture if available
+      if (model.architecture?.output_modalities) {
+        const inputMods = model.architecture.input_modalities || ['text'];
+        const outputMods = model.architecture.output_modalities;
+        
+        return {
+          modality: inputMods.length > 0 && outputMods.length > 0 
+            ? `${inputMods.join('+')}->${outputMods.join('+')}`
+            : 'text->image',
+          input_modalities: inputMods,
+          output_modalities: outputMods
+        };
+      }
+      
+      // Fallback: derive from capabilities
+      const capabilities = model.capabilities;
       const inputMods = [];
       const outputMods = ['image'];
       
@@ -448,10 +464,11 @@ export function registerOpenAIRoutes(app, upload) {
 
     res.json({
       object: 'list',
+      backend_settings: modelManager.backendSettings || {},
       data: models
         .filter(m => m.enabled !== false)
         .map(model => {
-          const architecture = getModalities(model.capabilities);
+          const architecture = getModalities(model);
           return {
             id: model.id,
             object: 'model',

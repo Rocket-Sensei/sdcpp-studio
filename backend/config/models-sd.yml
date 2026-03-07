@@ -16,7 +16,7 @@ models:
       - "40"
     mode: "on_demand"
     exec_mode: "server"
-    port: 1235
+    # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "512x512"
     generation_params:

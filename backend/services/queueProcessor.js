@@ -590,6 +590,9 @@ async function processGenerateJob(job, modelConfig, genLogger) {
 async function processHTTPGeneration(job, modelConfig, params, genLogger) {
   // Build the request with model-specific API endpoint
   // Replace localhost with 127.0.0.1 to avoid IPv6 issues with Node.js fetch
+  if (!modelConfig.api) {
+    throw new Error(`Model ${modelConfig.id} does not have an API endpoint configured`);
+  }
   const apiUrl = modelConfig.api.replace('localhost', '127.0.0.1');
 
   // Parse SD-specific extra args from prompt

@@ -14,9 +14,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import { spawn } from 'child_process';
+import { pickPort } from 'pick-port';
 import { broadcastModelStatus } from './websocket.js';
 import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger, flushSdCppLogger } from '../utils/logger.js';
 import { extractFilenameFromArgs, extractQuantFromFilename } from '../utils/modelHelpers.js';
+import { getBackendRegistry } from './backendRegistry.js';
 
 const logger = createLogger('modelManager');
 
@@ -235,9 +237,13 @@ export class ModelManager {
     this.configLoaded = false;
     this.isShuttingDown = false;
 
-    // Port management
+    // Port management - using pick-port for dynamic allocation
     this.usedPorts = new Set();
-    this.nextAvailablePort = options.startPort || 8000;
+    this.portRange = options.portRange || { minPort: 40000, maxPort: 49000 };
+    this.host = options.host || '127.0.0.1'; // Local only for security
+
+    // Backend registry for multi-model backend support
+    this.backendRegistry = getBackendRegistry(options.backendConfigPath);
 
     // Event callbacks
     this.onProcessExit = options.onProcessExit || null;
@@ -303,12 +309,17 @@ export class ModelManager {
           mergedConfig.supports_negative_prompt = config.supports_negative_prompt;
         }
 
-        // Capture global default_autostop setting
-        if (config.default_autostop) {
-          mergedConfig.default_autostop = config.default_autostop;
-        }
+      // Capture global default_autostop setting
+      if (config.default_autostop) {
+        mergedConfig.default_autostop = config.default_autostop;
+      }
 
-        loadedFiles.push(configPath);
+      // Capture backend enablement settings (from backend_settings key to avoid conflict with backends.yml)
+      if (config.backend_settings) {
+        mergedConfig.backend_settings = { ...mergedConfig.backend_settings, ...config.backend_settings };
+      }
+
+      loadedFiles.push(configPath);
         logger.debug({ configPath }, 'Loaded configuration from file');
       }
 
@@ -336,6 +347,10 @@ export class ModelManager {
         }
       }
 
+      // Store backend enablement settings
+      this.backendSettings = mergedConfig.backend_settings || {};
+      logger.info({ backends: this.backendSettings }, 'Backend settings loaded');
+
       logger.info({ defaultModel: this.defaultModelId || 'none' }, 'Default model');
       if (this.defaultModels) {
         logger.info({ defaultModels: this.defaultModels }, 'Type-specific defaults');
@@ -353,6 +368,27 @@ export class ModelManager {
           continue;
         }
 
+        // Check backend enablement settings
+        // Models are filtered based on their backend preset or model type
+        const modelBackend = modelConfig.backend;
+        if (modelBackend) {
+          // Map backend presets to settings keys
+          const backendToSetting = {
+            'wan2gp': 'wan2gp',
+            'llama-server': 'llama',
+            'llama-server-multi': 'llama'
+          };
+          
+          const settingKey = backendToSetting[modelBackend];
+          if (settingKey && this.backendSettings[settingKey]) {
+            const backendEnabled = this.backendSettings[settingKey].enabled;
+            if (backendEnabled === false) {
+              logger.debug({ modelId, backend: modelBackend }, 'Backend is disabled in settings, skipping model');
+              continue;
+            }
+          }
+        }
+
         // Validate required fields
         if (!modelConfig.name) {
           logger.warn({ modelId }, 'Model missing name, skipping');
@@ -364,8 +400,11 @@ export class ModelManager {
           modelConfig.exec_mode = ExecMode.SERVER;
         }
         // Command is required for SERVER and CLI modes, but not for API mode
-        if ((modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.CLI) && !modelConfig.command) {
-          logger.warn({ modelId, execMode: modelConfig.exec_mode }, 'Model missing command, skipping');
+        // If backend is specified, command will be inherited from backend preset
+        const hasBackend = !!modelConfig.backend;
+        const hasCommand = !!modelConfig.command || (hasBackend && this.backendRegistry.hasBackend(modelConfig.backend));
+        if ((modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.CLI) && !hasCommand) {
+          logger.warn({ modelId, execMode: modelConfig.exec_mode }, 'Model missing command and no backend specified, skipping');
           continue;
         }
         // API key is required for API mode
@@ -387,40 +426,14 @@ export class ModelManager {
         }
 
         // Auto-fill api field from port for server mode if not present
+        // Note: If no port is specified, it will be dynamically allocated at startup
         if (modelConfig.exec_mode === ExecMode.SERVER && modelConfig.port && !modelConfig.api) {
           modelConfig.api = `http://127.0.0.1:${modelConfig.port}/v1`;
-          logger.debug({ modelId, api: modelConfig.api }, 'Auto-filled api field');
+          logger.debug({ modelId, api: modelConfig.api }, 'Auto-filled api field from config port');
         }
 
-        // Auto-add --listen-port from port field for server mode if not in args
-        if (modelConfig.exec_mode === ExecMode.SERVER && modelConfig.port) {
-          const listenPortIdx = modelConfig.args.findIndex(arg =>
-            arg === '--listen-port' || arg === '-l' || arg.startsWith('--listen-port=')
-          );
-          // Only add if --listen-port is not already in args
-          if (listenPortIdx === -1) {
-            // Check if -l flag exists (short form)
-            const lFlagIdx = modelConfig.args.indexOf('-l');
-            if (lFlagIdx === -1) {
-              // Neither --listen-port nor -l found, add both
-              modelConfig.args.push('-l');
-              modelConfig.args.push('127.0.0.1');
-              modelConfig.args.push('--listen-port');
-              modelConfig.args.push(String(modelConfig.port));
-              logger.debug({ modelId, port: modelConfig.port }, 'Auto-added --listen-port to args');
-            } else {
-              // -l exists, check if port follows it
-              if (modelConfig.args[lFlagIdx + 1] && !modelConfig.args[lFlagIdx + 1].match(/^\d+$/)) {
-                // -l is followed by a host address, check if --listen-port follows
-                if (!modelConfig.args.includes('--listen-port')) {
-                  // Insert --listen-port after the host address
-                  modelConfig.args.splice(lFlagIdx + 2, 0, '--listen-port', String(modelConfig.port));
-                  logger.debug({ modelId, port: modelConfig.port }, 'Auto-added --listen-port after -l 127.0.0.1');
-                }
-              }
-            }
-          }
-        }
+        // Listen args (--listen-port and -l) are now added dynamically in startModel
+        // based on the dynamically allocated port. No need to add them here anymore.
 
         // Ensure capabilities is an array, default to text-to-image if not specified
         if (!modelConfig.capabilities) {
@@ -458,13 +471,22 @@ export class ModelManager {
           logger.debug({ modelId, ms: autostopMs }, 'Using default auto-stop timeout');
         }
 
+        // Resolve with backend preset if specified
+        let finalConfig = modelConfig;
+        if (modelConfig.backend) {
+          finalConfig = this.backendRegistry.resolveModelConfig({
+            id: modelId,
+            ...modelConfig
+          });
+        }
+
         // Store model config
         this.models.set(modelId, {
           id: modelId,
-          ...modelConfig
+          ...finalConfig
         });
 
-        logger.debug({ modelId, name: modelConfig.name, supportsNegativePrompt: modelConfig.supports_negative_prompt, autostopMs }, 'Loaded model');
+        logger.debug({ modelId, name: finalConfig.name, backend: finalConfig.backend, supportsNegativePrompt: finalConfig.supports_negative_prompt, autostopMs }, 'Loaded model');
       }
 
       this.configLoaded = true;
@@ -624,8 +646,16 @@ export class ModelManager {
     logger.info({ modelId, name: model.name }, 'Starting model');
 
     try {
-      // Determine port
-      const port = options.port || model.port || this._getAvailablePort();
+      // Determine port - use pick-port for dynamic allocation if not specified
+      let port;
+      if (options.port) {
+        port = options.port;
+      } else if (model.port) {
+        port = model.port;
+        logger.warn({ modelId, port }, 'Using hardcoded port from config (consider removing port from config)');
+      } else {
+        port = await this._getAvailablePort();
+      }
 
       // Build command and args
       const command = options.command || model.command;
@@ -640,6 +670,23 @@ export class ModelManager {
         const hasSteps = processedArgs.some(arg => arg === '--steps' || arg.startsWith('--steps='));
         if (!hasSteps) {
           finalArgs = [...processedArgs, '--steps', String(model.generation_params.sample_steps)];
+        }
+      }
+
+      // Inject listen address and port for server mode (dynamic allocation)
+      if (model.exec_mode === ExecMode.SERVER) {
+        const hasListenPort = finalArgs.some(arg => arg === '--listen-port' || arg.startsWith('--listen-port='));
+        const hasLFlag = finalArgs.includes('-l');
+        const hasHost = finalArgs.includes('127.0.0.1') || finalArgs.includes('localhost');
+        
+        if (!hasListenPort) {
+          finalArgs = [...finalArgs, '--listen-port', String(port)];
+          logger.debug({ modelId, port }, 'Added --listen-port to args');
+        }
+        
+        if (!hasLFlag && !hasHost) {
+          finalArgs = ['-l', '127.0.0.1', ...finalArgs];
+          logger.debug({ modelId, host: '127.0.0.1' }, 'Added -l 127.0.0.1 to args (local only)');
         }
       }
 
@@ -930,18 +977,29 @@ export class ModelManager {
   }
 
   /**
-   * Get an available port
-   * @returns {number} Available port number
+   * Get an available port using pick-port
+   * @returns {Promise<number>} Available port number
    * @private
    */
-  _getAvailablePort() {
-    while (this.usedPorts.has(this.nextAvailablePort)) {
-      this.nextAvailablePort++;
+  async _getAvailablePort() {
+    try {
+      const port = await pickPort({
+        type: 'tcp',
+        ip: this.host,
+        minPort: this.portRange.minPort,
+        maxPort: this.portRange.maxPort,
+        reserveTimeout: 1 // Short timeout since we'll bind immediately
+      });
+      
+      // Track the port we're using
+      this.usedPorts.add(port);
+      logger.debug({ port, host: this.host }, 'Allocated port using pick-port');
+      
+      return port;
+    } catch (error) {
+      logger.error({ error }, 'Failed to allocate port with pick-port');
+      throw new Error(`Failed to allocate port: ${error.message}`);
     }
-
-    const port = this.nextAvailablePort;
-    this.nextAvailablePort++;
-    return port;
   }
 
   /**

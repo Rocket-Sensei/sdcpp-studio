@@ -1,0 +1,130 @@
+# LLM (Text Generation) Models Configuration
+# 
+# These models are standalone LLMs for text generation/chat.
+# They use llama-server as the backend.
+# Note: Some of these models are also used as components in image generation models
+# (e.g., Qwen2.5-VL is used with --qwen2vl flag in SD models), but here they are
+# configured for direct text generation.
+
+models:
+  # ==================== Qwen 2.5 VL (Vision-Language Model) ====================
+  # Note: These are vision models that can also do text generation
+  
+  llm-qwen2.5-vl-7b-q4_k_m:
+    name: "Qwen 2.5 VL 7B (Q4_K_M)"
+    description: "Qwen 2.5 VL 7B Instruct - Vision-language model (Q4_K_M quantized)"
+    backend: "llama-server"
+    model_file: "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+    mmproj: "./models/Qwen2.5-VL-7B-Instruct.mmproj-Q8_0.gguf"
+    capabilities: ["text-generation", "vision"]
+    model_type: "text-generation"
+    architecture:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+    # llama-server args
+    args:
+      - "--host"
+      - "127.0.0.1"
+    generation_params:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 2048
+    autostop: "10m"
+
+  llm-qwen2.5-vl-7b-q8_0:
+    name: "Qwen 2.5 VL 7B (Q8_0)"
+    description: "Qwen 2.5 VL 7B Instruct - Vision-language model (Q8_0 quantized)"
+    backend: "llama-server"
+    model_file: "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+    mmproj: "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+    capabilities: ["text-generation", "vision"]
+    model_type: "text-generation"
+    architecture:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+    args:
+      - "--host"
+      - "127.0.0.1"
+    generation_params:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 2048
+    autostop: "10m"
+
+  # ==================== Qwen 3 (Text Generation) ====================
+  
+  llm-qwen3-4b-q8_0:
+    name: "Qwen 3 4B (Q8_0)"
+    description: "Qwen 3 4B Instruct - Text generation model (Q8_0 quantized)"
+    backend: "llama-server"
+    model_file: "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+    capabilities: ["text-generation"]
+    model_type: "text-generation"
+    architecture:
+      input_modalities: ["text"]
+      output_modalities: ["text"]
+    args:
+      - "--host"
+      - "127.0.0.1"
+    generation_params:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 4096
+    autostop: "10m"
+
+  # ==================== Llama Models ====================
+  
+  llm-llama-3.1-8b-q8_0:
+    name: "Llama 3.1 8B (Q8_0)"
+    description: "Meta Llama 3.1 8B Instruct - General purpose text generation (Q8_0 quantized)"
+    backend: "llama-server"
+    model_file: "./models/Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
+    capabilities: ["text-generation"]
+    model_type: "text-generation"
+    architecture:
+      input_modalities: ["text"]
+      output_modalities: ["text"]
+    args:
+      - "--host"
+      - "127.0.0.1"
+    generation_params:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 4096
+    autostop: "10m"
+
+  # ==================== Gemma & Devstral (from llm-models.ini) ====================
+  # These use the llama-server with --models-preset for multi-model mode
+  
+  llm-gemma-3-27b-it:
+    name: "Gemma 3 27B IT"
+    description: "Google Gemma 3 27B Instruct - IQ3_XS quantized"
+    backend: "llama-server"
+    # Using the INI file configuration for multi-model mode
+    ini_section: "gemma-3-27b-it"
+    capabilities: ["text-generation"]
+    model_type: "text-generation"
+    architecture:
+      input_modalities: ["text", "image"]
+      output_modalities: ["text"]
+    generation_params:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 4096
+    autostop: "10m"
+
+  llm-devstral-small-24b:
+    name: "Devstral Small 24B"
+    description: "Devstral Small 2-24B Instruct - Q4_K_M quantized"
+    backend: "llama-server"
+    ini_section: "Devstral-Small-2-24B-Instruct"
+    capabilities: ["text-generation"]
+    model_type: "text-generation"
+    architecture:
+      input_modalities: ["text"]
+      output_modalities: ["text"]
+    generation_params:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 4096
+    autostop: "10m"

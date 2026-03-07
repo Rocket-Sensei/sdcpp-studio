@@ -1,0 +1,124 @@
+# Example: New Simplified Model Configuration Format
+# 
+# This file demonstrates the new backend-based configuration system.
+# Instead of 30+ lines per model, you can now define models in ~5-10 lines
+# by referencing backend presets defined in backends.yml
+#
+# OLD FORMAT (30+ lines):
+#   qwen-image:
+#     name: "Qwen Image"
+#     capabilities: ["text-to-image"]
+#     command: "./bin/sd-server"
+#     args:
+#       - "--diffusion-model"
+#       - "./models/Qwen_Image-Q4_K_M.gguf"
+#       - "--vae"
+#       - "./models/qwen_image_vae.safetensors"
+#       - "--qwen2vl"
+#       - "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+#       - "-v"
+#       - "--offload-to-cpu"
+#       - "--clip-on-cpu"
+#       - "--diffusion-fa"
+#       - "--flow-shift"
+#       - "3"
+#       - "--steps"
+#       - "24"
+#     exec_mode: "server"
+#     mode: "on_demand"
+#     model_type: "text-to-image"
+#
+# NEW FORMAT (10 lines):
+#   qwen-image:
+#     name: "Qwen Image"
+#     backend: "sd-server"
+#     model_file: "./models/Qwen_Image-Q4_K_M.gguf"
+#     vae: "./models/qwen_image_vae.safetensors"
+#     qwen2vl: "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+#     capabilities: ["text-to-image"]
+#     generation_params:
+#       sample_steps: 24
+#
+# Benefits:
+# - 70% less configuration code
+# - Centralized backend settings
+# - Easy to add new models
+# - Consistent defaults across similar models
+
+models:
+  # ==================== Qwen Image Models ====================
+  # Using sd-server backend with Qwen-specific components
+  
+  qwen-image:
+    name: "Qwen Image"
+    description: "Qwen Image - advanced text-to-image with complex text rendering"
+    backend: "sd-server"
+    model_file: "./models/Qwen_Image-Q4_K_M.gguf"
+    vae: "./models/qwen_image_vae.safetensors"
+    qwen2vl: "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+    capabilities: ["text-to-image"]
+    default: true
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 24
+      sampling_method: "euler"
+    autostop: "15m"
+
+  qwen-image-2512:
+    name: "Qwen Image 2512"
+    description: "Qwen Image 2512 - latest version"
+    backend: "sd-server"
+    model_file: "./models/qwen-image-2512-Q3_K_M.gguf"
+    vae: "./models/qwen_image_vae.safetensors"
+    qwen2vl: "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+    capabilities: ["text-to-image"]
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 24
+      sampling_method: "euler"
+    autostop: "15m"
+
+  # ==================== FLUX Models ====================
+  # Using sd-server-flux backend (optimized for FLUX)
+  
+  flux1-schnell:
+    name: "FLUX.1 Schnell"
+    description: "FLUX.1 Schnell - Fast generation [Q8_0]"
+    backend: "sd-server-flux"
+    model_file: "./models/flux1-schnell-Q8_0.gguf"
+    vae: "./models/ae.safetensors"
+    clip_l: "./models/clip_l.safetensors"
+    t5xxl: "./models/t5xxl_fp16.safetensors"
+    capabilities: ["text-to-image"]
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 4
+      sampling_method: "euler"
+
+  # ==================== LLM Models (Text Generation) ====================
+  # Using llama-server backend
+  
+  gemma-3-27b-it:
+    name: "Gemma 3 27B IT"
+    description: "Google Gemma 3 27B Instruct"
+    backend: "llama-server"
+    # For llama-server with --models-preset, reference the INI section
+    ini_section: "gemma-3-27b-it"
+    capabilities: ["text-generation"]
+    model_type: "text-generation"
+
+  devstral-small-24b:
+    name: "Devstral Small 24B"
+    description: "Devstral Small 2-24B Instruct"
+    backend: "llama-server"
+    ini_section: "Devstral-Small-2-24B-Instruct"
+    capabilities: ["text-generation"]
+    model_type: "text-generation"
+
+# Available file field mappings:
+# - model_file → --diffusion-model
+# - vae → --vae
+# - clip_l → --clip_l
+# - t5xxl → --t5xxl
+# - qwen2vl → --qwen2vl
+# - clip_vision → --clip_vision
