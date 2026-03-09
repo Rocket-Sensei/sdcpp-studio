@@ -2,7 +2,7 @@
 
 ## Recent Changes
 
-### 2024-03-09 - API Key Authentication Flow Improvements & HTTP Retry Logic
+### 2026-03-09 - API Key Authentication Flow Improvements & HTTP Retry Logic
 
 **Fixed:**
 - Restored proper API key entry flow on frontend boot
@@ -26,7 +26,7 @@
 - Updated `validateApiKey()` to use config endpoint instead of making test requests
 - Added comprehensive tests for new auth flow behavior
 
-### 2024-03-07 - Text Generation Support & LLM Models
+### 2026-03-07 - Text Generation Support & LLM Models
 
 **Added:**
 - New "Text" generation mode for LLM text generation
@@ -53,7 +53,7 @@
   - Created comprehensive backend documentation structure
   - Added docs for Wan2GP, SD.cpp, and llama.cpp backends
 
-### 2024-03-07 - Dynamic Port Allocation & Multi-Model Backend System
+### 2026-03-07 - Dynamic Port Allocation & Multi-Model Backend System
 
 **Added:**
 - Dynamic port allocation using `pick-port` library
@@ -76,7 +76,7 @@
   - Model auto-discovery from directories
   - Clear separation between backend and model settings
 
-### 2024-03-07 - Model List API Update
+### 2026-03-07 - Model List API Update
 
 **Changed:**
 - Updated `/api/v1/models` endpoint to use OpenRouter-style JSON format
