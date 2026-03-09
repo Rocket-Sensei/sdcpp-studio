@@ -582,7 +582,32 @@ export async function loggedFetch(url, options = {}) {
 
   logApiRequest(method, url, headers, body);
 
-  const response = await fetch(url, options);
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (fetchError) {
+    // Enhanced error logging for fetch failures
+    const errorInfo = {
+      url,
+      method,
+      error: fetchError.message,
+      errorType: fetchError.name,
+      errorCode: fetchError.code,
+      cause: fetchError.cause?.message || fetchError.cause,
+      // Include timeout info if available
+      signalReason: options.signal?.reason,
+      signalAborted: options.signal?.aborted,
+    };
+    
+    baseLogger.error(errorInfo, 'Fetch request failed');
+    
+    // Re-throw with enhanced message
+    const enhancedError = new Error(`Fetch failed: ${fetchError.message} (URL: ${url}, Method: ${method})`);
+    enhancedError.cause = fetchError;
+    enhancedError.url = url;
+    enhancedError.method = method;
+    throw enhancedError;
+  }
 
   // Try to parse response for logging
   try {

@@ -7,17 +7,17 @@ models:
     name: "Z-Image"
     description: "Z-Image"
     capabilities: ["text-to-image"]
-    supports_negative_prompt: false
+    supports_negative_prompt: true
     mode: "on_demand"
     command: "./bin/sd-server"
     # Port is dynamically allocated (40000-49000 range)
     args:
       - "--diffusion-model"
-      - "./models/z_image-Q8_0.gguf"
+      - "./models/z-image-Q8_0.gguf"
       - "--vae"
       - "./models/ae.safetensors"
       - "--llm"
-      - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "./models/qwen_3_4b.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -31,7 +31,7 @@ models:
     # These are applied when this model is selected
     generation_params:
       cfg_scale: 1
-      sample_steps: 9  # Ultra-fast distilled model, uses 4-9 steps
+      sample_steps: 40
       sampling_method: "euler"
 
   z-image-turbo:

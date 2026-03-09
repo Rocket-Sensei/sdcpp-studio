@@ -331,21 +331,30 @@ async function processQueue() {
       const generationTimeMs = totalTimeMs - modelLoadingTimeMs;
       const generationTimeSec = (generationTimeMs / 1000).toFixed(2);
 
-      logger.error({
+      // Enhanced error context for debugging
+      const errorContext = {
         error: error.message,
+        errorType: error.name,
         jobId: job.id,
+        jobType: job.type,
+        modelId: currentModelId,
         modelLoadingTimeMs,
         generationTimeSec,
         generationTimeMs,
         totalTimeMs,
-      }, 'Job failed');
+        prompt: job.prompt?.substring(0, 100),
+      };
+
+      // Add extra context for timeout errors
+      if (error.timeoutMs) {
+        errorContext.timeoutMs = error.timeoutMs;
+        errorContext.suggestedAction = 'Consider increasing timeout or reducing steps for this model';
+      }
+
+      logger.error(errorContext, 'Job failed');
       genLogger.error({
-        error: error.message,
+        ...errorContext,
         stack: error.stack,
-        modelLoadingTimeMs,
-        generationTimeSec,
-        generationTimeMs,
-        totalTimeMs,
         result: 'failed',
       }, 'Generation failed');
 
@@ -688,11 +697,53 @@ async function processHTTPGeneration(job, modelConfig, params, genLogger) {
     genLogger.debug('Using API key for authentication');
   }
 
-  const response = await loggedFetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(requestBody)
-  });
+  // Calculate timeout based on expected generation time
+  // Z-image with 40 steps needs more time - use 5 min base + 10 sec per step
+  const steps = params.sample_steps || 40;
+  const timeoutMs = Math.max(60000, 30000 + (steps * 10000)); // At least 60s, or 30s + 10s per step
+  
+  genLogger.info({ 
+    endpoint, 
+    modelName, 
+    timeoutMs, 
+    steps,
+    requestSize: JSON.stringify(requestBody).length 
+  }, 'Starting HTTP API request with timeout');
+
+  let response;
+  try {
+    response = await loggedFetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (fetchError) {
+    // Enhanced error logging for fetch failures
+    const errorContext = {
+      endpoint,
+      modelId: modelConfig.id,
+      modelName,
+      timeoutMs,
+      steps,
+      error: fetchError.message,
+      errorType: fetchError.name,
+      requestBodyPreview: JSON.stringify(requestBody).substring(0, 500),
+    };
+    
+    logger.error(errorContext, 'HTTP generation fetch failed');
+    genLogger.error(errorContext, 'HTTP generation fetch failed - possible timeout or connection issue');
+    
+    // Check if it's a timeout specifically
+    if (fetchError.message?.includes('timeout') || fetchError.name === 'TimeoutError') {
+      const timeoutError = new Error(`Generation timeout after ${timeoutMs}ms - model may need more steps or is not responding (steps: ${steps})`);
+      timeoutError.modelId = modelConfig.id;
+      timeoutError.timeoutMs = timeoutMs;
+      throw timeoutError;
+    }
+    
+    throw fetchError;
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
