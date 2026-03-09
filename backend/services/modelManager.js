@@ -657,10 +657,20 @@ export class ModelManager {
         port = await this._getAvailablePort();
       }
 
-      // For server mode, update the model's api field with the dynamically allocated port
-      if (model.exec_mode === ExecMode.SERVER && !model.api) {
-        model.api = `http://127.0.0.1:${port}/v1`;
-        logger.debug({ modelId, port, api: model.api }, 'Auto-generated API endpoint from dynamic port');
+      // Determine if using dynamic port allocation (no hardcoded port in options or config)
+      const isDynamicPort = !options.port && !model.port;
+
+      // For server mode, update the model's api field
+      if (model.exec_mode === ExecMode.SERVER) {
+        if (isDynamicPort) {
+          // Always update API with new dynamic port
+          model.api = `http://127.0.0.1:${port}/v1`;
+          logger.debug({ modelId, port, api: model.api }, 'Auto-generated API endpoint from dynamic port');
+        } else if (!model.api) {
+          // Only set API if not already set when using hardcoded port
+          model.api = `http://127.0.0.1:${port}/v1`;
+          logger.debug({ modelId, port, api: model.api }, 'Set API endpoint from hardcoded port');
+        }
       }
 
       // Build command and args
@@ -850,6 +860,12 @@ export class ModelManager {
       this.processes.delete(modelId);
       if (processEntry.port) {
         this.usedPorts.delete(processEntry.port);
+      }
+
+      // Clear model.api so fresh dynamic port is used on next start
+      const model = this.models.get(modelId);
+      if (model) {
+        delete model.api;
       }
 
       logger.info({ modelId }, 'Model stopped');
@@ -1204,6 +1220,12 @@ export class ModelManager {
     // Free the port
     if (processEntry.port) {
       this.usedPorts.delete(processEntry.port);
+    }
+
+    // Clear model.api so fresh dynamic port is used on next start
+    const model = this.models.get(modelId);
+    if (model) {
+      delete model.api;
     }
 
     // Don't delete from processes immediately - keep for status info
