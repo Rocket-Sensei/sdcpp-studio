@@ -159,14 +159,51 @@ Health check endpoint.
 
 Get API configuration including SD API endpoint, default model, and authentication status.
 
+**Authentication:** Not required - this endpoint is publicly accessible
+
+**Query Parameters:** None
+
 **Response:**
 ```json
 {
   "sdApiEndpoint": "http://192.168.2.180:1234/v1",
   "model": "qwen-image",
-  "authEnabled": true
+  "authEnabled": true,
+  "keyPassed": false,
+  "keyValid": false
 }
 ```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sdApiEndpoint` | string | The configured SD API endpoint URL |
+| `model` | string | The default model ID |
+| `authEnabled` | boolean | Whether API key authentication is enabled on the server |
+| `keyPassed` | boolean | Whether an API key was provided in the request headers |
+| `keyValid` | boolean | Whether the provided API key is correct (only true when `authEnabled` and `keyPassed` are both true and the key matches) |
+
+**Example - Check authentication status:**
+```bash
+# Check if auth is required
+curl http://localhost:3000/api/config
+
+# Response when auth is disabled:
+# {"sdApiEndpoint": "...", "model": "...", "authEnabled": false, "keyPassed": false, "keyValid": false}
+
+# Validate an API key
+curl http://localhost:3000/api/config \
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Response with valid key:
+# {"sdApiEndpoint": "...", "model": "...", "authEnabled": true, "keyPassed": true, "keyValid": true}
+```
+
+**Notes:**
+- This endpoint never returns 401/403 errors, even when authentication is enabled
+- Use this endpoint to check if authentication is required before making other requests
+- The `keyValid` field can be used to validate API keys without making actual API calls
 
 ---
 

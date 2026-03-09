@@ -64,35 +64,64 @@ export async function authenticatedFetch(url, options = {}) {
 }
 
 /**
- * Check if the API requires authentication
- * @returns {Promise<boolean>} True if authentication is required
+ * Get configuration from the server
+ * This endpoint does not require authentication
+ * @param {string} [apiKey] - Optional API key to validate
+ * @returns {Promise<{authEnabled: boolean, keyPassed: boolean, keyValid: boolean, sdApiEndpoint: string, model: string}>} Configuration object
  */
-export async function isAuthRequired() {
+export async function getServerConfig(apiKey = null) {
   try {
-    const response = await fetch('/api/config');
-    if (!response.ok) {
-      return false;
+    const headers = {};
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
     }
+    
+    const response = await fetch('/api/config', { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch config: ${response.statusText}`);
+    }
+    
     const config = await response.json();
-    return config.authRequired || false;
-  } catch {
-    return false;
+    return {
+      authEnabled: config.authEnabled || false,
+      keyPassed: config.keyPassed || false,
+      keyValid: config.keyValid || false,
+      sdApiEndpoint: config.sdApiEndpoint,
+      model: config.model
+    };
+  } catch (error) {
+    console.error('Failed to get server config:', error);
+    return {
+      authEnabled: false,
+      keyPassed: false,
+      keyValid: false,
+      sdApiEndpoint: null,
+      model: null
+    };
   }
 }
 
 /**
- * Validate an API key by making a test request
+ * Check if the API requires authentication
+ * @returns {Promise<boolean>} True if authentication is required
+ * @deprecated Use getServerConfig() instead
+ */
+export async function isAuthRequired() {
+  const config = await getServerConfig();
+  return config.authEnabled;
+}
+
+/**
+ * Validate an API key by checking with the config endpoint
  * @param {string} apiKey - The API key to validate
  * @returns {Promise<boolean>} True if the API key is valid
  */
 export async function validateApiKey(apiKey) {
   try {
-    const response = await fetch('/api/generations', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-    });
-    return response.ok || response.status !== 401;
+    const config = await getServerConfig(apiKey);
+    // If auth is not enabled, any key is "valid" (not needed)
+    // If auth is enabled, check that the key is valid
+    return !config.authEnabled || config.keyValid;
   } catch {
     return false;
   }

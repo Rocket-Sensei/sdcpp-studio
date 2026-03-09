@@ -2,6 +2,30 @@
 
 ## Recent Changes
 
+### 2024-03-09 - API Key Authentication Flow Improvements & HTTP Retry Logic
+
+**Fixed:**
+- Restored proper API key entry flow on frontend boot
+- `/api/config` endpoint now returns detailed auth status flags:
+  - `authEnabled`: Whether API key authentication is configured on the server
+  - `keyPassed`: Whether an API key was provided in the request
+  - `keyValid`: Whether the provided API key is correct
+- Updated frontend `AppBoot` component to use new config endpoint flags
+- Added `getServerConfig()` function to frontend API utilities for checking auth status
+- Config endpoint remains publicly accessible (no authentication required)
+
+**Added:**
+- Retry logic for HTTP generation failures in queue processor
+  - 3 retry attempts total
+  - Delays: immediate → 1 second → 5 seconds
+  - Only retries on fetch/connection errors (not HTTP error responses)
+  - Improved error logging with attempt counts
+
+**Technical:**
+- Exported `extractApiToken()` from auth middleware for reuse in config endpoint
+- Updated `validateApiKey()` to use config endpoint instead of making test requests
+- Added comprehensive tests for new auth flow behavior
+
 ### 2024-03-07 - Text Generation Support & LLM Models
 
 **Added:**

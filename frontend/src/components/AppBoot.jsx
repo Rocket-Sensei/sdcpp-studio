@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Key } from 'lucide-react';
-import { getStoredApiKey, saveApiKey, authenticatedFetch } from '../utils/api';
+import { getStoredApiKey, saveApiKey, getServerConfig } from '../utils/api';
 import { ApiKeyModal } from './ApiKeyModal';
 
 /**
@@ -16,10 +16,13 @@ const BOOT_STATE = {
 /**
  * AppBoot Component - Handles initial app initialization and auth checking
  *
- * Simplified logic:
- * 1. Call /api/config to check config
- * 2. If we get 401, show API key dialog
- * 3. No pre-validation, no "Validating API key" state
+ * Logic:
+ * 1. Call /api/config with stored API key (if any)
+ * 2. Check response flags:
+ *    - If authEnabled=false: No auth needed, proceed
+ *    - If authEnabled=true and keyValid=true: Auth satisfied, proceed
+ *    - If authEnabled=true and (keyPassed=false or keyValid=false): Show API key modal
+ * 3. User enters key, we retry with the new key
  *
  * @param {Object} props
  * @param {React.ReactNode} props.children - The main app component (only rendered when ready)
@@ -30,23 +33,21 @@ export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
   const [bootState, setBootState] = useState(BOOT_STATE.INITIALIZING);
   const [error, setError] = useState(null);
 
-  // Initialize: Try to fetch config, if we get 401 show API key modal
+  // Initialize: Try to fetch config with stored API key
   useEffect(() => {
     const initialize = async () => {
       try {
-        const response = await authenticatedFetch('/api/config');
+        const storedKey = getStoredApiKey();
+        const config = await getServerConfig(storedKey);
 
-        if (response.status === 401) {
-          // Unauthorized - need API key
+        // Check if auth is required and if the key is valid
+        if (config.authEnabled && !config.keyValid) {
+          // Auth is enabled but no valid key provided
           setBootState(BOOT_STATE.NEEDS_API_KEY);
           return;
         }
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch config: ${response.statusText}`);
-        }
-
-        // Success - ready to boot
+        // Either no auth required, or we have a valid key
         setBootState(BOOT_STATE.READY);
         onBootComplete?.();
       } catch (err) {
@@ -59,23 +60,21 @@ export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
     initialize();
   }, [onBootComplete]);
 
-  // Handle API key submission - just save it and retry the config fetch
+  // Handle API key submission
   const handleApiKeySubmit = useCallback(async (apiKey) => {
     try {
-      saveApiKey(apiKey);
-      onApiKeyChange?.();
+      // Validate the new key with the server
+      const config = await getServerConfig(apiKey);
 
-      // Retry the config fetch with the new API key
-      const response = await authenticatedFetch('/api/config');
-
-      if (response.status === 401) {
+      if (config.authEnabled && !config.keyValid) {
+        // Key is invalid
         setError('Invalid API key. Please check and try again.');
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch config: ${response.statusText}`);
-      }
+      // Key is valid - save it and proceed
+      saveApiKey(apiKey);
+      onApiKeyChange?.();
 
       // Success - ready to boot
       setError(null);

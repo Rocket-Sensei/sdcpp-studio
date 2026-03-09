@@ -65,12 +65,52 @@ describe('API Endpoints (No Model Required)', () => {
       expect(data.timestamp).toBeTruthy();
     });
 
-    it('GET /api/config should return config', async () => {
+    it('GET /api/config should return config with auth flags', async () => {
       const response = await fetch(`${API_URL}/api/config`);
       expect(response.ok).toBe(true);
 
       const data = await response.json();
       expect(data).toHaveProperty('sdApiEndpoint');
+      expect(data).toHaveProperty('model');
+      expect(data).toHaveProperty('authEnabled');
+      expect(data).toHaveProperty('keyPassed');
+      expect(data).toHaveProperty('keyValid');
+      
+      // All flags should be booleans
+      expect(typeof data.authEnabled).toBe('boolean');
+      expect(typeof data.keyPassed).toBe('boolean');
+      expect(typeof data.keyValid).toBe('boolean');
+      
+      // When no key is provided, keyPassed should be false
+      expect(data.keyPassed).toBe(false);
+      // When no key is provided, keyValid should be false
+      expect(data.keyValid).toBe(false);
+    });
+
+    it('GET /api/config should detect provided API key', async () => {
+      // Test with X-Api-Key header
+      const response1 = await fetch(`${API_URL}/api/config`, {
+        headers: { 'X-Api-Key': 'some-key' }
+      });
+      const data1 = await response1.json();
+      expect(data1.keyPassed).toBe(true);
+      // Without auth enabled, keyValid should be false
+      expect(data1.keyValid).toBe(false);
+      
+      // Test with Bearer token
+      const response2 = await fetch(`${API_URL}/api/config`, {
+        headers: { 'Authorization': 'Bearer some-token' }
+      });
+      const data2 = await response2.json();
+      expect(data2.keyPassed).toBe(true);
+      expect(data2.keyValid).toBe(false);
+    });
+
+    it('GET /api/config should work without authentication', async () => {
+      // This endpoint should always be accessible
+      const response = await fetch(`${API_URL}/api/config`);
+      expect(response.ok).toBe(true);
+      expect(response.status).not.toBe(401);
     });
   });
 

@@ -711,38 +711,82 @@ async function processHTTPGeneration(job, modelConfig, params, genLogger) {
   }, 'Starting HTTP API request with timeout');
 
   let response;
-  try {
-    response = await loggedFetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(timeoutMs)
-    });
-  } catch (fetchError) {
-    // Enhanced error logging for fetch failures
-    const errorContext = {
-      endpoint,
-      modelId: modelConfig.id,
-      modelName,
-      timeoutMs,
-      steps,
-      error: fetchError.message,
-      errorType: fetchError.name,
-      requestBodyPreview: JSON.stringify(requestBody).substring(0, 500),
-    };
-    
-    logger.error(errorContext, 'HTTP generation fetch failed');
-    genLogger.error(errorContext, 'HTTP generation fetch failed - possible timeout or connection issue');
-    
-    // Check if it's a timeout specifically
-    if (fetchError.message?.includes('timeout') || fetchError.name === 'TimeoutError') {
-      const timeoutError = new Error(`Generation timeout after ${timeoutMs}ms - model may need more steps or is not responding (steps: ${steps})`);
-      timeoutError.modelId = modelConfig.id;
-      timeoutError.timeoutMs = timeoutMs;
-      throw timeoutError;
+  let lastError;
+  const maxRetries = 3;
+  const retryDelays = [0, 1000, 5000]; // First: immediate, Second: 1s, Third: 5s
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Wait before retry (except first attempt)
+      if (attempt > 0 && retryDelays[attempt] > 0) {
+        genLogger.info({ 
+          attempt: attempt + 1, 
+          delayMs: retryDelays[attempt],
+          lastError: lastError?.message 
+        }, `Waiting ${retryDelays[attempt]}ms before retry`);
+        await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+      }
+      
+      genLogger.info({ 
+        attempt: attempt + 1, 
+        maxRetries,
+        endpoint 
+      }, `Making HTTP API request (attempt ${attempt + 1}/${maxRetries})`);
+      
+      response = await loggedFetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      
+      // Success - break out of retry loop
+      break;
+      
+    } catch (fetchError) {
+      lastError = fetchError;
+      
+      // Enhanced error logging for fetch failures
+      const errorContext = {
+        attempt: attempt + 1,
+        maxRetries,
+        endpoint,
+        modelId: modelConfig.id,
+        modelName,
+        timeoutMs,
+        steps,
+        error: fetchError.message,
+        errorType: fetchError.name,
+        requestBodyPreview: JSON.stringify(requestBody).substring(0, 500),
+      };
+      
+      logger.warn(errorContext, `HTTP generation fetch failed (attempt ${attempt + 1}/${maxRetries})`);
+      genLogger.warn(errorContext, `HTTP generation fetch failed - possible timeout or connection issue (attempt ${attempt + 1}/${maxRetries})`);
+      
+      // Check if it's a timeout specifically
+      if (fetchError.message?.includes('timeout') || fetchError.name === 'TimeoutError') {
+        const timeoutError = new Error(`Generation timeout after ${timeoutMs}ms - model may need more steps or is not responding (steps: ${steps})`);
+        timeoutError.modelId = modelConfig.id;
+        timeoutError.timeoutMs = timeoutMs;
+        throw timeoutError;
+      }
+      
+      // If this was the last attempt, throw the error
+      if (attempt === maxRetries - 1) {
+        logger.error({ 
+          attempts: maxRetries,
+          finalError: fetchError.message,
+          modelId: modelConfig.id 
+        }, 'HTTP generation failed after all retry attempts');
+        genLogger.error({ 
+          attempts: maxRetries,
+          finalError: fetchError.message 
+        }, 'HTTP generation failed after all retry attempts');
+        throw fetchError;
+      }
+      
+      // Otherwise, continue to next retry
     }
-    
-    throw fetchError;
   }
 
   if (!response.ok) {

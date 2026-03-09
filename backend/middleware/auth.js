@@ -21,7 +21,7 @@ function getApiKey() {
  * @param {import('express').Request} req - Express request object
  * @returns {string|null} The token or null if invalid
  */
-function extractApiToken(req) {
+export function extractApiToken(req) {
   // First try Authorization header with Bearer prefix
   const authHeader = req.headers.authorization;
   if (authHeader && typeof authHeader === 'string') {

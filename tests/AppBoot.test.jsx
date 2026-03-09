@@ -3,8 +3,8 @@
  *
  * Verifies the proper boot sequence:
  * 1. Initial loading state (initializing)
- * 2. Auth check via authenticatedFetch('/api/config')
- * 3. API key modal if 401 response
+ * 2. Auth check via getServerConfig() with stored API key
+ * 3. API key modal if auth is enabled but key is invalid/not provided
  * 4. App renders after successful auth
  */
 
@@ -20,10 +20,9 @@ vi.mock('../frontend/src/utils/api', () => ({
   getStoredApiKey: vi.fn(),
   saveApiKey: vi.fn(),
   authenticatedFetch: vi.fn(),
+  getServerConfig: vi.fn(),
+  validateApiKey: vi.fn(),
 }));
-
-// Import mock helper
-import { createMockResponse } from './setup.js';
 
 // Mock the ApiKeyModal
 vi.mock('../frontend/src/components/ApiKeyModal', () => {
@@ -58,6 +57,16 @@ vi.mock('../frontend/src/components/ApiKeyModal', () => {
   };
 });
 
+// Helper to create mock config responses
+const createMockConfig = (overrides = {}) => ({
+  authEnabled: false,
+  keyPassed: false,
+  keyValid: false,
+  sdApiEndpoint: 'http://localhost:1234/v1',
+  model: 'test-model',
+  ...overrides,
+});
+
 describe('AppBoot Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,8 +78,8 @@ describe('AppBoot Component', () => {
 
   describe('Initial Loading State', () => {
     it('should show loading screen on mount', () => {
-      // Make authenticatedFetch hang to test initial state
-      vi.mocked(apiUtils.authenticatedFetch).mockImplementation(
+      // Make getServerConfig hang to test initial state
+      vi.mocked(apiUtils.getServerConfig).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -80,7 +89,7 @@ describe('AppBoot Component', () => {
     });
 
     it('should show loading with correct message', () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockImplementation(
+      vi.mocked(apiUtils.getServerConfig).mockImplementation(
         () => new Promise(() => {})
       );
 
@@ -91,10 +100,10 @@ describe('AppBoot Component', () => {
     });
   });
 
-  describe('No Auth Required (200 OK)', () => {
-    it('should render children when config fetch returns 200', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(200, true)
+  describe('No Auth Required (authEnabled: false)', () => {
+    it('should render children when auth is not enabled', async () => {
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: false })
       );
 
       render(<AppBoot>App Content</AppBoot>);
@@ -105,8 +114,8 @@ describe('AppBoot Component', () => {
     });
 
     it('should call onBootComplete when config fetch succeeds', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(200, true)
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: false })
       );
       const onBootComplete = vi.fn();
 
@@ -118,14 +127,14 @@ describe('AppBoot Component', () => {
     });
   });
 
-  describe('Auth Required (401 Response)', () => {
+  describe('Auth Required - No Key Provided', () => {
     beforeEach(() => {
       vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
     });
 
-    it('should show API key modal when config fetch returns 401', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(401, false)
+    it('should show API key modal when auth is enabled but no key provided', async () => {
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false })
       );
 
       render(<AppBoot>App Content</AppBoot>);
@@ -136,8 +145,8 @@ describe('AppBoot Component', () => {
     });
 
     it('should NOT render children while waiting for API key', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(401, false)
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false })
       );
 
       render(<AppBoot>App Content</AppBoot>);
@@ -151,10 +160,11 @@ describe('AppBoot Component', () => {
       const onApiKeyChange = vi.fn();
       const onBootComplete = vi.fn();
 
-      // First call returns 401, second returns 200 after API key is submitted
-      vi.mocked(apiUtils.authenticatedFetch)
-        .mockResolvedValueOnce(createMockResponse(401, false))
-        .mockResolvedValueOnce(createMockResponse(200, true));
+      // First call: auth enabled, no key
+      // Second call: auth enabled, valid key
+      vi.mocked(apiUtils.getServerConfig)
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: true }));
 
       render(
         <AppBoot onApiKeyChange={onApiKeyChange} onBootComplete={onBootComplete}>
@@ -178,11 +188,11 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should show error when API key is invalid (second 401)', async () => {
-      // Both calls return 401 - API key is invalid
-      vi.mocked(apiUtils.authenticatedFetch)
-        .mockResolvedValueOnce(createMockResponse(401, false))
-        .mockResolvedValueOnce(createMockResponse(401, false));
+    it('should show error when API key is invalid', async () => {
+      // Both calls: auth enabled but key invalid
+      vi.mocked(apiUtils.getServerConfig)
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: false }));
 
       render(<AppBoot>App Content</AppBoot>);
 
@@ -202,8 +212,8 @@ describe('AppBoot Component', () => {
     });
 
     it('should show error when second fetch throws', async () => {
-      vi.mocked(apiUtils.authenticatedFetch)
-        .mockResolvedValueOnce(createMockResponse(401, false))
+      vi.mocked(apiUtils.getServerConfig)
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
         .mockRejectedValueOnce(new Error('Network error'));
 
       render(<AppBoot>App Content</AppBoot>);
@@ -220,31 +230,11 @@ describe('AppBoot Component', () => {
         expect(errorElement.textContent).toContain('Failed to validate');
       });
     });
-
-    it('should stay in needs_api_key state when fetch returns non-401 error after submit', async () => {
-      vi.mocked(apiUtils.authenticatedFetch)
-        .mockResolvedValueOnce(createMockResponse(401, false))
-        .mockResolvedValueOnce(createMockResponse(500, false));
-
-      render(<AppBoot>App Content</AppBoot>);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('submit-button'));
-
-      // Should still show modal with error
-      await waitFor(() => {
-        expect(screen.getByTestId('api-key-modal')).toBeInTheDocument();
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-    });
   });
 
   describe('Error Handling', () => {
     it('should show error screen when config fetch throws', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
+      vi.mocked(apiUtils.getServerConfig).mockRejectedValue(
         new Error('Config fetch failed')
       );
 
@@ -257,7 +247,7 @@ describe('AppBoot Component', () => {
 
     it('should display error message when boot fails', async () => {
       const errorMessage = 'Network connection failed';
-      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
+      vi.mocked(apiUtils.getServerConfig).mockRejectedValue(
         new Error(errorMessage)
       );
 
@@ -269,7 +259,7 @@ describe('AppBoot Component', () => {
     });
 
     it('should show retry button when error occurs', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
+      vi.mocked(apiUtils.getServerConfig).mockRejectedValue(
         new Error('Config fetch failed')
       );
 
@@ -279,24 +269,12 @@ describe('AppBoot Component', () => {
         expect(screen.getByText('Retry')).toBeInTheDocument();
       });
     });
-
-    it('should show error when response is not OK and not 401', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(500, false)
-      );
-
-      render(<AppBoot>App Content</AppBoot>);
-
-      await waitFor(() => {
-        expect(screen.getByText('Initialization Error')).toBeInTheDocument();
-      });
-    });
   });
 
   describe('Boot State Transitions', () => {
-    it('should transition: initializing -> ready (200 OK)', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(200, true)
+    it('should transition: initializing -> ready (no auth)', async () => {
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: false })
       );
 
       render(<AppBoot>App Content</AppBoot>);
@@ -311,9 +289,9 @@ describe('AppBoot Component', () => {
       });
     });
 
-    it('should transition: initializing -> needs_api_key (401)', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(401, false)
+    it('should transition: initializing -> needs_api_key (auth enabled, no key)', async () => {
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false })
       );
 
       render(<AppBoot>App Content</AppBoot>);
@@ -329,7 +307,7 @@ describe('AppBoot Component', () => {
     });
 
     it('should transition: initializing -> error (network error)', async () => {
-      vi.mocked(apiUtils.authenticatedFetch).mockRejectedValue(
+      vi.mocked(apiUtils.getServerConfig).mockRejectedValue(
         new Error('Network error')
       );
 
@@ -348,9 +326,9 @@ describe('AppBoot Component', () => {
     it('should transition: needs_api_key -> ready after valid API key submit', async () => {
       const onBootComplete = vi.fn();
 
-      vi.mocked(apiUtils.authenticatedFetch)
-        .mockResolvedValueOnce(createMockResponse(401, false))
-        .mockResolvedValueOnce(createMockResponse(200, true));
+      vi.mocked(apiUtils.getServerConfig)
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
+        .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: true }));
 
       render(
         <AppBoot onBootComplete={onBootComplete}>App Content</AppBoot>
@@ -373,25 +351,25 @@ describe('AppBoot Component', () => {
   });
 
   describe('Existing API Key in Storage', () => {
-    it('should use stored API key via authenticatedFetch', async () => {
+    it('should use stored API key via getServerConfig', async () => {
       vi.mocked(apiUtils.getStoredApiKey).mockReturnValue('stored-key');
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(200, true)
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: true, keyPassed: true, keyValid: true })
       );
 
       const onBootComplete = vi.fn();
       render(<AppBoot onBootComplete={onBootComplete}>App Content</AppBoot>);
 
       await waitFor(() => {
-        expect(apiUtils.authenticatedFetch).toHaveBeenCalledWith('/api/config');
+        expect(apiUtils.getServerConfig).toHaveBeenCalledWith('stored-key');
         expect(onBootComplete).toHaveBeenCalled();
       });
     });
 
-    it('should show API key modal if stored key returns 401', async () => {
+    it('should show API key modal if stored key is invalid', async () => {
       vi.mocked(apiUtils.getStoredApiKey).mockReturnValue('invalid-stored-key');
-      vi.mocked(apiUtils.authenticatedFetch).mockResolvedValue(
-        createMockResponse(401, false)
+      vi.mocked(apiUtils.getServerConfig).mockResolvedValue(
+        createMockConfig({ authEnabled: true, keyPassed: true, keyValid: false })
       );
 
       render(<AppBoot>App Content</AppBoot>);
@@ -410,14 +388,14 @@ describe('API Key Entry Flow - Integration', () => {
     vi.mocked(apiUtils.getStoredApiKey).mockReturnValue(null);
   });
 
-  it('should complete full flow: 401 -> prompt -> submit -> boot', async () => {
+  it('should complete full flow: needs key -> prompt -> submit -> boot', async () => {
     const onBootComplete = vi.fn();
     const onApiKeyChange = vi.fn();
 
-    // Simulate: 401 first, then 200 after key submit
-    vi.mocked(apiUtils.authenticatedFetch)
-      .mockResolvedValueOnce(createMockResponse(401, false))
-      .mockResolvedValueOnce(createMockResponse(200, true));
+    // Simulate: needs key first, then valid after key submit
+    vi.mocked(apiUtils.getServerConfig)
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: true }));
 
     render(
       <AppBoot onBootComplete={onBootComplete} onApiKeyChange={onApiKeyChange}>
@@ -444,12 +422,12 @@ describe('API Key Entry Flow - Integration', () => {
     });
   });
 
-  it('should allow retry after failed validation (401 on retry)', async () => {
-    // First 401 triggers modal, second 401 is invalid key, third 200 is success
-    vi.mocked(apiUtils.authenticatedFetch)
-      .mockResolvedValueOnce(createMockResponse(401, false))
-      .mockResolvedValueOnce(createMockResponse(401, false))
-      .mockResolvedValueOnce(createMockResponse(200, true));
+  it('should allow retry after failed validation (invalid key)', async () => {
+    // First: needs key, second: invalid key, third: valid key
+    vi.mocked(apiUtils.getServerConfig)
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: false }))
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: true }));
 
     render(
       <AppBoot>
@@ -481,10 +459,10 @@ describe('API Key Entry Flow - Integration', () => {
   });
 
   it('should allow retry after network error on submit', async () => {
-    vi.mocked(apiUtils.authenticatedFetch)
-      .mockResolvedValueOnce(createMockResponse(401, false))
+    vi.mocked(apiUtils.getServerConfig)
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: false, keyValid: false }))
       .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce(createMockResponse(200, true));
+      .mockResolvedValueOnce(createMockConfig({ authEnabled: true, keyPassed: true, keyValid: true }));
 
     render(
       <AppBoot>
