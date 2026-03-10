@@ -55,8 +55,55 @@ export function extractModelPath(model) {
   return extractFilenameFromArgs(model.args);
 }
 
+const FILE_FLAGS = [
+  '--diffusion-model',
+  '--model',
+  '-m',
+  '--vae',
+  '--llm',
+  '--llm_vision',
+  '--clip_l',
+  '--t5xxl',
+  '--clip',
+  '--clip_g',
+  '--clip_vision',
+  '--embeddings',
+  '--text_encoder',
+  '--tokenizer',
+  '--mmdit'
+];
+
 /**
- * Helper function to extract filename from model args
+ * Extract file paths from model args
+ * @param {Array} args - Model arguments array
+ * @returns {Array} Array of file objects with { flag, path }
+ */
+export function extractFilesFromArgs(args) {
+  if (!args || !Array.isArray(args)) {
+    return [];
+  }
+
+  const files = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (FILE_FLAGS.includes(arg) && i + 1 < args.length) {
+      const filePath = args[i + 1];
+      if (filePath && (filePath.startsWith('./') || filePath.startsWith('/') || filePath.includes('.'))) {
+        files.push({
+          flag: arg,
+          path: filePath
+        });
+      }
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Extract only the main model filename from args (for backward compatibility)
  * Looks for --diffusion-model, --model, or -m flag values
  * @param {Array} args - Model arguments array
  * @returns {string|null} Extracted filename or null
@@ -147,38 +194,70 @@ export function extractQuantFromFilename(filename) {
 }
 
 /**
- * Helper function to get file status for a model with HuggingFace config
+ * Helper function to get file status for a model
+ * Detects files from model.args first, falls back to huggingface.files
  * @param {Object} model - The model object
- * @returns {Promise<Object|null>} File status object with { hasHuggingFace, allFilesExist, files[] }
+ * @returns {Promise<Object|null>} File status object with { hasHuggingFace, allFilesExist, files[], source }
  */
 export async function getModelFileStatus(model) {
-  if (!model.huggingface || !model.huggingface.files) {
+  const { existsSync } = await import('fs');
+
+  const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+  let fileList = [];
+  let source = null;
+
+  // First: try to extract files from model.args
+  if (model.args && Array.isArray(model.args)) {
+    const argsFiles = extractFilesFromArgs(model.args);
+    if (argsFiles.length > 0) {
+      fileList = argsFiles;
+      source = 'args';
+    }
+  }
+
+  // Fall back to huggingface.files if no args files found
+  if (fileList.length === 0 && model.huggingface && model.huggingface.files) {
+    fileList = model.huggingface.files.map(f => ({ flag: 'huggingface', path: f.path, dest: f.dest }));
+    source = 'huggingface';
+  }
+
+  // No files detected - could be API mode or external model
+  if (fileList.length === 0) {
     return {
       hasHuggingFace: false,
-      allFilesExist: true,  // Models without huggingface config are configured locally, assume files present
-      files: []
+      allFilesExist: true,
+      files: [],
+      source: null
     };
   }
 
-  const { existsSync } = await import('fs');
-
-  // Get project root path (backend/..)
-  const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-
   // Check each file
-  const fileStatus = model.huggingface.files.map(file => {
-    // Use the dest from config, or fall back to MODELS_DIR env, or ./models
-    const destDir = file.dest || process.env.MODELS_DIR || './models';
+  const fileStatus = fileList.map(file => {
+    let resolvedDestDir;
+    let filePath;
+    let fileName;
+    let exists;
 
-    // Resolve the path from the project root
-    const resolvedDestDir = resolve(projectRoot, destDir);
-    const fileName = basename(file.path);
-    const filePath = join(resolvedDestDir, fileName);
-    const exists = existsSync(filePath);
+    if (source === 'huggingface') {
+      // Use the dest from config, or fall back to MODELS_DIR env, or ./models
+      const destDir = file.dest || process.env.MODELS_DIR || './models';
+      resolvedDestDir = resolve(projectRoot, destDir);
+      fileName = basename(file.path);
+      filePath = join(resolvedDestDir, fileName);
+    } else {
+      // Args-based files - use the path as-is (relative to project root)
+      const fileArg = file.path;
+      resolvedDestDir = resolve(projectRoot, dirname(fileArg));
+      fileName = basename(fileArg);
+      filePath = resolve(projectRoot, fileArg);
+    }
+
+    exists = existsSync(filePath);
 
     return {
       path: file.path,
-      dest: file.dest,
+      flag: file.flag,
       filePath,
       resolvedDestDir,
       exists,
@@ -187,9 +266,10 @@ export async function getModelFileStatus(model) {
   });
 
   return {
-    hasHuggingFace: true,
+    hasHuggingFace: source === 'huggingface',
     allFilesExist: fileStatus.every(f => f.exists),
-    files: fileStatus
+    files: fileStatus,
+    source
   };
 }
 
@@ -243,6 +323,7 @@ export default {
   deriveModelType,
   extractModelPath,
   extractFilenameFromArgs,
+  extractFilesFromArgs,
   getModelTypeFromFilename,
   getModelFileStatus,
   findModelIdByName,
