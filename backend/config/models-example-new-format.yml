@@ -84,6 +84,7 @@ models:
   flux1-schnell:
     name: "FLUX.1 Schnell"
     description: "FLUX.1 Schnell - Fast generation [Q8_0]"
+    enabled: false
     backend: "sd-server-flux"
     model_file: "./models/flux1-schnell-Q8_0.gguf"
     vae: "./models/vae/flux1_f32.safetensors"
@@ -101,6 +102,7 @@ models:
   gemma-3-27b-it:
     name: "Gemma 3 27B IT"
     description: "Google Gemma 3 27B Instruct"
+    enabled: false
     backend: "llama-server"
     # For llama-server with --models-preset, reference the INI section
     ini_section: "gemma-3-27b-it"
@@ -110,6 +112,7 @@ models:
   devstral-small-24b:
     name: "Devstral Small 24B"
     description: "Devstral Small 2-24B Instruct"
+    enabled: false
     backend: "llama-server"
     ini_section: "Devstral-Small-2-24B-Instruct"
     capabilities: ["text-generation"]
