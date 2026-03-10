@@ -5,6 +5,7 @@ models:
   # Recommended settings: cfg_scale=0.0-1.0 (typically 0.0), steps=4-9 (typically 9)
   z-image:
     name: "Z-Image"
+    quant: "Q8_0"
     description: "Z-Image"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -34,8 +35,189 @@ models:
       sample_steps: 40
       sampling_method: "euler"
 
+  z-image-bf16:
+    enabled: false
+    name: "Z-Image BF16"
+    quant: "BF16"
+    description: "Z-Image BF16 - high quality BF16 variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: true
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/z-image/z-image-BF16.gguf"
+      - "--vae"
+      - "./models/vae/flux1_f32.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "40"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 40
+      sampling_method: "euler"
+
+  z-image-q5-ks:
+    enabled: false
+    name: "Z-Image Q5_K_S"
+    quant: "Q5_K_S"
+    description: "Z-Image Q5_K_S - compact quantized variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: true
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/z-image/z-image-Q5_K_S.gguf"
+      - "--vae"
+      - "./models/vae/flux1_f32.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "40"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 40
+      sampling_method: "euler"
+
+  z-image-turbo-bf16:
+    enabled: false
+    name: "Z-Image Turbo BF16"
+    quant: "BF16"
+    description: "Z-Image Turbo BF16 - high quality BF16 variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/z-image/z-image-turbo-BF16.gguf"
+      - "--vae"
+      - "./models/vae/flux1_f32.safetensors"
+      - "--llm"
+      - "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "9"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 9
+      sampling_method: "euler"
+
+  z-image-turbo-q2-k:
+    enabled: true
+    name: "Z-Image Turbo Q2_K"
+    quant: "Q2_K"
+    description: "Z-Image Turbo Q2_K - ultra-compact quantized variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/z-image/z-image-turbo-Q2_K.gguf"
+      - "--vae"
+      - "./models/vae/flux1_f32.safetensors"
+      - "--llm"
+      - "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "9"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 9
+      sampling_method: "euler"
+
+  z-image-turbo-q6-k:
+    enabled: false
+    name: "Z-Image Turbo Q6_K"
+    quant: "Q6_K"
+    description: "Z-Image Turbo Q6_K - medium-high quality quantized variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/z-image/z-image-turbo-Q6_K.gguf"
+      - "--vae"
+      - "./models/vae/flux1_f32.safetensors"
+      - "--llm"
+      - "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "9"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 9
+      sampling_method: "euler"
+
+  z-image-turbo-underscore-q8:
+    enabled: true
+    name: "Z-Image Turbo Q8_0 (alt)"
+    quant: "Q8_0"
+    description: "Z-Image Turbo Q8_0 alternate filename variant"
+    capabilities: ["text-to-image"]
+    supports_negative_prompt: false
+    mode: "on_demand"
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/z-image/z_image_turbo-Q8_0.gguf"
+      - "--vae"
+      - "./models/vae/flux1_f32.safetensors"
+      - "--llm"
+      - "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--diffusion-fa"
+      - "--steps"
+      - "9"
+    exec_mode: "server"
+    model_type: "text-to-image"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 1
+      sample_steps: 9
+      sampling_method: "euler"
+
   z-image-turbo:
     name: "Z-Image Turbo"
+    quant: "Q8_0"
     description: "Z-Image Turbo - fast text-to-image model with 4GB VRAM support"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
