@@ -194,8 +194,33 @@ export function extractQuantFromFilename(filename) {
 }
 
 /**
+ * Top-level config fields that point to model files.
+ * Matches the ARGUMENT_MAP in backendRegistry.js so we can detect files
+ * from model configs that use field-based declarations (e.g. model_file, vae)
+ * rather than explicit args arrays.
+ */
+const CONFIG_FILE_FIELDS = {
+  model_file: '--diffusion-model',
+  diffusion_model: '--diffusion-model',
+  vae: '--vae',
+  vae_file: '--vae',
+  clip_l: '--clip_l',
+  clip_l_file: '--clip_l',
+  t5xxl: '--t5xxl',
+  t5xxl_file: '--t5xxl',
+  qwen2vl: '--qwen2vl',
+  qwen2vl_file: '--qwen2vl',
+  clip_vision: '--clip_vision',
+  clip_vision_file: '--clip_vision',
+  mmproj: '--mmproj',
+  mmproj_file: '--mmproj',
+};
+
+/**
  * Helper function to get file status for a model
- * Detects files from model.args first, falls back to huggingface.files
+ * Priority: 1) model.args file flags  2) top-level config file fields  3) huggingface.files
+ * Models with exec_mode=api and no detectable files are treated as present (external).
+ * All other models with no detectable files are treated as NOT present.
  * @param {Object} model - The model object
  * @returns {Promise<Object|null>} File status object with { hasHuggingFace, allFilesExist, files[], source }
  */
@@ -207,7 +232,7 @@ export async function getModelFileStatus(model) {
   let fileList = [];
   let source = null;
 
-  // First: try to extract files from model.args
+  // 1) Extract files from model.args (post-resolution, these include merged backend args)
   if (model.args && Array.isArray(model.args)) {
     const argsFiles = extractFilesFromArgs(model.args);
     if (argsFiles.length > 0) {
@@ -216,44 +241,56 @@ export async function getModelFileStatus(model) {
     }
   }
 
-  // Fall back to huggingface.files if no args files found
+  // 2) Check top-level config file fields (model_file, vae, mmproj, etc.)
+  if (fileList.length === 0) {
+    for (const [field, flag] of Object.entries(CONFIG_FILE_FIELDS)) {
+      if (model[field] && typeof model[field] === 'string') {
+        fileList.push({ flag, path: model[field] });
+      }
+    }
+    if (fileList.length > 0) {
+      source = 'config';
+    }
+  }
+
+  // 3) Fall back to huggingface.files
   if (fileList.length === 0 && model.huggingface && model.huggingface.files) {
     fileList = model.huggingface.files.map(f => ({ flag: 'huggingface', path: f.path, dest: f.dest }));
     source = 'huggingface';
   }
 
-  // No files detected - could be API mode or external model
+  // No files detected
   if (fileList.length === 0) {
+    // API/external models with no local files are treated as available
+    const isExternal = model.exec_mode === 'api' || !!(model.api && !model.command);
     return {
       hasHuggingFace: false,
-      allFilesExist: true,
+      allFilesExist: isExternal,
       files: [],
       source: null
     };
   }
 
-  // Check each file
+  // Check each file on disk
   const fileStatus = fileList.map(file => {
     let resolvedDestDir;
     let filePath;
     let fileName;
-    let exists;
 
     if (source === 'huggingface') {
-      // Use the dest from config, or fall back to MODELS_DIR env, or ./models
       const destDir = file.dest || process.env.MODELS_DIR || './models';
       resolvedDestDir = resolve(projectRoot, destDir);
       fileName = basename(file.path);
       filePath = join(resolvedDestDir, fileName);
     } else {
-      // Args-based files - use the path as-is (relative to project root)
+      // Args/config files - resolve relative to project root
       const fileArg = file.path;
       resolvedDestDir = resolve(projectRoot, dirname(fileArg));
       fileName = basename(fileArg);
       filePath = resolve(projectRoot, fileArg);
     }
 
-    exists = existsSync(filePath);
+    const exists = existsSync(filePath);
 
     return {
       path: file.path,

@@ -3,19 +3,29 @@
  *
  * Tests for modelHelpers.js functions including:
  * - extractFilesFromArgs: Extract file paths from model args
- * - getModelFileStatus: Detect files from args vs huggingface config
+ * - getModelFileStatus: Detect files from args, config fields, and huggingface config
+ *
+ * IMPORTANT: Tests that need real files on disk use os.tmpdir() to avoid
+ * touching the real models/ directory.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 describe('modelHelpers', () => {
-  let testDirs = [];
+  // Use a unique temp directory per test run - NEVER touch real project dirs
+  let tmpDir = null;
+
+  const createTmpDir = () => {
+    tmpDir = path.join(os.tmpdir(), `sdcpp-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(tmpDir, { recursive: true });
+    return tmpDir;
+  };
 
   const createTestFile = (filePath) => {
     const dir = path.dirname(filePath);
@@ -23,20 +33,6 @@ describe('modelHelpers', () => {
       mkdirSync(dir, { recursive: true });
     }
     writeFileSync(filePath, 'test content');
-    testDirs.push(dir);
-  };
-
-  const cleanupTestFiles = () => {
-    for (const dir of [...new Set(testDirs)]) {
-      try {
-        if (existsSync(dir)) {
-          rmSync(dir, { recursive: true, force: true });
-        }
-      } catch (e) {
-        // Ignore cleanup errors
-      }
-    }
-    testDirs = [];
   };
 
   beforeEach(() => {
@@ -44,7 +40,14 @@ describe('modelHelpers', () => {
   });
 
   afterEach(() => {
-    cleanupTestFiles();
+    if (tmpDir && existsSync(tmpDir)) {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true });
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
+    tmpDir = null;
   });
 
   describe('extractFilesFromArgs', () => {
@@ -138,16 +141,18 @@ describe('modelHelpers', () => {
       expect(status.files[0].flag).toBe('--diffusion-model');
     });
 
-    it('should check file existence for args-based files', async () => {
+    it('should check file existence using a temp directory', async () => {
       const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
       
-      // Create a test file
-      const testFilePath = path.join(PROJECT_ROOT, 'models/test-model.gguf');
+      // Use a temp dir so we never risk deleting real models/
+      const dir = createTmpDir();
+      const testFilePath = path.join(dir, 'test-model.gguf');
       createTestFile(testFilePath);
       
+      // Use absolute path so getModelFileStatus resolves it correctly
       const model = {
         id: 'test-model',
-        args: ['--diffusion-model', './models/test-model.gguf']
+        args: ['--diffusion-model', testFilePath]
       };
       
       const status = await getModelFileStatus(model);
@@ -173,7 +178,40 @@ describe('modelHelpers', () => {
       expect(status.allFilesExist).toBe(false);
     });
 
-    it('should fall back to huggingface.files when no args files', async () => {
+    it('should detect files from config fields (model_file, vae, mmproj)', async () => {
+      const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
+      
+      const model = {
+        id: 'llm-test',
+        model_file: './models/some-llm.gguf',
+        mmproj: './models/mmproj.gguf',
+      };
+      
+      const status = await getModelFileStatus(model);
+      
+      expect(status.source).toBe('config');
+      expect(status.files).toHaveLength(2);
+      expect(status.files[0].flag).toBe('--diffusion-model');
+      expect(status.files[1].flag).toBe('--mmproj');
+      expect(status.allFilesExist).toBe(false); // files don't exist
+    });
+
+    it('should prefer args over config fields', async () => {
+      const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
+      
+      const model = {
+        id: 'test-model',
+        model_file: './models/config-model.gguf',
+        args: ['--diffusion-model', './models/args-model.gguf'],
+      };
+      
+      const status = await getModelFileStatus(model);
+      
+      expect(status.source).toBe('args');
+      expect(status.files[0].path).toBe('./models/args-model.gguf');
+    });
+
+    it('should fall back to huggingface.files when no args or config files', async () => {
       const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
       
       const model = {
@@ -211,7 +249,7 @@ describe('modelHelpers', () => {
       expect(status.files[0].path).toBe('./models/args-model.gguf');
     });
 
-    it('should handle models with no files (API mode)', async () => {
+    it('should treat API/external models as present', async () => {
       const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
       
       const model = {
@@ -228,6 +266,23 @@ describe('modelHelpers', () => {
       expect(status.hasHuggingFace).toBe(false);
     });
 
+    it('should treat non-API models with no files as NOT present', async () => {
+      const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
+      
+      // A model with just ini_section and no file fields - should be missing
+      const model = {
+        id: 'llm-gemma',
+        backend: 'llama-server',
+        ini_section: 'gemma-3-27b-it',
+        capabilities: ['text-generation'],
+      };
+      
+      const status = await getModelFileStatus(model);
+      
+      expect(status.source).toBeNull();
+      expect(status.allFilesExist).toBe(false);
+    });
+
     it('should handle models with empty args', async () => {
       const { getModelFileStatus } = await import('../backend/utils/modelHelpers.js');
       
@@ -240,6 +295,8 @@ describe('modelHelpers', () => {
       
       expect(status.source).toBeNull();
       expect(status.files).toEqual([]);
+      // No exec_mode=api, so treated as not present
+      expect(status.allFilesExist).toBe(false);
     });
   });
 });
