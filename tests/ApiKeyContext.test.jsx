@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 
 // Clear the global mock for ApiKeyContext to test real behavior
 vi.unmock('../frontend/src/contexts/ApiKeyContext');
@@ -18,10 +19,38 @@ import { ApiKeyModal, ApiKeyProvider } from '../frontend/src/components/ApiKeyMo
 
 // Mock the API utilities that ApiKeyModal uses
 vi.mock('../frontend/src/utils/api', () => ({
+  authenticatedFetch: vi.fn((url) => {
+    let payload = {};
+    if (typeof url === 'string' && url.includes('/api/generations')) {
+      payload = {
+        data: [],
+        pagination: { total: 0, limit: 20, offset: 0, hasMore: false }
+      };
+    } else if (typeof url === 'string' && url.includes('/api/models')) {
+      payload = { data: [] };
+    } else if (typeof url === 'string' && url.includes('/api/upscalers')) {
+      payload = { upscalers: [] };
+    } else if (typeof url === 'string' && url.includes('/api/config')) {
+      payload = { authEnabled: false, keyPassed: false, keyValid: false, model: null, sdApiEndpoint: null };
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => payload,
+      text: async () => '',
+    });
+  }),
   saveApiKey: vi.fn(),
   validateApiKey: vi.fn(() => Promise.resolve(true)),
   isAuthRequired: vi.fn(() => Promise.resolve(false)),
   getStoredApiKey: vi.fn(() => null),
+  getServerConfig: vi.fn(() => Promise.resolve({
+    authEnabled: false,
+    keyPassed: false,
+    keyValid: false,
+    sdApiEndpoint: null,
+    model: null,
+  })),
 }));
 
 describe('ApiKeyContext Provider Hierarchy', () => {
@@ -134,7 +163,13 @@ describe('ApiKeyContext Provider Hierarchy', () => {
       // The correct order is: ApiKeyContextProvider OUTSIDE ApiKeyProvider
       // This ensures ApiKeyModal (rendered by ApiKeyProvider) can access the context
       expect(() => {
-        render(React.createElement(AppWithProviders));
+        render(
+          React.createElement(
+            MemoryRouter,
+            { initialEntries: ['/studio'] },
+            React.createElement(AppWithProviders)
+          )
+        );
       }).not.toThrow();
     });
 
@@ -142,7 +177,13 @@ describe('ApiKeyContext Provider Hierarchy', () => {
       const { AppWithProviders } = await import('../frontend/src/App');
 
       // Render the app
-      render(React.createElement(AppWithProviders));
+      render(
+        React.createElement(
+          MemoryRouter,
+          { initialEntries: ['/studio'] },
+          React.createElement(AppWithProviders)
+        )
+      );
 
       // If the providers were in the wrong order, we would get an error
       // The fact that this doesn't throw means the hierarchy is correct

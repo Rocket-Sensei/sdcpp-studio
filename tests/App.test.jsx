@@ -67,6 +67,15 @@ vi.mock('../frontend/src/utils/api', () => ({
     json: async () => ({}),
     text: async () => '',
   })),
+  getStoredApiKey: vi.fn(() => null),
+  saveApiKey: vi.fn(),
+  getServerConfig: vi.fn(() => Promise.resolve({
+    authEnabled: false,
+    keyPassed: false,
+    keyValid: false,
+    sdApiEndpoint: null,
+    model: null,
+  })),
   isAuthRequired: vi.fn(() => false),
 }));
 
