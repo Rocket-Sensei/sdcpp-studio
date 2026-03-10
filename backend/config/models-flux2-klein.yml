@@ -8,11 +8,11 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux-2-klein-4b.safetensors"
+      - "./models/flux-klein-4b/flux-2-klein-4b.safetensors"
       - "--vae"
-      - "./models/flux2_klein_vae.safetensors"
+      - "./models/vae/flux2_klein_vae.safetensors"
       - "--llm"
-      - "./models/qwen_3_4b.safetensors"
+      - "./models/qwen3/qwen_3_4b.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -30,19 +30,547 @@ models:
       sample_steps: 4
       sampling_method: "euler"
 
+  flux2-klein-4b-bf16:
+    enabled: false
+    name: "FLUX.2 Klein 4B BF16"
+    quant: "BF16"
+    description: "FLUX.2 [klein] 4B BF16 - High quality FP16/BF16 variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-BF16.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-f16:
+    enabled: false
+    name: "FLUX.2 Klein 4B F16"
+    quant: "F16"
+    description: "FLUX.2 [klein] 4B F16 - Full precision variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-F16.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q8:
+    enabled: true
+    name: "FLUX.2 Klein 4B Q8_0"
+    quant: "Q8_0"
+    description: "FLUX.2 [klein] 4B Q8_0 - High quality quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q8_0.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q6:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q6_K"
+    quant: "Q6_K"
+    description: "FLUX.2 [klein] 4B Q6_K - Medium-high quality quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q6_K.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q5-k-m:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q5_K_M"
+    quant: "Q5_K_M"
+    description: "FLUX.2 [klein] 4B Q5_K_M - Medium quality quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q5_K_M.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q5-k-s:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q5_K_S"
+    quant: "Q5_K_S"
+    description: "FLUX.2 [klein] 4B Q5_K_S - Small-medium quality quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q5_K_S.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q5-0:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q5_0"
+    quant: "Q5_0"
+    description: "FLUX.2 [klein] 4B Q5_0 - Medium quality quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q5_0.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q5-1:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q5_1"
+    quant: "Q5_1"
+    description: "FLUX.2 [klein] 4B Q5_1 - Medium quality quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q5_1.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q4-k-m:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q4_K_M"
+    quant: "Q4_K_M"
+    description: "FLUX.2 [klein] 4B Q4_K_M - Balanced quality/size quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q4_K_M.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q4-k-s:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q4_K_S"
+    quant: "Q4_K_S"
+    description: "FLUX.2 [klein] 4B Q4_K_S - Smaller balanced quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q4_K_S.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q4-0:
+    enabled: true
+    name: "FLUX.2 Klein 4B Q4_0"
+    quant: "Q4_0"
+    description: "FLUX.2 [klein] 4B Q4_0 - Compact quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q4_0.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q4-1:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q4_1"
+    quant: "Q4_1"
+    description: "FLUX.2 [klein] 4B Q4_1 - Compact quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q4_1.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q3-k-m:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q3_K_M"
+    quant: "Q3_K_M"
+    description: "FLUX.2 [klein] 4B Q3_K_M - Smaller quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q3_K_M.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q3-k-s:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q3_K_S"
+    quant: "Q3_K_S"
+    description: "FLUX.2 [klein] 4B Q3_K_S - Very compact quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q3_K_S.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-q2-k:
+    enabled: false
+    name: "FLUX.2 Klein 4B Q2_K"
+    quant: "Q2_K"
+    description: "FLUX.2 [klein] 4B Q2_K - Ultra-compact quantized variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-4b-Q2_K.gguf"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-base-bf16:
+    enabled: false
+    name: "FLUX.2 Klein Base 4B BF16"
+    quant: "BF16"
+    description: "FLUX.2 [klein] Base 4B BF16 - Base model variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-base-4b-bf16.safetensors"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
+  flux2-klein-4b-base-fp8:
+    enabled: false
+    name: "FLUX.2 Klein Base 4B FP8"
+    quant: "FP8"
+    description: "FLUX.2 [klein] Base 4B FP8 - Base model FP8 variant"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/flux-klein-4b/flux-2-klein-base-4b-fp8.safetensors"
+      - "--vae"
+      - "./models/vae/flux2_klein_vae.safetensors"
+      - "--llm"
+      - "./models/qwen3/qwen_3_4b.safetensors"
+      - "-v"
+      - "--offload-to-cpu"
+      - "--clip-on-cpu"
+      - "--steps"
+      - "6"
+      - "--diffusion-fa"
+    mode: "on_demand"
+    exec_mode: "server"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    startup_timeout: 120000
+    generation_params:
+      cfg_scale: 1.0
+      sample_steps: 6
+      sampling_method: "euler"
+
   flux2-klein-9b-q8:
     name: "FLUX.2 Klein 9B"
+    quant: "Q8_0"
     description: " FLUX.2 [klein] 9B Q8_0 unifies generation and editing in a single compact architecture"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux-2-klein-9b-Q8_0.gguf"
+      - "./models/flux-klein-9b/flux-2-klein-9b-Q8_0.gguf"
       - "--vae"
-      - "./models/flux2_klein_vae.safetensors"
+      - "./models/vae/flux2_klein_vae.safetensors"
       - "--llm"
-      - "./models/qwen_3_8b.safetensors"
+      - "./models/qwen3/qwen_3_8b.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -72,9 +600,9 @@ models:
       - "--diffusion-model"
       - "./models/unstableRevolutionF2K_AlphaF2K4B.safetensors"
       - "--vae"
-      - "./models/flux2_klein_vae.safetensors"
+      - "./models/vae/flux2_klein_vae.safetensors"
       - "--llm"
-      - "./models/qwen_3_4b.safetensors"
+      - "./models/qwen3/qwen_3_4b.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -103,9 +631,9 @@ models:
       - "--diffusion-model"
       - "./models/unstableRevolutionF2K_AlphaF2K4B.safetensors"
       - "--vae"
-      - "./models/flux2_klein_vae.safetensors"
+      - "./models/vae/flux2_klein_vae.safetensors"
       - "--llm"
-      - "./models/qwen_3_8b.safetensors"
+      - "./models/qwen3/qwen_3_8b.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"

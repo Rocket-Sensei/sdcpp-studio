@@ -14,8 +14,8 @@ models:
     name: "Qwen 2.5 VL 7B (Q4_K_M)"
     description: "Qwen 2.5 VL 7B Instruct - Vision-language model (Q4_K_M quantized)"
     backend: "llama-server"
-    model_file: "./models/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
-    mmproj: "./models/Qwen2.5-VL-7B-Instruct.mmproj-Q8_0.gguf"
+    model_file: "./models/qwen25/Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+    mmproj: "./models/qwen25/Qwen2.5-VL-7B-Instruct.mmproj-Q8_0.gguf"
     capabilities: ["text-generation", "vision"]
     model_type: "text-generation"
     architecture:
@@ -35,8 +35,8 @@ models:
     name: "Qwen 2.5 VL 7B (Q8_0)"
     description: "Qwen 2.5 VL 7B Instruct - Vision-language model (Q8_0 quantized)"
     backend: "llama-server"
-    model_file: "./models/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
-    mmproj: "./models/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+    model_file: "./models/qwen25/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+    mmproj: "./models/qwen25/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
     capabilities: ["text-generation", "vision"]
     model_type: "text-generation"
     architecture:
@@ -57,7 +57,7 @@ models:
     name: "Qwen 3 4B (Q8_0)"
     description: "Qwen 3 4B Instruct - Text generation model (Q8_0 quantized)"
     backend: "llama-server"
-    model_file: "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+    model_file: "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
     capabilities: ["text-generation"]
     model_type: "text-generation"
     architecture:
@@ -78,7 +78,7 @@ models:
     name: "Llama 3.1 8B (Q8_0)"
     description: "Meta Llama 3.1 8B Instruct - General purpose text generation (Q8_0 quantized)"
     backend: "llama-server"
-    model_file: "./models/Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
+    model_file: "./models/_other/Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
     capabilities: ["text-generation"]
     model_type: "text-generation"
     architecture:

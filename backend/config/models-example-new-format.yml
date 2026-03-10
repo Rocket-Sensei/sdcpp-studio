@@ -86,7 +86,7 @@ models:
     description: "FLUX.1 Schnell - Fast generation [Q8_0]"
     backend: "sd-server-flux"
     model_file: "./models/flux1-schnell-Q8_0.gguf"
-    vae: "./models/ae.safetensors"
+    vae: "./models/vae/flux1_f32.safetensors"
     clip_l: "./models/clip_l.safetensors"
     t5xxl: "./models/t5xxl_fp16.safetensors"
     capabilities: ["text-to-image"]

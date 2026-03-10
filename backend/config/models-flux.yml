@@ -2,19 +2,20 @@ models:
   # ==================== Flux Models ====================
   flux1-schnell-fp8:
     name: "FLUX.1 Schnell"
+    quant: "Q8_0"
     description: "FLUX.1 Schnell - Fast generation model [Q8_0]"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux1-schnell-Q8_0.gguf"
+      - "./models/flux1-schnell/flux1-schnell-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -34,6 +35,7 @@ models:
   flux1-schnell-fp8-cli:
     enabled: false
     name: "FLUX.1 Schnell FP8 - CLI mode"
+    quant: "Q8_0"
     description: "FLUX.1 Schnell FP8 used via sd-cli"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
@@ -41,13 +43,13 @@ models:
     command: "./bin/sd-cli"
     args:
       - "--diffusion-model"
-      - "./models/flux1-schnell-Q8_0.gguf"
+      - "./models/flux1-schnell/flux1-schnell-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -66,6 +68,7 @@ models:
   fluxed-up-flux-61-q8:
     enabled: false
     name: "FluxedUp Flux 61 Q8"
+    quant: "Q8_0"
     description: "FluxedUp Flux 61 - Q8 quantized (12GB)"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
@@ -74,11 +77,11 @@ models:
       - "--diffusion-model"
       - "./models/fluxedUpFluxNSFW_61FP16.q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -96,6 +99,7 @@ models:
   fluxed-up-flux:
     enabled: false
     name: "FluxedUp Flux"
+    quant: "Q4_K_S"
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
@@ -104,11 +108,11 @@ models:
       - "--diffusion-model"
       - "./models/fluxedUpFluxNSFW_v51Q4KSV2.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -126,6 +130,7 @@ models:
   fux-capacity:
     enabled: false
     name: "fuxCapacityNSFW"
+    quant: "Q8_0"
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
@@ -134,11 +139,11 @@ models:
       - "--diffusion-model"
       - "./models/fuxCapacityNSFWPornFlux_40Q80.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -156,19 +161,20 @@ models:
   flux1-krea-dev:
     enabled: false
     name: "FLUX.1 Krea Dev"
+    quant: "Q8_0"
     description: "FLUX.1 Krea Dev - Drop-in replacement for FLUX.1 dev"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux1-krea-dev-Q8_0.gguf"
+      - "./models/flux1-krea/flux1-krea-dev-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"

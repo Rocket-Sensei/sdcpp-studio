@@ -7,19 +7,20 @@
 models:
   shuttle-3-diffusion:
     name: "Shuttle-3-Diffusion"
+    quant: "Q8_0"
     description: "Shuttle-3-Diffusion - Apache 2.0 licensed aesthetic model (Flux Schnell based)"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/shuttle-3-diffusion-Q8_0.gguf"
+      - "./models/flux-other/shuttle-3-diffusion-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"
@@ -43,13 +44,13 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/shuttle-jaguar-Q8_0.gguf"
+      - "./models/flux-other/shuttle-jaguar-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"

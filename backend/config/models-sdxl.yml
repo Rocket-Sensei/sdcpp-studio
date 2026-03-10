@@ -12,9 +12,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/epicrealismXL_pureFix.safetensors"
+      - "./models/sdxl-other/epicrealismXL_pureFix.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -38,9 +38,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/forrealxlV10_v10.safetensors"
+      - "./models/sdxl-other/forrealxlV10_v10.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -63,9 +63,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/ThinkDiffusionXL.safetensors"
+      - "./models/sdxl-other/ThinkDiffusionXL.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -89,9 +89,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/pornmasterPro_noobV15VAE.safetensors"
+      - "./models/sdxl-other/pornmasterPro_noobV15VAE.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -115,9 +115,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/perfectionAmateurILXL_33.safetensors"
+      - "./models/sdxl-other/perfectionAmateurILXL_33.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -140,9 +140,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/DreamShaperXL_Turbo_dpmppSdeKarras_half_pruned_6.safetensors"
+      - "./models/sdxl-other/DreamShaperXL_Turbo_dpmppSdeKarras_half_pruned_6.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -165,7 +165,7 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/cyberrealistic_final.safetensors"
+      - "./models/sdxl-other/cyberrealistic_final.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -189,9 +189,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/novaAnimeXL_ilV160.safetensors"
+      - "./models/sdxl-other/novaAnimeXL_ilV160.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -214,9 +214,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/perfectdeliberate_v70.safetensors"
+      - "./models/deliberate/perfectdeliberate_v70.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -239,9 +239,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/perfectdeliberate_v8.safetensors"
+      - "./models/deliberate/perfectdeliberate_v8.safetensors"
       - "--vae"
-      - "./models/sdxl-vae-fp16-fix.safetensors"
+      - "./models/vae/sdxl-vae-fp16-fix.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
@@ -255,4 +255,3 @@ models:
       cfg_scale: 7.0
       sample_steps: 20
       sampling_method: "euler_a"
-

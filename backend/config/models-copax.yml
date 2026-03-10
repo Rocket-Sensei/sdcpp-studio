@@ -12,11 +12,11 @@ models:
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/copaxTimeless_xplusZ1.safetensors"
+      - "./models/sdxl-other/copaxTimeless_xplusZ1.safetensors"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/ae.safetensors"
       - "--llm"
-      - "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf"
+      - "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
       - "-v"
       - "--offload-to-cpu"
       - "--diffusion-fa"
@@ -37,12 +37,12 @@ models:
       repo: "copax/CopaxTimelessXLZ1"
       files:
         - path: "copaxTimeless_xplusZ1.safetensors"
-          dest: "./models/"
+          dest: "./models/sdxl-other/"
         - path: "ae.safetensors"
-          dest: "./models/"
+          dest: "./models/vae/"
           repo: "black-forest-labs/FLUX.1-schnell"
         - path: "Qwen3-4B-Instruct-2507-Q8_0.gguf"
-          dest: "./models/"
+          dest: "./models/qwen3/"
           repo: "unsloth/Qwen3-4B-Instruct-2507-GGUF"
     # Civitai download source
     civitai:

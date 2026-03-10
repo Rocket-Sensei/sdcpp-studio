@@ -2,19 +2,20 @@ models:
   chroma-unlocked:
     enabled: false
     name: "chroma unlocked v10 Q8_0"
+    quant: "Q8_0"
     description: "chroma unlocked v10 Q8_0"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/chroma-unlocked-v10-Q8_0.gguf"
+      - "./models/chroma/chroma-unlocked-v10-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"

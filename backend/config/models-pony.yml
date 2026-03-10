@@ -8,9 +8,9 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/CyberRealisticPony_V12.7-q8_0.gguf"
+      - "./models/sdxl-other/CyberRealisticPony_V12.7-q8_0.gguf"
       - "--vae"
-      - "./models/CyberRealisticPony_V12.7-vae_f16-q8_0.gguf"
+      - "./models/sdxl-other/CyberRealisticPony_V12.7-vae_f16-q8_0.gguf"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"

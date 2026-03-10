@@ -9,19 +9,20 @@ models:
   flux1-kontext-dev:
     enabled: false
     name: "FLUX.1 Kontext Dev"
+    quant: "Q8_0"
     description: "FLUX.1 Kontext Dev - Enhanced FLUX.1 dev model (6GB+ VRAM) - Supports imgedit"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux1-kontext-dev-Q8_0.gguf"
+      - "./models/flux1-kontext/flux1-kontext-dev-Q8_0.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
-      - "./models/clip_l.safetensors"
+      - "./models/clips/kontext_clip_l.safetensors"
       - "--t5xxl"
-      - "./models/t5xxl_fp16.safetensors"
+      - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
       - "--offload-to-cpu"
       - "--clip-on-cpu"

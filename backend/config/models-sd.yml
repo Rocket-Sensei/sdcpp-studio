@@ -9,7 +9,7 @@ models:
     command: "./bin/sd-server"
     args:
       - "-m"
-      - "./models/sd1_5.ckpt"
+      - "./models/sd/sd1_5.ckpt"
       - "-v"
       - "--offload-to-cpu"
       - "--steps"
