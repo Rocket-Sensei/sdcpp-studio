@@ -8,6 +8,7 @@ import {
 } from '../db/queries.js';
 import { modelManager } from '../services/modelManager.js';
 import { authenticateRequest } from '../middleware/auth.js';
+import { getModelFileStatus } from '../utils/modelHelpers.js';
 
 const logger = createLogger('routes:openai');
 
@@ -419,7 +420,7 @@ export function registerOpenAIRoutes(app, upload) {
    * GET /api/v1/models
    * OpenAI-compatible models list endpoint (OpenRouter-style format)
    */
-  app.get('/api/v1/models', authenticateRequest, (req, res) => {
+  app.get('/api/v1/models', authenticateRequest, async (req, res) => {
     const models = modelManager.getAllModels();
     
     const getModalities = (model) => {
@@ -462,12 +463,19 @@ export function registerOpenAIRoutes(app, upload) {
       };
     };
 
+    const modelsWithFileStatus = await Promise.all(
+      models.map(async (model) => {
+        const fileStatus = await getModelFileStatus(model);
+        return { model, fileStatus };
+      })
+    );
+
     res.json({
       object: 'list',
       backend_settings: modelManager.backendSettings || {},
-      data: models
-        .filter(m => m.enabled !== false)
-        .map(model => {
+      data: modelsWithFileStatus
+        .filter(({ model }) => model.enabled !== false)
+        .map(({ model, fileStatus }) => {
           const architecture = getModalities(model);
           return {
             id: model.id,
@@ -484,7 +492,8 @@ export function registerOpenAIRoutes(app, upload) {
               cfg_scale: model.generation_params?.cfg_scale ?? null,
               sample_steps: model.generation_params?.sample_steps ?? null,
               sampling_method: model.generation_params?.sampling_method ?? null
-            }
+            },
+            fileStatus
           };
         })
     });

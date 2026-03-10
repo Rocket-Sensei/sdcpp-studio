@@ -103,6 +103,26 @@ describe('Models List JSON', () => {
         expect(model.architecture.output_modalities).toContain('image');
       });
     });
+
+    it('should include fileStatus for each model', async () => {
+      const response = await fetch(`${API_URL}/api/v1/models`, {
+        headers: AUTH_HEADER
+      });
+
+      expect(response.ok).toBe(true);
+
+      const data = await response.json();
+
+      if (data.data.length > 0) {
+        data.data.forEach(model => {
+          expect(model).toHaveProperty('fileStatus');
+          expect(model.fileStatus).toHaveProperty('hasHuggingFace');
+          expect(model.fileStatus).toHaveProperty('allFilesExist');
+          expect(model.fileStatus).toHaveProperty('files');
+          expect(Array.isArray(model.fileStatus.files)).toBe(true);
+        });
+      }
+    });
   });
 
   describe('GET /api/models', () => {
