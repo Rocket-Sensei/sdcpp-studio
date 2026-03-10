@@ -15,28 +15,10 @@
  */
 
 import { getModelManager } from '../services/modelManager.js';
-import { existsSync, statSync } from 'fs';
-import { join, dirname, basename, resolve } from 'path';
+import { getModelFileStatus } from '../utils/modelHelpers.js';
+import { statSync } from 'fs';
+import { dirname, basename, resolve } from 'path';
 import { fileURLToPath } from 'url';
-
-// File flags to look for in args array
-const FILE_FLAGS = [
-  '--diffusion-model',
-  '--model',
-  '-m',
-  '--vae',
-  '--llm',
-  '--llm_vision',
-  '--clip_l',
-  '--t5xxl',
-  '--clip',
-  '--clip_g',
-  '--clip_vision',
-  '--embeddings',
-  '--text_encoder',
-  '--tokenizer',
-  '--mmdit'
-];
 
 // ANSI colors for terminal output
 const colors = {
@@ -92,105 +74,29 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = resolve(__dirname, '../..');
 
 /**
- * Extract file paths from model args
- * @param {Array} args - Model arguments array
- * @returns {Array} Array of file objects with { flag, path }
- */
-function extractFilesFromArgs(args) {
-  if (!args || !Array.isArray(args)) {
-    return [];
-  }
-
-  const files = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (FILE_FLAGS.includes(arg) && i + 1 < args.length) {
-      const filePath = args[i + 1];
-      if (filePath && (filePath.startsWith('./') || filePath.startsWith('/') || filePath.includes('.'))) {
-        files.push({
-          flag: arg,
-          path: filePath
-        });
-      }
-    }
-  }
-
-  return files;
-}
-
-/**
  * Check if model files exist on disk
- * Priority: 1) model.args file flags  2) huggingface.files  3) external API models
- * Shows per-file status for diffusion model, VAE, LLM, CLIP components
+ * Uses the shared getModelFileStatus from modelHelpers.js (same as GUI)
+ * Priority: 1) model.args file flags  2) config fields  3) huggingface.files  4) external API
  */
-function checkModelFiles(model) {
-  let fileList = [];
-  let source = null;
+async function checkModelFiles(model) {
+  const status = await getModelFileStatus(model);
 
-  // 1) Extract files from model.args
-  if (model.args && Array.isArray(model.args)) {
-    const argsFiles = extractFilesFromArgs(model.args);
-    if (argsFiles.length > 0) {
-      fileList = argsFiles;
-      source = 'args';
-    }
-  }
-
-  // 2) Fall back to huggingface.files
-  if (fileList.length === 0 && model.huggingface && model.huggingface.files) {
-    fileList = model.huggingface.files.map(f => ({ flag: 'huggingface', path: f.path, dest: f.dest }));
-    source = 'huggingface';
-  }
-
-  // No files detected - check if it's an external API model
-  if (fileList.length === 0) {
-    const isExternal = model.exec_mode === 'api' || !!(model.api && !model.command);
-    return {
-      files: [],
-      allExist: isExternal,
-      hasHuggingFace: false,
-      source: null,
-      isExternal
-    };
-  }
-
-  // Check each file on disk
-  const fileStatus = fileList.map(file => {
-    let filePath;
-    let fileName;
-
-    if (source === 'huggingface') {
-      const destDir = file.dest || process.env.MODELS_DIR || './models';
-      const resolvedDestDir = resolve(PROJECT_ROOT, destDir);
-      fileName = basename(file.path);
-      filePath = join(resolvedDestDir, fileName);
-    } else {
-      // Args files - resolve relative to project root
-      fileName = basename(file.path);
-      filePath = resolve(PROJECT_ROOT, file.path);
-    }
-
-    const exists = existsSync(filePath);
-
-    return {
-      path: file.path,
-      flag: file.flag,
-      filePath,
-      exists,
-      fileName
-    };
-  });
-
-  const allExist = fileStatus.every(f => f.exists);
+  // Normalize the returned file format for CLI display
+  const normalizedFiles = status.files.map(file => ({
+    path: file.path,
+    flag: file.flag,
+    filePath: file.filePath,
+    exists: file.exists,
+    fileName: basename(file.filePath),
+    dest: file.dest || null
+  }));
 
   return {
-    files: fileStatus,
-    allExist,
-    hasHuggingFace: source === 'huggingface',
-    source,
-    isExternal: false
+    files: normalizedFiles,
+    allExist: status.allFilesExist,
+    hasHuggingFace: status.hasHuggingFace,
+    source: status.source,
+    isExternal: status.allFilesExist && normalizedFiles.length === 0 && !status.hasHuggingFace
   };
 }
 
@@ -212,7 +118,7 @@ function formatFileSize(bytes) {
 /**
  * List all models
  */
-function listModels() {
+async function listModels() {
   const manager = getModelManager();
   manager.loadConfig();
 
@@ -222,10 +128,10 @@ function listModels() {
 
   printHeader('Available Models');
 
-  allModels.forEach(model => {
+  for (const model of allModels) {
     const isDefault = defaultModel?.id === model.id;
     const isRunning = runningModels.includes(model.id);
-    const fileStatus = checkModelFiles(model);
+    const fileStatus = await checkModelFiles(model);
     const fileCount = fileStatus.files.length;
     const presentCount = fileStatus.files.filter(f => f.exists).length;
 
@@ -270,20 +176,17 @@ function listModels() {
       colors.dim + '\n  Files:    ' + colors.reset + filesText
     );
     console.log('');
-  });
+  }
 
   // Summary
   printSubheader('Summary');
   const totalModels = allModels.length;
-  const withFiles = allModels.filter(m => {
-    const status = checkModelFiles(m);
-    return status.source === 'args' || status.hasHuggingFace || status.isExternal;
-  }).length;
-  const withLocalFiles = allModels.filter(m => {
-    const status = checkModelFiles(m);
-    return status.source === 'args' || status.hasHuggingFace;
-  }).length;
-  const allFilesPresent = allModels.filter(m => checkModelFiles(m).allExist).length;
+
+  // Check file status for all models for summary
+  const allFileStatuses = await Promise.all(allModels.map(m => checkModelFiles(m)));
+  const withFiles = allFileStatuses.filter(status => status.source === 'args' || status.hasHuggingFace || status.isExternal).length;
+  const withLocalFiles = allFileStatuses.filter(status => status.source === 'args' || status.hasHuggingFace).length;
+  const allFilesPresent = allFileStatuses.filter(status => status.allExist).length;
   const runningCount = runningModels.length;
 
   console.log(`  Total models:     ${colorize(totalModels.toString(), 'bold')}`);
@@ -296,7 +199,7 @@ function listModels() {
 /**
  * Show detailed info for a specific model
  */
-function showModelInfo(modelId) {
+async function showModelInfo(modelId) {
   const manager = getModelManager();
   manager.loadConfig();
 
@@ -309,7 +212,7 @@ function showModelInfo(modelId) {
   }
 
   const isRunning = manager.isModelRunning(modelId);
-  const fileStatus = checkModelFiles(model);
+  const fileStatus = await checkModelFiles(model);
 
   printHeader(`Model: ${model.name}`);
 
@@ -396,7 +299,7 @@ function showRunningModels() {
 /**
  * Show model file status
  */
-function showModelFiles(modelId) {
+async function showModelFiles(modelId) {
   const manager = getModelManager();
   manager.loadConfig();
 
@@ -407,7 +310,7 @@ function showModelFiles(modelId) {
     process.exit(1);
   }
 
-  const fileStatus = checkModelFiles(model);
+  const fileStatus = await checkModelFiles(model);
 
   printHeader(`File Status: ${model.name}`);
 
@@ -470,7 +373,7 @@ function showDownloadedModels() {
 /**
  * Main CLI entry point
  */
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const command = args[0] || 'list';
   const target = args[1];
@@ -478,7 +381,7 @@ function main() {
   switch (command) {
     case 'list':
     case 'ls':
-      listModels();
+      await listModels();
       break;
 
     case 'info':
@@ -488,7 +391,7 @@ function main() {
         console.log('Usage: node backend/scripts/models-cli.js info <model-id>');
         process.exit(1);
       }
-      showModelInfo(target);
+      await showModelInfo(target);
       break;
 
     case 'running':
@@ -502,7 +405,7 @@ function main() {
         console.log('Usage: node backend/scripts/models-cli.js files <model-id>');
         process.exit(1);
       }
-      showModelFiles(target);
+      await showModelFiles(target);
       break;
 
     case 'downloaded':
