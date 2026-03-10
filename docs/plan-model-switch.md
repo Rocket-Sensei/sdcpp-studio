@@ -38,7 +38,7 @@ models:
       - "--diffusion-model"
       - "/media/nvme/sdnext/models/UNET/fluxedUpFluxNSFW_v51Q4KSV2.gguf"
       - "--vae"
-      - "./models/ae.safetensors"
+      - "./models/vae/flux1_f32.safetensors"
       - "--clip_l"
       - "./models/clip_l.safetensors"
       - "--t5xxl"

@@ -153,7 +153,7 @@ frontend/src/components/
 {
   "z-image-turbo": {
     "diffusion_model": "./models/z_image_turbo-Q8_0.gguf",  // 4.2 GB
-    "vae": "./models/ae.safetensors",                       // 0.8 GB
+    "vae": "./models/vae/flux1_f32.safetensors",                       // 0.8 GB
     "llm": "./models/Qwen3-4B-Instruct-2507-Q8_0.gguf",    // 4.5 GB
     "offload_to_cpu": true,
     "clip_on_cpu": true,

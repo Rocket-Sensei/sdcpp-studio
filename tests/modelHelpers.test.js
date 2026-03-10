@@ -69,7 +69,7 @@ describe('modelHelpers', () => {
       
       const args = [
         '--diffusion-model', './models/flux1-schnell-Q8_0.gguf',
-        '--vae', './models/ae.safetensors',
+        '--vae', './models/flux1_f32.safetensors',
         '--clip_l', './models/clip_l.safetensors',
         '--t5xxl', './models/t5xxl_fp16.safetensors',
         '--steps', '4'
