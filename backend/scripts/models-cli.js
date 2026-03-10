@@ -19,6 +19,25 @@ import { existsSync, statSync } from 'fs';
 import { join, dirname, basename, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
+// File flags to look for in args array
+const FILE_FLAGS = [
+  '--diffusion-model',
+  '--model',
+  '-m',
+  '--vae',
+  '--llm',
+  '--llm_vision',
+  '--clip_l',
+  '--t5xxl',
+  '--clip',
+  '--clip_g',
+  '--clip_vision',
+  '--embeddings',
+  '--text_encoder',
+  '--tokenizer',
+  '--mmdit'
+];
+
 // ANSI colors for terminal output
 const colors = {
   reset: '\x1b[0m',
@@ -73,25 +92,92 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = resolve(__dirname, '../..');
 
 /**
- * Check if model files exist on disk
+ * Extract file paths from model args
+ * @param {Array} args - Model arguments array
+ * @returns {Array} Array of file objects with { flag, path }
  */
-function checkModelFiles(model) {
-  if (!model.huggingface || !model.huggingface.files) {
-    return { files: [], allExist: false, hasHuggingFace: false };
+function extractFilesFromArgs(args) {
+  if (!args || !Array.isArray(args)) {
+    return [];
   }
 
-  const fileStatus = model.huggingface.files.map(file => {
-    const destDir = file.dest || process.env.MODELS_DIR || './models';
-    const resolvedDestDir = resolve(PROJECT_ROOT, destDir);
-    const fileName = basename(file.path);
-    const filePath = join(resolvedDestDir, fileName);
+  const files = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (FILE_FLAGS.includes(arg) && i + 1 < args.length) {
+      const filePath = args[i + 1];
+      if (filePath && (filePath.startsWith('./') || filePath.startsWith('/') || filePath.includes('.'))) {
+        files.push({
+          flag: arg,
+          path: filePath
+        });
+      }
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Check if model files exist on disk
+ * Priority: 1) model.args file flags  2) huggingface.files  3) external API models
+ * Shows per-file status for diffusion model, VAE, LLM, CLIP components
+ */
+function checkModelFiles(model) {
+  let fileList = [];
+  let source = null;
+
+  // 1) Extract files from model.args
+  if (model.args && Array.isArray(model.args)) {
+    const argsFiles = extractFilesFromArgs(model.args);
+    if (argsFiles.length > 0) {
+      fileList = argsFiles;
+      source = 'args';
+    }
+  }
+
+  // 2) Fall back to huggingface.files
+  if (fileList.length === 0 && model.huggingface && model.huggingface.files) {
+    fileList = model.huggingface.files.map(f => ({ flag: 'huggingface', path: f.path, dest: f.dest }));
+    source = 'huggingface';
+  }
+
+  // No files detected - check if it's an external API model
+  if (fileList.length === 0) {
+    const isExternal = model.exec_mode === 'api' || !!(model.api && !model.command);
+    return {
+      files: [],
+      allExist: isExternal,
+      hasHuggingFace: false,
+      source: null,
+      isExternal
+    };
+  }
+
+  // Check each file on disk
+  const fileStatus = fileList.map(file => {
+    let filePath;
+    let fileName;
+
+    if (source === 'huggingface') {
+      const destDir = file.dest || process.env.MODELS_DIR || './models';
+      const resolvedDestDir = resolve(PROJECT_ROOT, destDir);
+      fileName = basename(file.path);
+      filePath = join(resolvedDestDir, fileName);
+    } else {
+      // Args files - resolve relative to project root
+      fileName = basename(file.path);
+      filePath = resolve(PROJECT_ROOT, file.path);
+    }
+
     const exists = existsSync(filePath);
 
     return {
       path: file.path,
-      dest: file.dest,
+      flag: file.flag,
       filePath,
-      resolvedDestDir,
       exists,
       fileName
     };
@@ -102,7 +188,9 @@ function checkModelFiles(model) {
   return {
     files: fileStatus,
     allExist,
-    hasHuggingFace: true
+    hasHuggingFace: source === 'huggingface',
+    source,
+    isExternal: false
   };
 }
 
@@ -138,8 +226,8 @@ function listModels() {
     const isDefault = defaultModel?.id === model.id;
     const isRunning = runningModels.includes(model.id);
     const fileStatus = checkModelFiles(model);
-    const fileCount = fileStatus.hasHuggingFace ? fileStatus.files.length : 0;
-    const presentCount = fileStatus.hasHuggingFace ? fileStatus.files.filter(f => f.exists).length : 0;
+    const fileCount = fileStatus.files.length;
+    const presentCount = fileStatus.files.filter(f => f.exists).length;
 
     // Status indicators
     const statusIndicators = [
@@ -161,13 +249,25 @@ function listModels() {
     );
 
     // Model details
+    let filesText;
+    if (fileStatus.source === 'args') {
+      const components = fileStatus.files.map(f => {
+        const flagName = f.flag.replace(/^--/, '');
+        return f.exists ? colorize(flagName, 'green') : colorize(flagName, 'red');
+      }).join(', ');
+      filesText = `${presentCount}/${fileCount} present (${components})`;
+    } else if (fileStatus.hasHuggingFace) {
+      filesText = `${presentCount}/${fileCount} present` + (fileStatus.allExist ? '' : colorize(' (incomplete)', 'red'));
+    } else if (fileStatus.isExternal) {
+      filesText = colorize('External API', 'blue');
+    } else {
+      filesText = colorize('No files configured', 'yellow');
+    }
+
     console.log(
       colors.dim + '  Name:     ' + colors.reset + model.name +
       colors.dim + '\n  Type:     ' + colors.reset + model.model_type +
-      colors.dim + '\n  Files:    ' + colors.reset +
-      (fileStatus.hasHuggingFace
-        ? `${presentCount}/${fileCount} present` + (fileStatus.allExist ? '' : colorize(' (incomplete)', 'red'))
-        : colorize('No HuggingFace config', 'yellow'))
+      colors.dim + '\n  Files:    ' + colors.reset + filesText
     );
     console.log('');
   });
@@ -175,13 +275,20 @@ function listModels() {
   // Summary
   printSubheader('Summary');
   const totalModels = allModels.length;
-  const withHuggingFace = allModels.filter(m => m.huggingface?.files).length;
+  const withFiles = allModels.filter(m => {
+    const status = checkModelFiles(m);
+    return status.source === 'args' || status.hasHuggingFace || status.isExternal;
+  }).length;
+  const withLocalFiles = allModels.filter(m => {
+    const status = checkModelFiles(m);
+    return status.source === 'args' || status.hasHuggingFace;
+  }).length;
   const allFilesPresent = allModels.filter(m => checkModelFiles(m).allExist).length;
   const runningCount = runningModels.length;
 
   console.log(`  Total models:     ${colorize(totalModels.toString(), 'bold')}`);
-  console.log(`  Configured:       ${colorize(withHuggingFace.toString(), 'cyan')} (with HuggingFace)`);
-  console.log(`  Files present:    ${colorize(allFilesPresent.toString(), allFilesPresent === withHuggingFace ? 'green' : 'yellow')} / ${withHuggingFace}`);
+  console.log(`  With files:       ${colorize(withFiles.toString(), 'cyan')}`);
+  console.log(`  Files present:    ${colorize(allFilesPresent.toString(), allFilesPresent === withLocalFiles ? 'green' : 'yellow')} / ${withLocalFiles}`);
   console.log(`  Running:          ${colorize(runningCount.toString(), runningCount > 0 ? 'green' : 'gray')}`);
   console.log(`  Default model:    ${colorize(defaultModel?.id || 'none', defaultModel ? 'blue' : 'gray')}`);
 }
@@ -304,8 +411,13 @@ function showModelFiles(modelId) {
 
   printHeader(`File Status: ${model.name}`);
 
-  if (!fileStatus.hasHuggingFace) {
-    console.log(colorize('This model has no HuggingFace configuration.', 'yellow'));
+  // Handle models with no files configured
+  if (fileStatus.files.length === 0) {
+    if (fileStatus.isExternal) {
+      console.log(colorize('External API model - no local files required.', 'blue'));
+    } else {
+      console.log(colorize('No files configured for this model.', 'yellow'));
+    }
     return;
   }
 
@@ -315,7 +427,12 @@ function showModelFiles(modelId) {
   console.log(
     `Status:  ${allPresent ? colorize('All files present', 'green') : colorize(`${presentCount}/${fileStatus.files.length} files present`, 'yellow')}`
   );
-  console.log(`Repo:    ${colorize(model.huggingface.repo, 'blue')}`);
+
+  if (fileStatus.source === 'huggingface') {
+    console.log(`Repo:    ${colorize(model.huggingface.repo, 'blue')}`);
+  } else if (fileStatus.source === 'args') {
+    console.log(`Source:  ${colorize('Model arguments', 'cyan')}`);
+  }
   console.log('');
 
   fileStatus.files.forEach(file => {
@@ -323,11 +440,21 @@ function showModelFiles(modelId) {
     const statusColor = file.exists ? 'green' : 'red';
     const size = file.exists ? formatFileSize(statSync(file.filePath).size) : 'N/A';
 
-    console.log(`  ${status} ${colorize(file.path, statusColor)}`);
-    console.log(`     ${colors.dim}Source: ${file.path}${colors.reset}`);
-    console.log(`     ${colors.dim}Dest:   ${file.dest || './models'}${colors.reset}`);
-    console.log(`     ${colors.dim}Path:   ${file.filePath}${colors.reset}`);
-    console.log(`     ${colors.dim}Size:   ${size}${colors.reset}`);
+    if (fileStatus.source === 'args') {
+      // Show component type and file path for args-based files
+      const flagName = file.flag.replace(/^--/, '');
+      console.log(`  ${status} ${colorize(`[${flagName}]`, 'cyan')} ${colorize(file.fileName, statusColor)}`);
+      console.log(`     ${colors.dim}Arg:    ${file.flag}${colors.reset}`);
+      console.log(`     ${colors.dim}Path:   ${file.filePath}${colors.reset}`);
+      console.log(`     ${colors.dim}Size:   ${size}${colors.reset}`);
+    } else {
+      // HuggingFace-style display
+      console.log(`  ${status} ${colorize(file.path, statusColor)}`);
+      console.log(`     ${colors.dim}Source: ${file.path}${colors.reset}`);
+      console.log(`     ${colors.dim}Dest:   ${file.dest || './models'}${colors.reset}`);
+      console.log(`     ${colors.dim}Path:   ${file.filePath}${colors.reset}`);
+      console.log(`     ${colors.dim}Size:   ${size}${colors.reset}`);
+    }
     console.log('');
   });
 }
