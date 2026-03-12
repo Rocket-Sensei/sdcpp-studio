@@ -38,6 +38,34 @@ const placementLabel = {
   cpu: "CPU",
 };
 
+const DEFAULT_FLAGS = {
+  offloadToCpu: true,
+  clipOnCpu: true,
+  vaeOnCpu: true,
+  vaeTiling: false,
+  diffusionFa: true,
+};
+
+function loadMemoryFlagsFromStorage(modelId) {
+  try {
+    const stored = localStorage.getItem(`memoryFlags:${modelId}`);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    // silently fail
+  }
+  return null;
+}
+
+function saveMemoryFlagsToStorage(modelId, flags) {
+  try {
+    localStorage.setItem(`memoryFlags:${modelId}`, JSON.stringify(flags));
+  } catch (e) {
+    // silently fail
+  }
+}
+
 // Short display names for components
 function shortName(name) {
   const map = {
@@ -337,13 +365,7 @@ export function MemoryPanel({
   const { gpuInfo } = useGpuInfo();
 
   // Memory flags state (defaults match settings.yml memory_defaults)
-  const [flags, setFlags] = useState({
-    offloadToCpu: true,
-    clipOnCpu: true,
-    vaeOnCpu: true,
-    vaeTiling: false,
-    diffusionFa: true,
-  });
+  const [flags, setFlags] = useState(DEFAULT_FLAGS);
 
   // Exec mode state
   const [execMode, setExecMode] = useState("auto");
@@ -353,15 +375,23 @@ export function MemoryPanel({
 
   // Update flags when model changes
   useEffect(() => {
-    if (modelConfig?.memoryFlags) {
+    if (!selectedModelId) return;
+    
+    // Load order: 1) localStorage (if exists), 2) modelConfig.memoryFlags, 3) hardcoded defaults
+    const storedFlags = loadMemoryFlagsFromStorage(selectedModelId);
+    if (storedFlags) {
+      setFlags({ ...DEFAULT_FLAGS, ...storedFlags });
+    } else if (modelConfig?.memoryFlags) {
       const mf = modelConfig.memoryFlags;
       setFlags({
-        offloadToCpu: mf.offload_to_cpu ?? true,
-        clipOnCpu: mf.clip_on_cpu ?? true,
-        vaeOnCpu: mf.vae_on_cpu ?? false,
-        vaeTiling: mf.vae_tiling ?? false,
-        diffusionFa: mf.diffusion_fa ?? true,
+        offloadToCpu: mf.offload_to_cpu ?? DEFAULT_FLAGS.offloadToCpu,
+        clipOnCpu: mf.clip_on_cpu ?? DEFAULT_FLAGS.clipOnCpu,
+        vaeOnCpu: mf.vae_on_cpu ?? DEFAULT_FLAGS.vaeOnCpu,
+        vaeTiling: mf.vae_tiling ?? DEFAULT_FLAGS.vaeTiling,
+        diffusionFa: mf.diffusion_fa ?? DEFAULT_FLAGS.diffusionFa,
       });
+    } else {
+      setFlags(DEFAULT_FLAGS);
     }
     // Read exec mode from model config
     const mode = modelConfig?.exec_mode || modelConfig?.execMode || "auto";
@@ -403,8 +433,10 @@ export function MemoryPanel({
 
   const handleFlagsChange = useCallback((newFlags) => {
     setFlags(newFlags);
-    // Optionally persist to backend
+    // Save to localStorage
     if (selectedModelId) {
+      saveMemoryFlagsToStorage(selectedModelId, newFlags);
+      // Also persist to backend
       authenticatedFetch(`/api/models/${selectedModelId}/memory-flags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
