@@ -12,6 +12,12 @@ import {
   Cpu,
   Eye,
   EyeOff,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Grid3X3,
+  Zap,
+  Image,
+  LetterText,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -22,6 +28,42 @@ import { authenticatedFetch } from "../utils/api";
 import { useDownloadProgress, useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
 
 const API_V1 = "/api/v1/models";
+
+const MEMORY_FLAG_LABELS = {
+  offloadToCpu: { label: "Offload to CPU", icon: ArrowDownToLine, iconAlt: ArrowUpFromLine },
+  clipOnCpu: { label: "CLIP on CPU", icon: LetterText, iconAlt: Cpu },
+  vaeOnCpu: { label: "VAE on CPU", icon: Image, iconAlt: Cpu },
+  vaeTiling: { label: "VAE Tiling", icon: Grid3X3, iconAlt: Grid3X3 },
+  diffusionFa: { label: "Flash Attention", icon: Zap, iconAlt: Zap },
+};
+
+function loadMemoryFlagsFromStorage(modelId) {
+  try {
+    const stored = localStorage.getItem(`memoryFlags:${modelId}`);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    // silently fail
+  }
+  return null;
+}
+
+function saveMemoryFlagsToStorage(modelId, flags) {
+  try {
+    localStorage.setItem(`memoryFlags:${modelId}`, JSON.stringify(flags));
+  } catch (e) {
+    // silently fail
+  }
+}
+
+const DEFAULT_FLAGS = {
+  offloadToCpu: true,
+  clipOnCpu: true,
+  vaeOnCpu: true,
+  vaeTiling: false,
+  diffusionFa: true,
+};
 
 /**
  * Analyze model args and return array of component types
@@ -177,6 +219,7 @@ export function MultiModelSelector({
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [showMissingModels, setShowMissingModels] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [memoryFlags, setMemoryFlags] = useState({});
 
   // Keep a ref to the latest fetchModels function for polling
   const fetchModelsRef = useRef(null);
@@ -422,6 +465,27 @@ export function MultiModelSelector({
       ...prev,
       [modelId]: !prev[modelId],
     }));
+  };
+
+  // Get memory flags for a model (load from localStorage if not in state)
+  const getMemoryFlags = (modelId) => {
+    if (memoryFlags[modelId]) {
+      return memoryFlags[modelId];
+    }
+    const stored = loadMemoryFlagsFromStorage(modelId);
+    if (stored) {
+      setMemoryFlags(prev => ({ ...prev, [modelId]: stored }));
+      return stored;
+    }
+    return DEFAULT_FLAGS;
+  };
+
+  // Toggle a memory flag
+  const toggleMemoryFlag = (modelId, flagKey) => {
+    const currentFlags = getMemoryFlags(modelId);
+    const newFlags = { ...currentFlags, [flagKey]: !currentFlags[flagKey] };
+    setMemoryFlags(prev => ({ ...prev, [modelId]: newFlags }));
+    saveMemoryFlagsToStorage(modelId, newFlags);
   };
 
   // Select all models (only visible models based on showMissingModels filter)
@@ -789,6 +853,33 @@ export function MultiModelSelector({
                       </div>
                     )}
                   </div>
+
+                  {/* Memory flags - only show when model is selected AND expanded */}
+                  {isSelected && isServerMode && (
+                    <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-border/50">
+                      <span className="text-muted-foreground text-xs mr-1">Memory:</span>
+                      {Object.entries(MEMORY_FLAG_LABELS).map(([key, { label, icon: Icon, iconAlt }]) => {
+                        const flags = getMemoryFlags(model.id);
+                        const isEnabled = flags[key];
+                        const ToggleIcon = isEnabled ? Icon : iconAlt;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => toggleMemoryFlag(model.id, key)}
+                            className={cn(
+                              "h-5 w-5 rounded flex items-center justify-center transition-colors",
+                              isEnabled
+                                ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            )}
+                            title={label}
+                          >
+                            <ToggleIcon className="h-3 w-3" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Files status */}
                   {filesStatus && filesStatus.files && (
