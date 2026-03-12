@@ -23,6 +23,65 @@ import { useDownloadProgress, useWebSocket, WS_CHANNELS } from "../hooks/useWebS
 
 const API_V1 = "/api/v1/models";
 
+/**
+ * Analyze model args and return array of component types
+ * @param {Object} model - Model configuration object
+ * @returns {Array} Array of component types (e.g., ['model', 'vae', 'llm'])
+ */
+const getModelComponents = (model) => {
+  if (!model || !model.args || !Array.isArray(model.args)) {
+    return [];
+  }
+
+  const args = model.args;
+  const components = new Set();
+
+  if (args.includes('--diffusion-model') || args.includes('--model') || args.includes('-m')) {
+    components.add('model');
+  }
+  if (args.includes('--vae')) {
+    components.add('vae');
+  }
+  if (args.includes('--llm') || args.includes('--llm_vision')) {
+    components.add('llm');
+  }
+  if (args.includes('--clip_l') || args.includes('--clip') || args.includes('--clip_g')) {
+    components.add('clip');
+  }
+  if (args.includes('--t5xxl')) {
+    components.add('t5');
+  }
+  if (args.includes('--clip_vision')) {
+    components.add('clip_vision');
+  }
+  if (args.includes('--embeddings')) {
+    components.add('embeddings');
+  }
+  if (args.includes('--text_encoder') || args.includes('--tokenizer')) {
+    components.add('text_encoder');
+  }
+  if (args.includes('--mmdit')) {
+    components.add('mmdit');
+  }
+
+  return Array.from(components);
+};
+
+/**
+ * Component badge configuration
+ */
+const COMPONENT_CONFIG = {
+  model: { label: 'M', title: 'Model (diffusion)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.3)' },
+  vae: { label: 'V', title: 'VAE', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.3)' },
+  llm: { label: 'L', title: 'LLM', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)', border: 'rgba(139, 92, 246, 0.3)' },
+  clip: { label: 'C', title: 'CLIP', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)', border: 'rgba(6, 182, 212, 0.3)' },
+  t5: { label: 'T5', title: 'T5XXL', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.15)', border: 'rgba(236, 72, 153, 0.3)' },
+  clip_vision: { label: 'CV', title: 'CLIP Vision', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.15)', border: 'rgba(20, 184, 166, 0.3)' },
+  embeddings: { label: 'E', title: 'Embeddings', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.3)' },
+  text_encoder: { label: 'TE', title: 'Text Encoder', color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)', border: 'rgba(100, 116, 139, 0.3)' },
+  mmdit: { label: 'MMDIT', title: 'MMDIT', color: '#84cc16', bg: 'rgba(132, 204, 22, 0.15)', border: 'rgba(132, 204, 22, 0.3)' },
+};
+
 // Model status constants
 // Status is now directly from API: "stopped", "starting", "running", "stopping", "error"
 
@@ -610,6 +669,32 @@ export function MultiModelSelector({
                         {model.quant}
                       </span>
                     )}
+                    {isSelected && (() => {
+                      const components = getModelComponents(model);
+                      return components.length > 0 ? (
+                        <div className="flex items-center gap-0.5">
+                          {components.map(comp => {
+                            const config = COMPONENT_CONFIG[comp];
+                            if (!config) return null;
+                            return (
+                              <span
+                                key={comp}
+                                className="inline-flex px-1 py-0.5 rounded text-xs font-semibold flex-shrink-0 cursor-help"
+                                style={{
+                                  backgroundColor: config.bg,
+                                  color: config.color,
+                                  borderColor: config.border,
+                                  border: '1px solid'
+                                }}
+                                title={config.title}
+                              >
+                                {config.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : null;
+                    })()}
                     {isCliMode && (
                       <Badge variant="outline" className="gap-1 text-xs flex-shrink-0">
                         <Cpu className="h-3 w-3" />
