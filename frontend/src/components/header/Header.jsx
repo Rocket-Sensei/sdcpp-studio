@@ -23,7 +23,7 @@ function UsageLine({ label, usedMB, totalMB, colorClass = "bg-primary" }) {
   const percent = Math.min(100, Math.max(0, Math.round((usedMB / totalMB) * 100)));
 
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
+    <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
       <span className="uppercase">{label}</span>
       <span className="text-foreground/90">[{formatGbCompact(usedMB)}/{formatGbCompact(totalMB)}]</span>
       <span className="h-1 w-8 rounded-full bg-muted/70 overflow-hidden">
@@ -45,7 +45,7 @@ function HeaderResourceWidget() {
   }
 
   return (
-    <div className="hidden sm:flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2 py-1">
+    <div className="flex items-center gap-1.5 sm:gap-2 rounded-md border border-border/60 bg-muted/30 px-1.5 sm:px-2 py-1 text-[10px] sm:text-[11px]">
       <UsageLine label="vram" usedMB={vramUsedMB} totalMB={vramTotalMB} colorClass="bg-amber-400" />
       <UsageLine label="ram" usedMB={ramUsedMB} totalMB={ramTotalMB} colorClass="bg-blue-500" />
     </div>
@@ -65,7 +65,7 @@ export function Header({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-shrink-0">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-bold hidden sm:block">sd.cpp Studio</h1>
+            <h1 className="text-lg font-bold"><span className="hidden sm:inline">sd.cpp Studio</span><span className="sm:hidden">sd.cpp</span></h1>
             <HeaderResourceWidget />
           </div>
 

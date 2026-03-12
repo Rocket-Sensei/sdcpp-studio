@@ -845,7 +845,7 @@ export function MultiModelSelector({
               )}
             >
               {/* Main row */}
-              <div className="flex items-center gap-3 p-1">
+              <div className="flex items-center gap-2 p-1.5">
                 {/* Expand/collapse button */}
                 <button
                   onClick={() => toggleExpand(model.id)}
@@ -867,8 +867,8 @@ export function MultiModelSelector({
 
                 {/* Model info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium truncate">{model.name}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium text-sm truncate max-w-[150px] sm:max-w-none">{model.name}</span>
                     {model.quant && model.quant !== 'unknown' && (
                       <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border flex-shrink-0"
                         style={{

@@ -78,12 +78,12 @@ export function PromptBar({
 
   return (
     <form
-      className="bg-card border border-border rounded-xl p-4 shadow-sm"
+      className="space-y-3"
       data-testid="generate-panel"
       onSubmit={handleFormSubmit}
     >
       {/* Generation Mode Selector - SHARED between top and bottom panels */}
-      <div className="mb-3">
+      <div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {MODES.map((modeOption) => {
             const Icon = modeOption.icon;
@@ -110,7 +110,7 @@ export function PromptBar({
 
       {/* Model selector row - NOT shown for upscale mode */}
       {mode !== "upscale" && (
-        <div className="mb-3">
+        <div>
           <MultiModelSelector
             selectedModels={selectedModels}
             onModelsChange={onModelsChange}
