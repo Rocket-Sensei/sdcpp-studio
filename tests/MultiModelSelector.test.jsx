@@ -697,12 +697,22 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
       });
 
-      // Find the play button (title attribute)
-      const playButtons = screen.getAllByTitle('Start model');
+      // Find the play/configure button (title attribute)
+      const playButtons = screen.getAllByTitle('Configure and start server');
       expect(playButtons.length).toBeGreaterThan(0);
 
       await act(async () => {
         fireEvent.click(playButtons[0]);
+      });
+
+      // Wait for modal to appear and click the "Start Server" button in the modal
+      await waitFor(() => {
+        expect(screen.getByText('Server Configuration')).toBeInTheDocument();
+      });
+
+      const startServerButton = screen.getByText('Start Server');
+      await act(async () => {
+        fireEvent.click(startServerButton);
       });
 
       await waitFor(() => {
@@ -710,6 +720,8 @@ describe('MultiModelSelector', () => {
         const startCall = mockFetchCalls.find(call => call.url === '/api/v1/models/qwen-image/start');
         expect(startCall).toBeDefined();
         expect(startCall.options?.method).toBe('POST');
+        // Now sends default steps in body: {"steps":9}
+        expect(startCall.options?.body).toContain('"steps":9');
         expect(toast.success).toHaveBeenCalled();
       });
     });
@@ -755,7 +767,7 @@ describe('MultiModelSelector', () => {
       });
 
       // Find the stop button (title attribute)
-      const stopButtons = screen.getAllByTitle('Stop model');
+      const stopButtons = screen.getAllByTitle('Stop server');
       expect(stopButtons.length).toBeGreaterThan(0);
 
       await act(async () => {
@@ -802,8 +814,8 @@ describe('MultiModelSelector', () => {
 
       // CLI Model should not have start/stop buttons
       const cliModelRow = screen.getByText('CLI Model').closest('div').parentElement;
-      const startButtons = cliModelRow?.querySelectorAll('[title="Start model"]');
-      const stopButtons = cliModelRow?.querySelectorAll('[title="Stop model"]');
+      const startButtons = cliModelRow?.querySelectorAll('[title="Configure and start server"]');
+      const stopButtons = cliModelRow?.querySelectorAll('[title="Stop server"]');
 
       expect(startButtons?.length).toBe(0);
       expect(stopButtons?.length).toBe(0);
@@ -979,9 +991,19 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
       });
 
-      const playButtons = screen.getAllByTitle('Start model');
+      const playButtons = screen.getAllByTitle('Configure and start server');
       await act(async () => {
         fireEvent.click(playButtons[0]);
+      });
+
+      // Wait for modal to appear and click the "Start Server" button in the modal
+      await waitFor(() => {
+        expect(screen.getByText('Server Configuration')).toBeInTheDocument();
+      });
+
+      const startServerButton = screen.getByText('Start Server');
+      await act(async () => {
+        fireEvent.click(startServerButton);
       });
 
       await waitFor(() => {
@@ -1028,7 +1050,7 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
       });
 
-      const stopButtons = screen.getAllByTitle('Stop model');
+      const stopButtons = screen.getAllByTitle('Stop server');
       await act(async () => {
         fireEvent.click(stopButtons[0]);
       });
@@ -1077,9 +1099,19 @@ describe('MultiModelSelector', () => {
         expect(screen.getByText('Qwen Image')).toBeInTheDocument();
       });
 
-      const playButtons = screen.getAllByTitle('Start model');
+      const playButtons = screen.getAllByTitle('Configure and start server');
       await act(async () => {
         fireEvent.click(playButtons[0]);
+      });
+
+      // Wait for modal to appear and click the "Start Server" button in the modal
+      await waitFor(() => {
+        expect(screen.getByText('Server Configuration')).toBeInTheDocument();
+      });
+
+      const startServerButton = screen.getByText('Start Server');
+      await act(async () => {
+        fireEvent.click(startServerButton);
       });
 
       await waitFor(() => {

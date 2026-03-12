@@ -431,10 +431,12 @@ export function registerModelRoutes(app) {
   /**
    * POST /api/models/:id/start
    * Start a model process
+   * Body: { steps?: number, threads?: number, extraArgs?: string }
    */
   app.post('/api/models/:id/start', authenticateRequest, async (req, res) => {
     try {
       const modelId = req.params.id;
+      const { steps, threads, extraArgs } = req.body || {};
       const model = modelManager.getModel(modelId);
 
       if (!model) {
@@ -449,8 +451,40 @@ export function registerModelRoutes(app) {
         });
       }
 
+      // Build options for startModel
+      const options = {};
+      if (steps !== undefined || threads !== undefined || extraArgs) {
+        options.args = [...(model.args || [])];
+        
+        // Inject --steps if provided
+        if (steps !== undefined) {
+          const existingStepsIdx = options.args.findIndex(arg => arg === '--steps');
+          if (existingStepsIdx >= 0) {
+            options.args[existingStepsIdx + 1] = String(steps);
+          } else {
+            options.args.push('--steps', String(steps));
+          }
+        }
+        
+        // Inject --threads if provided
+        if (threads !== undefined) {
+          const existingThreadsIdx = options.args.findIndex(arg => arg === '--threads');
+          if (existingThreadsIdx >= 0) {
+            options.args[existingThreadsIdx + 1] = String(threads);
+          } else {
+            options.args.push('--threads', String(threads));
+          }
+        }
+        
+        // Parse and inject extra args
+        if (extraArgs && typeof extraArgs === 'string') {
+          const extra = extraArgs.split(/\s+/).filter(Boolean);
+          options.args.push(...extra);
+        }
+      }
+
       // Start the model process
-      const process = await modelManager.startModel(modelId);
+      const process = await modelManager.startModel(modelId, options);
 
       res.json({
         success: true,

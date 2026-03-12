@@ -18,10 +18,15 @@ import {
   Zap,
   Image,
   LetterText,
+  Settings,
+  Server,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import { cn } from "../lib/utils";
 import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
@@ -220,6 +225,8 @@ export function MultiModelSelector({
   const [showMissingModels, setShowMissingModels] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [memoryFlags, setMemoryFlags] = useState({});
+  const [serverConfigModal, setServerConfigModal] = useState({ open: false, modelId: null, model: null });
+  const [serverConfig, setServerConfig] = useState({ steps: 9, threads: "", extraArgs: "" });
 
   // Keep a ref to the latest fetchModels function for polling
   const fetchModelsRef = useRef(null);
@@ -371,12 +378,20 @@ export function MultiModelSelector({
     },
   });
 
-  // Start a model
-  const startModel = async (modelId) => {
+  // Start a model with optional server config
+  const startModel = async (modelId, serverSettings = null) => {
     setActionInProgress((prev) => ({ ...prev, [modelId]: "starting" }));
     try {
+      const body = serverSettings ? {
+        steps: serverSettings.steps ? parseInt(serverSettings.steps, 10) : undefined,
+        threads: serverSettings.threads ? parseInt(serverSettings.threads, 10) : undefined,
+        extraArgs: serverSettings.extraArgs || undefined
+      } : {};
+
       const response = await authenticatedFetch(`${API_V1}/${modelId}/start`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
       });
       if (!response.ok) {
         const error = await response.json();
@@ -390,6 +405,30 @@ export function MultiModelSelector({
     } finally {
       setActionInProgress((prev) => ({ ...prev, [modelId]: null }));
     }
+  };
+
+  // Open server config modal for a model
+  const openServerConfigModal = (model) => {
+    // Extract default steps from model args if available
+    let defaultSteps = 9;
+    if (model.args) {
+      const stepsIdx = model.args.findIndex(arg => arg === '--steps');
+      if (stepsIdx >= 0 && model.args[stepsIdx + 1]) {
+        defaultSteps = parseInt(model.args[stepsIdx + 1], 10) || 9;
+      } else if (model.generation_params?.sample_steps) {
+        defaultSteps = model.generation_params.sample_steps;
+      }
+    }
+    setServerConfig({ steps: defaultSteps, threads: "", extraArgs: "" });
+    setServerConfigModal({ open: true, modelId: model.id, model });
+  };
+
+  // Handle server config modal confirm
+  const handleServerConfigStart = () => {
+    if (serverConfigModal.modelId) {
+      startModel(serverConfigModal.modelId, serverConfig);
+    }
+    setServerConfigModal({ open: false, modelId: null, model: null });
   };
 
   // Stop a model
@@ -533,8 +572,11 @@ export function MultiModelSelector({
     if (isRunning) {
       return (
         <div className={cn("flex items-center gap-1.5", className)}>
-          <CheckCircle2 className="h-3 w-3 text-green-500" />
-          <span className="text-xs text-green-600 font-medium">Running</span>
+          <div className="relative">
+            <Server className="h-3.5 w-3.5 text-green-500" />
+            <div className="absolute -inset-1 bg-green-500/30 rounded-full animate-pulse" />
+          </div>
+          <span className="text-xs text-green-600 font-medium">Server Ready</span>
         </div>
       );
     }
@@ -790,35 +832,44 @@ export function MultiModelSelector({
                   {isServerMode && model.mode === "on_demand" && (
                     <>
                       {model.status === "running" ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => stopModel(model.id)}
-                          disabled={actionInProgress[model.id] === "stopping"}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          title="Stop model"
-                        >
-                          {actionInProgress[model.id] === "stopping" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Square className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 gap-1 h-6">
+                            <Server className="h-3 w-3" />
+                            Running
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => stopModel(model.id)}
+                            disabled={actionInProgress[model.id] === "stopping"}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title="Stop server"
+                          >
+                            {actionInProgress[model.id] === "stopping" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => startModel(model.id)}
-                          disabled={actionInProgress[model.id] === "starting"}
-                          className="h-8 w-8 p-0 text-green-500 hover:text-green-500"
-                          title="Start model"
-                        >
-                          {actionInProgress[model.id] === "starting" ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => openServerConfigModal(model)}
+                            disabled={actionInProgress[model.id] === "starting"}
+                            className="gap-1.5 bg-green-600 hover:bg-green-700"
+                            title="Configure and start server"
+                          >
+                            {actionInProgress[model.id] === "starting" ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Settings className="h-3.5 w-3.5" />
+                            )}
+                            Start
+                          </Button>
+                        </div>
                       )}
                     </>
                   )}
@@ -916,6 +967,72 @@ export function MultiModelSelector({
       </div>
         </>
       )}
+
+      {/* Server Config Modal */}
+      <Dialog open={serverConfigModal.open} onOpenChange={(open) => setServerConfigModal({ ...serverConfigModal, open })}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5 text-green-600" />
+              Server Configuration
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="steps">Steps</Label>
+              <Input
+                id="steps"
+                type="number"
+                min="1"
+                max="100"
+                value={serverConfig.steps}
+                onChange={(e) => setServerConfig({ ...serverConfig, steps: e.target.value })}
+                placeholder="9"
+              />
+              <p className="text-xs text-muted-foreground">Number of sampling steps (default: 9)</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="threads">Threads (optional)</Label>
+              <Input
+                id="threads"
+                type="number"
+                min="1"
+                value={serverConfig.threads}
+                onChange={(e) => setServerConfig({ ...serverConfig, threads: e.target.value })}
+                placeholder="Auto"
+              />
+              <p className="text-xs text-muted-foreground">Number of CPU threads to use</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="extraArgs">Additional Arguments</Label>
+              <Input
+                id="extraArgs"
+                value={serverConfig.extraArgs}
+                onChange={(e) => setServerConfig({ ...serverConfig, extraArgs: e.target.value })}
+                placeholder="--arg1 value1 --arg2 value2"
+              />
+              <p className="text-xs text-muted-foreground">Extra command line arguments</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServerConfigModal({ open: false, modelId: null, model: null })}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleServerConfigStart} 
+              className="bg-green-600 hover:bg-green-700"
+              disabled={actionInProgress[serverConfigModal.modelId] === "starting"}
+            >
+              {actionInProgress[serverConfigModal.modelId] === "starting" ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Start Server
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
