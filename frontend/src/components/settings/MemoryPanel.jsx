@@ -50,7 +50,18 @@ function loadMemoryFlagsFromStorage(modelId) {
   try {
     const stored = localStorage.getItem(`memoryFlags:${modelId}`);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Backward compatibility: old format stored flags directly
+      if (parsed && typeof parsed === "object" && parsed.flags) {
+        return {
+          flags: parsed.flags,
+          manual: Boolean(parsed.manual),
+        };
+      }
+      return {
+        flags: parsed,
+        manual: true,
+      };
     }
   } catch (e) {
     // silently fail
@@ -58,12 +69,69 @@ function loadMemoryFlagsFromStorage(modelId) {
   return null;
 }
 
-function saveMemoryFlagsToStorage(modelId, flags) {
+function saveMemoryFlagsToStorage(modelId, flags, manual = true) {
   try {
-    localStorage.setItem(`memoryFlags:${modelId}`, JSON.stringify(flags));
+    localStorage.setItem(`memoryFlags:${modelId}`, JSON.stringify({ flags, manual }));
   } catch (e) {
     // silently fail
   }
+}
+
+async function persistMemoryFlagsToBackend(modelId, flags) {
+  if (!modelId) return;
+  await authenticatedFetch(`/api/models/${modelId}/memory-flags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      offloadToCpu: flags.offloadToCpu,
+      clipOnCpu: flags.clipOnCpu,
+      vaeOnCpu: flags.vaeOnCpu,
+      vaeTiling: flags.vaeTiling,
+      diffusionFa: flags.diffusionFa,
+    }),
+  });
+}
+
+function getFlagsFromModelConfig(modelConfig) {
+  if (!modelConfig?.memoryFlags) return DEFAULT_FLAGS;
+  const mf = modelConfig.memoryFlags;
+  return {
+    offloadToCpu: mf.offload_to_cpu ?? DEFAULT_FLAGS.offloadToCpu,
+    clipOnCpu: mf.clip_on_cpu ?? DEFAULT_FLAGS.clipOnCpu,
+    vaeOnCpu: mf.vae_on_cpu ?? DEFAULT_FLAGS.vaeOnCpu,
+    vaeTiling: mf.vae_tiling ?? DEFAULT_FLAGS.vaeTiling,
+    diffusionFa: mf.diffusion_fa ?? DEFAULT_FLAGS.diffusionFa,
+  };
+}
+
+function areFlagsEqual(a = {}, b = {}) {
+  return (
+    a.offloadToCpu === b.offloadToCpu &&
+    a.clipOnCpu === b.clipOnCpu &&
+    a.vaeOnCpu === b.vaeOnCpu &&
+    a.vaeTiling === b.vaeTiling &&
+    a.diffusionFa === b.diffusionFa
+  );
+}
+
+function getCliPeakMB(estimate) {
+  return estimate?.cli?.usage?.peakVramMB || estimate?.cliMode?.peakVramMB || estimate?.peakVramMB || 0;
+}
+
+function getServerPeakMB(estimate) {
+  return estimate?.server?.usage?.peakVramMB || estimate?.serverMode?.peakVramMB || 0;
+}
+
+function formatGbCompact(mb) {
+  if (!Number.isFinite(mb) || mb <= 0) {
+    return "0";
+  }
+
+  const gb = mb / 1024;
+  if (gb >= 10) {
+    return gb.toFixed(0);
+  }
+  return gb.toFixed(1).replace(/\.0$/, "");
 }
 
 // Short display names for components
@@ -99,8 +167,22 @@ export function MemoryInlineBar({
   estimate,
 }) {
   const vramTotal = gpuInfo?.vramTotalMB || 0;
-  const cliPeak = estimate?.cliMode?.peakVramMB || estimate?.peakVramMB || 0;
-  const fitsInVram = vramTotal > 0 ? cliPeak <= vramTotal : true;
+  const vramUsed = gpuInfo?.vramUsedMB || 0;
+  const vramFree = gpuInfo?.vramFreeMB || 0;
+  const cliPeak = getCliPeakMB(estimate);
+  const vramBudget = estimate?.availableVramMB || vramFree || vramTotal;
+  const fitsInVram = vramBudget > 0 ? cliPeak <= vramBudget : true;
+
+  const breakdown = gpuInfo?.breakdownMB || {};
+  const imageMB = breakdown.image || 0;
+  const videoMB = breakdown.video || 0;
+  const llmMB = breakdown.llm || 0;
+  const systemMB = breakdown.system || 0;
+
+  const imageWidth = vramTotal > 0 ? Math.max(0, (imageMB / vramTotal) * 100) : 0;
+  const videoWidth = vramTotal > 0 ? Math.max(0, (videoMB / vramTotal) * 100) : 0;
+  const llmWidth = vramTotal > 0 ? Math.max(0, (llmMB / vramTotal) * 100) : 0;
+  const systemWidth = vramTotal > 0 ? Math.max(0, (systemMB / vramTotal) * 100) : 0;
 
   if (!selectedModelId) return null;
 
@@ -112,8 +194,31 @@ export function MemoryInlineBar({
           <Cpu className="h-3 w-3" />
           {gpuInfo.name?.replace('NVIDIA ', '').replace('GeForce ', '')}
           {vramTotal > 0 && (
-            <span className="opacity-70">({Math.round(vramTotal / 1024)}GB)</span>
+            <span
+              className="font-mono text-[11px] text-foreground/90"
+              title={`Free ${formatGbCompact(vramFree)}g`}
+            >
+              [{formatGbCompact(vramUsed)}/{formatGbCompact(vramTotal)}]
+            </span>
           )}
+        </span>
+      )}
+
+      {/* Live VRAM tiny bar + category breakdown */}
+      {vramTotal > 0 && (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground"
+          title={`Free VRAM: ${formatGbCompact(vramFree)}g`}
+        >
+          <span className="h-1.5 w-14 overflow-hidden rounded-full border border-border bg-muted/60">
+            <span className="flex h-full w-full">
+              <span className="bg-blue-500/90" style={{ width: `${imageWidth}%` }} />
+              <span className="bg-cyan-400/90" style={{ width: `${videoWidth}%` }} />
+              <span className="bg-emerald-500/90" style={{ width: `${llmWidth}%` }} />
+              <span className="bg-amber-400/90" style={{ width: `${systemWidth}%` }} />
+            </span>
+          </span>
+          <span>[img:{formatGbCompact(imageMB)}g video:{formatGbCompact(videoMB)}g llm:{formatGbCompact(llmMB)}g sys:{formatGbCompact(systemMB)}g]</span>
         </span>
       )}
 
@@ -161,6 +266,8 @@ export function MemoryPopover({
   height = 1024,
   flags,
   onFlagsChange,
+  isManualFlags,
+  onManualModeChange,
   execMode,
   onExecModeChange,
   gpuInfo,
@@ -197,11 +304,12 @@ export function MemoryPopover({
   }, [open]);
 
   const vramTotal = gpuInfo?.vramTotalMB || 0;
-  const cliPeak = estimate?.cliMode?.peakVramMB || estimate?.peakVramMB || 0;
-  const serverPeak = estimate?.serverMode?.peakVramMB || 0;
+  const vramFree = estimate?.availableVramMB || gpuInfo?.vramFreeMB || vramTotal;
+  const cliPeak = getCliPeakMB(estimate);
+  const serverPeak = getServerPeakMB(estimate);
   const activePeak = execMode === 'server' ? serverPeak || cliPeak : cliPeak;
-  const vramPercent = vramTotal > 0 ? Math.min(100, Math.round((activePeak / vramTotal) * 100)) : 0;
-  const fitsInVram = vramTotal > 0 ? activePeak <= vramTotal : true;
+  const vramPercent = vramFree > 0 ? Math.min(100, Math.round((activePeak / vramFree) * 100)) : 0;
+  const fitsInVram = vramFree > 0 ? activePeak <= vramFree : true;
   const vramBarColor = vramPercent > 90 ? "bg-red-500" : vramPercent > 70 ? "bg-yellow-500" : "bg-green-500";
 
   if (!selectedModelId) return null;
@@ -226,7 +334,7 @@ export function MemoryPopover({
       {open && (
         <div
           ref={popoverRef}
-          className="absolute bottom-full right-0 mb-2 w-72 rounded-lg border bg-popover text-popover-foreground shadow-lg z-50"
+          className="absolute bottom-full left-0 mb-2 w-72 rounded-lg border bg-popover text-popover-foreground shadow-lg z-50"
         >
           <div className="p-3 space-y-3">
             {/* Header */}
@@ -257,12 +365,12 @@ export function MemoryPopover({
             </div>
 
             {/* VRAM Bar */}
-            {vramTotal > 0 && cliPeak > 0 && (
+            {vramFree > 0 && cliPeak > 0 && (
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">VRAM ({width}x{height})</span>
+                  <span className="text-muted-foreground">VRAM Free ({width}x{height})</span>
                   <span className={cn("font-mono", fitsInVram ? "text-green-400" : "text-red-400")}>
-                    {activePeak} / {vramTotal} MB ({vramPercent}%)
+                    {activePeak} / {vramFree} MB ({vramPercent}%)
                   </span>
                 </div>
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -275,14 +383,41 @@ export function MemoryPopover({
                   <span>CLI: ~{cliPeak}MB</span>
                   {serverPeak > 0 && <span>Server: ~{serverPeak}MB</span>}
                 </div>
-                {!fitsInVram && (
+                {!fitsInVram && isManualFlags && (
                   <div className="flex items-center gap-1 text-xs text-red-400">
                     <AlertTriangle className="h-3 w-3" />
-                    <span>Exceeds VRAM - enable VAE tiling or VAE on CPU</span>
+                    <span>Exceeds VRAM in manual mode</span>
                   </div>
                 )}
               </div>
             )}
+
+            {/* Auto/manual mode */}
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Memory Management</div>
+              <div className="inline-flex rounded-md border border-border p-0.5">
+                <button
+                  type="button"
+                  onClick={() => onManualModeChange?.(false)}
+                  className={cn(
+                    "px-2 py-1 text-xs rounded transition-colors",
+                    !isManualFlags ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onManualModeChange?.(true)}
+                  className={cn(
+                    "px-2 py-1 text-xs rounded transition-colors",
+                    isManualFlags ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Manual
+                </button>
+              </div>
+            </div>
 
             {/* Memory Flag Toggles */}
             <div className="space-y-1">
@@ -361,11 +496,13 @@ export function MemoryPanel({
   modelConfig,
   width = 1024,
   height = 1024,
+  showInlineBar = true,
 }) {
   const { gpuInfo } = useGpuInfo();
 
   // Memory flags state (defaults match settings.yml memory_defaults)
   const [flags, setFlags] = useState(DEFAULT_FLAGS);
+  const [isManualFlags, setIsManualFlags] = useState(false);
 
   // Exec mode state
   const [execMode, setExecMode] = useState("auto");
@@ -379,19 +516,15 @@ export function MemoryPanel({
     
     // Load order: 1) localStorage (if exists), 2) modelConfig.memoryFlags, 3) hardcoded defaults
     const storedFlags = loadMemoryFlagsFromStorage(selectedModelId);
-    if (storedFlags) {
-      setFlags({ ...DEFAULT_FLAGS, ...storedFlags });
+    if (storedFlags?.flags) {
+      setFlags({ ...DEFAULT_FLAGS, ...storedFlags.flags });
+      setIsManualFlags(Boolean(storedFlags.manual));
     } else if (modelConfig?.memoryFlags) {
-      const mf = modelConfig.memoryFlags;
-      setFlags({
-        offloadToCpu: mf.offload_to_cpu ?? DEFAULT_FLAGS.offloadToCpu,
-        clipOnCpu: mf.clip_on_cpu ?? DEFAULT_FLAGS.clipOnCpu,
-        vaeOnCpu: mf.vae_on_cpu ?? DEFAULT_FLAGS.vaeOnCpu,
-        vaeTiling: mf.vae_tiling ?? DEFAULT_FLAGS.vaeTiling,
-        diffusionFa: mf.diffusion_fa ?? DEFAULT_FLAGS.diffusionFa,
-      });
+      setFlags(getFlagsFromModelConfig(modelConfig));
+      setIsManualFlags(false);
     } else {
       setFlags(DEFAULT_FLAGS);
+      setIsManualFlags(false);
     }
     // Read exec mode from model config
     const mode = modelConfig?.exec_mode || modelConfig?.execMode || "auto";
@@ -406,6 +539,27 @@ export function MemoryPanel({
     flags
   );
 
+  // Auto-adjust flags from recommendation when user has not manually overridden this model
+  useEffect(() => {
+    if (!selectedModelId || isManualFlags || !estimate?.recommendedFlags) {
+      return;
+    }
+
+    const recommended = {
+      offloadToCpu: estimate.recommendedFlags.offloadToCpu,
+      clipOnCpu: estimate.recommendedFlags.clipOnCpu,
+      vaeOnCpu: estimate.recommendedFlags.vaeOnCpu,
+      vaeTiling: estimate.recommendedFlags.vaeTiling,
+      diffusionFa: estimate.recommendedFlags.diffusionFa,
+    };
+
+    if (!areFlagsEqual(flags, recommended)) {
+      setFlags(recommended);
+      saveMemoryFlagsToStorage(selectedModelId, recommended, false);
+      persistMemoryFlagsToBackend(selectedModelId, recommended).catch(() => {});
+    }
+  }, [selectedModelId, estimate?.recommendedFlags, isManualFlags, flags]);
+
   // Fetch components when model changes
   useEffect(() => {
     if (!selectedModelId) {
@@ -416,7 +570,14 @@ export function MemoryPanel({
     let cancelled = false;
     async function fetchComponents() {
       try {
-        const response = await authenticatedFetch(`/api/models/${selectedModelId}/memory-components`);
+        const params = new URLSearchParams({
+          offloadToCpu: flags.offloadToCpu ? "1" : "0",
+          clipOnCpu: flags.clipOnCpu ? "1" : "0",
+          vaeOnCpu: flags.vaeOnCpu ? "1" : "0",
+          vaeTiling: flags.vaeTiling ? "1" : "0",
+          diffusionFa: flags.diffusionFa ? "1" : "0",
+        });
+        const response = await authenticatedFetch(`/api/models/${selectedModelId}/memory-components?${params}`);
         if (!response.ok) return;
         const data = await response.json();
         if (!cancelled) {
@@ -429,27 +590,41 @@ export function MemoryPanel({
 
     fetchComponents();
     return () => { cancelled = true; };
-  }, [selectedModelId]);
+  }, [selectedModelId, flags.offloadToCpu, flags.clipOnCpu, flags.vaeOnCpu, flags.vaeTiling, flags.diffusionFa]);
 
   const handleFlagsChange = useCallback((newFlags) => {
     setFlags(newFlags);
+    setIsManualFlags(true);
     // Save to localStorage
     if (selectedModelId) {
-      saveMemoryFlagsToStorage(selectedModelId, newFlags);
+      saveMemoryFlagsToStorage(selectedModelId, newFlags, true);
       // Also persist to backend
-      authenticatedFetch(`/api/models/${selectedModelId}/memory-flags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          offloadToCpu: newFlags.offloadToCpu,
-          clipOnCpu: newFlags.clipOnCpu,
-          vaeOnCpu: newFlags.vaeOnCpu,
-          vaeTiling: newFlags.vaeTiling,
-          diffusionFa: newFlags.diffusionFa,
-        }),
-      }).catch(() => {});
+      persistMemoryFlagsToBackend(selectedModelId, newFlags).catch(() => {});
     }
   }, [selectedModelId]);
+
+  const handleManualModeChange = useCallback((manual) => {
+    setIsManualFlags(manual);
+    if (!selectedModelId) {
+      return;
+    }
+
+    if (!manual && estimate?.recommendedFlags) {
+      const recommended = {
+        offloadToCpu: estimate.recommendedFlags.offloadToCpu,
+        clipOnCpu: estimate.recommendedFlags.clipOnCpu,
+        vaeOnCpu: estimate.recommendedFlags.vaeOnCpu,
+        vaeTiling: estimate.recommendedFlags.vaeTiling,
+        diffusionFa: estimate.recommendedFlags.diffusionFa,
+      };
+      setFlags(recommended);
+      saveMemoryFlagsToStorage(selectedModelId, recommended, false);
+      persistMemoryFlagsToBackend(selectedModelId, recommended).catch(() => {});
+      return;
+    }
+
+    saveMemoryFlagsToStorage(selectedModelId, flags, manual);
+  }, [selectedModelId, estimate?.recommendedFlags, flags]);
 
   const handleExecModeChange = useCallback((newMode) => {
     setExecMode(newMode);
@@ -478,6 +653,8 @@ export function MemoryPanel({
       height={height}
       flags={flags}
       onFlagsChange={handleFlagsChange}
+      isManualFlags={isManualFlags}
+      onManualModeChange={handleManualModeChange}
       execMode={execMode}
       onExecModeChange={handleExecModeChange}
       gpuInfo={gpuInfo}
@@ -488,7 +665,7 @@ export function MemoryPanel({
 
   return (
     <div className="flex items-center gap-2">
-      {inlineEl}
+      {showInlineBar && inlineEl}
       {popoverEl}
     </div>
   );

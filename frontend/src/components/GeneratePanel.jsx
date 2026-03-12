@@ -15,6 +15,7 @@ import { MemoryPanel } from "./settings/MemoryPanel";
 
 // localStorage key for settings form state persistence (different from Studio's key)
 const SETTINGS_STATE_KEY = "sd-cpp-studio-settings-form-state";
+const SETTINGS_STATE_EVENT = "sd-cpp-studio-settings-form-updated";
 
 const MODES = [
   { value: "image", label: "Image", needsImage: false, optionalImage: true, description: "Text to Image / Image to Image" },
@@ -289,6 +290,9 @@ export function GeneratePanel({
         flowShiftValue,
       };
       localStorage.setItem(SETTINGS_STATE_KEY, JSON.stringify(formState));
+      window.dispatchEvent(new CustomEvent(SETTINGS_STATE_EVENT, {
+        detail: { width: formState.width, height: formState.height },
+      }));
     }
   }, [
     localMode,
@@ -677,44 +681,46 @@ export function GeneratePanel({
             />
           )}
 
-          {/* Generate Button row with inline memory info */}
-          {localMode !== "upscale" && (
-            <div className="flex items-center justify-between gap-3 pt-4 border-t">
-              {/* Left: GPU info + component badges (always visible) */}
-              <div className="min-w-0 flex-1">
-                {selectedModels.length > 0 && (
-                  <MemoryPanel
-                    selectedModelId={selectedModels[0]}
-                    modelConfig={modelsMap?.[selectedModels[0]]}
-                    width={width}
-                    height={height}
-                  />
-                )}
-              </div>
+        </div>
+      )}
 
-              {/* Right: Memory settings popover + Generate button */}
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  onClick={handleGenerate}
-                  disabled={isLoading || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
-                  className="gap-2 px-6"
-                  data-testid="generate-button"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Generating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
+      {/* Generate Button row with inline memory info */}
+      {localMode !== "upscale" && (
+        <div className="flex items-center justify-between gap-3 pt-4 border-t">
+          {/* Left: GPU info + component badges (always visible) */}
+          <div className="min-w-0 flex-1">
+            {selectedModels.length > 0 && (
+              <MemoryPanel
+                selectedModelId={selectedModels[0]}
+                modelConfig={modelsMap?.[selectedModels[0]]}
+                width={width}
+                height={height}
+                showInlineBar={false}
+              />
+            )}
+          </div>
+
+          {/* Right: Memory settings popover + Generate button */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              onClick={handleGenerate}
+              disabled={isLoading || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
+              className="gap-2 px-6"
+              data-testid="generate-button"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       )}
     </div>

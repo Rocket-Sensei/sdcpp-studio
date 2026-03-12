@@ -319,6 +319,7 @@ function App() {
             <MultiModelSelector
               selectedModels={selectedModelsFilter}
               onModelsChange={setSelectedModelsFilter}
+              enableMemoryControls={false}
               className="max-h-96 overflow-y-auto"
             />
           </div>

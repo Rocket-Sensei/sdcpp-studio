@@ -7,9 +7,54 @@ import { getGpuInfo } from '../services/gpuService.js';
 import { calculateMemoryForModel } from '../services/memoryCalculator.js';
 import { fileURLToPath } from 'url';
 import { resolve, dirname, basename, join } from 'path';
+import os from 'os';
 import { authenticateRequest } from '../middleware/auth.js';
 
 const logger = createLogger('routes:models');
+
+function roundTo1(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function mbToGb(valueMB) {
+  if (!Number.isFinite(valueMB) || valueMB < 0) {
+    return 0;
+  }
+  return roundTo1(valueMB / 1024);
+}
+
+function bytesToMb(valueBytes) {
+  if (!Number.isFinite(valueBytes) || valueBytes < 0) {
+    return 0;
+  }
+  return Math.round(valueBytes / (1024 * 1024));
+}
+
+function isVideoModel(model) {
+  const modelType = String(model?.model_type || '').toLowerCase();
+  const capabilities = Array.isArray(model?.capabilities)
+    ? model.capabilities.map(cap => String(cap).toLowerCase())
+    : [];
+
+  return modelType.includes('video') || capabilities.some(cap => cap.includes('video'));
+}
+
+function isLlmModel(model) {
+  const modelType = String(model?.model_type || '').toLowerCase();
+  const capabilities = Array.isArray(model?.capabilities)
+    ? model.capabilities.map(cap => String(cap).toLowerCase())
+    : [];
+
+  return modelType.includes('llm') || capabilities.some(cap => cap.includes('llm') || cap.includes('chat') || cap.includes('text-generation'));
+}
+
+function classifySystemProcess(name) {
+  const value = String(name || '').toLowerCase();
+  if (value.includes('llama') || value.includes('llm') || value.includes('ollama')) {
+    return 'llm';
+  }
+  return 'system';
+}
 
 /**
  * Model management routes
@@ -42,8 +87,94 @@ export function registerModelRoutes(app) {
    */
   app.get('/api/gpu-info', authenticateRequest, async (req, res) => {
     try {
-      const gpuInfo = await getGpuInfo();
-      res.json(gpuInfo);
+      const gpuInfo = await getGpuInfo({ includeUsage: true });
+
+      const breakdownMB = {
+        image: 0,
+        video: 0,
+        llm: 0,
+        system: 0,
+      };
+
+      const trackedByPid = new Map();
+      for (const processInfo of processTracker.getAllProcesses()) {
+        if (processInfo?.pid) {
+          trackedByPid.set(processInfo.pid, processInfo);
+        }
+      }
+
+      const processBreakdown = Array.isArray(gpuInfo.processes)
+        ? gpuInfo.processes.map(proc => {
+            const usedMB = Math.max(0, Number(proc?.usedMB) || 0);
+            const tracked = trackedByPid.get(proc.pid);
+
+            let category = 'system';
+            if (tracked?.modelId) {
+              const model = modelManager.getModel(tracked.modelId);
+              if (isVideoModel(model)) {
+                category = 'video';
+              } else if (isLlmModel(model)) {
+                category = 'llm';
+              } else {
+                category = 'image';
+              }
+            } else {
+              category = classifySystemProcess(proc.processName);
+            }
+
+            breakdownMB[category] += usedMB;
+
+            return {
+              pid: proc.pid,
+              name: proc.processName,
+              category,
+              usedMB,
+              usedGB: mbToGb(usedMB),
+            };
+          })
+        : [];
+
+      const vramUsedMB = Number.isFinite(gpuInfo.vramUsedMB) ? gpuInfo.vramUsedMB : null;
+      if (vramUsedMB !== null) {
+        const categorizedMB = breakdownMB.image + breakdownMB.video + breakdownMB.llm + breakdownMB.system;
+        if (categorizedMB < vramUsedMB) {
+          breakdownMB.system += (vramUsedMB - categorizedMB);
+        }
+      }
+
+      const totalRamBytes = os.totalmem();
+      const freeRamBytes = os.freemem();
+      const usedRamBytes = Math.max(0, totalRamBytes - freeRamBytes);
+      const totalRamMB = bytesToMb(totalRamBytes);
+      const freeRamMB = bytesToMb(freeRamBytes);
+      const usedRamMB = bytesToMb(usedRamBytes);
+
+      const response = {
+        ...gpuInfo,
+        vram: {
+          totalGB: mbToGb(gpuInfo.vramTotalMB),
+          usedGB: mbToGb(gpuInfo.vramUsedMB),
+          freeGB: mbToGb(gpuInfo.vramFreeMB),
+        },
+        ram: {
+          totalMB: totalRamMB,
+          freeMB: freeRamMB,
+          usedMB: usedRamMB,
+          totalGB: mbToGb(totalRamMB),
+          freeGB: mbToGb(freeRamMB),
+          usedGB: mbToGb(usedRamMB),
+        },
+        breakdownMB,
+        breakdownGB: {
+          image: mbToGb(breakdownMB.image),
+          video: mbToGb(breakdownMB.video),
+          llm: mbToGb(breakdownMB.llm),
+          system: mbToGb(breakdownMB.system),
+        },
+        processBreakdown,
+      };
+
+      res.json(response);
     } catch (error) {
       logger.error({ error }, 'Error fetching GPU info');
       res.status(500).json({ error: error.message });
@@ -81,25 +212,72 @@ export function registerModelRoutes(app) {
       };
 
       // Get GPU info for VRAM budget
-      const gpuInfo = await getGpuInfo();
+      const gpuInfo = await getGpuInfo({ includeUsage: true });
       const gpuVramMB = gpuInfo.vramTotalMB || null;
+      const availableVramMB = gpuInfo.vramFreeMB ?? gpuVramMB;
 
-      // Calculate memory usage
-      const result = calculateMemoryForModel(model, width, height, flags, gpuVramMB);
+      // Calculate memory usage for currently selected flags
+      const result = calculateMemoryForModel(model, width, height, flags, availableVramMB);
       
       if (!result) {
         return res.json({
           modelId,
           error: 'Could not determine model architecture for memory estimation',
           gpuVramMB,
+          gpuFreeVramMB: gpuInfo.vramFreeMB ?? null,
         });
+      }
+
+      // Calculate recommended flags (best quality that safely fits VRAM)
+      const recommendationCandidates = [
+        { offloadToCpu: false, clipOnCpu: false, vaeOnCpu: false, vaeTiling: false, diffusionFlashAttn: true },
+        { offloadToCpu: true, clipOnCpu: false, vaeOnCpu: false, vaeTiling: false, diffusionFlashAttn: true },
+        { offloadToCpu: true, clipOnCpu: true, vaeOnCpu: false, vaeTiling: false, diffusionFlashAttn: true },
+        { offloadToCpu: true, clipOnCpu: true, vaeOnCpu: true, vaeTiling: false, diffusionFlashAttn: true },
+        { offloadToCpu: true, clipOnCpu: true, vaeOnCpu: true, vaeTiling: true, diffusionFlashAttn: true },
+      ];
+
+      const fallbackCandidate = recommendationCandidates[recommendationCandidates.length - 1];
+      let recommendedFlags = {
+        offloadToCpu: fallbackCandidate.offloadToCpu,
+        clipOnCpu: fallbackCandidate.clipOnCpu,
+        vaeOnCpu: fallbackCandidate.vaeOnCpu,
+        vaeTiling: fallbackCandidate.vaeTiling,
+        diffusionFa: fallbackCandidate.diffusionFlashAttn,
+      };
+
+      if (availableVramMB) {
+        const safetyBudgetMB = Math.floor(availableVramMB * 0.9);
+        for (const candidate of recommendationCandidates) {
+          const candidateResult = calculateMemoryForModel(
+            model,
+            width,
+            height,
+            candidate,
+            availableVramMB
+          );
+
+          if (candidateResult?.cli?.usage?.peakVramMB <= safetyBudgetMB) {
+            recommendedFlags = {
+              offloadToCpu: candidate.offloadToCpu,
+              clipOnCpu: candidate.clipOnCpu,
+              vaeOnCpu: candidate.vaeOnCpu,
+              vaeTiling: candidate.vaeTiling,
+              diffusionFa: candidate.diffusionFlashAttn,
+            };
+            break;
+          }
+        }
       }
 
       res.json({
         modelId,
         ...result,
         gpuVramMB,
+        gpuFreeVramMB: gpuInfo.vramFreeMB ?? null,
+        availableVramMB,
         flags,
+        recommendedFlags,
       });
     } catch (error) {
       logger.error({ error }, 'Error estimating memory');
@@ -233,8 +411,15 @@ export function registerModelRoutes(app) {
         return res.status(404).json({ error: 'Model not found' });
       }
 
-      // Get effective memory flags for this model
+      // Get effective memory flags for this model (override with query params when provided)
       const effectiveFlags = modelManager.getEffectiveMemoryFlags(modelId);
+      const resolvedFlags = {
+        offload_to_cpu: req.query.offloadToCpu !== undefined ? req.query.offloadToCpu === '1' : effectiveFlags.offload_to_cpu,
+        clip_on_cpu: req.query.clipOnCpu !== undefined ? req.query.clipOnCpu === '1' : effectiveFlags.clip_on_cpu,
+        vae_on_cpu: req.query.vaeOnCpu !== undefined ? req.query.vaeOnCpu === '1' : effectiveFlags.vae_on_cpu,
+        vae_tiling: req.query.vaeTiling !== undefined ? req.query.vaeTiling === '1' : effectiveFlags.vae_tiling,
+        diffusion_fa: req.query.diffusionFa !== undefined ? req.query.diffusionFa === '1' : effectiveFlags.diffusion_fa,
+      };
 
       // Detect components from model args
       const FILE_FLAGS = {
@@ -267,7 +452,7 @@ export function registerModelRoutes(app) {
           let placement, color;
           
           if (componentName === 'diffusion-model' || componentName === 'mmdit') {
-            if (effectiveFlags.offload_to_cpu) {
+            if (resolvedFlags.offload_to_cpu) {
               placement = 'offload';
               color = 'yellow';
             } else {
@@ -275,10 +460,10 @@ export function registerModelRoutes(app) {
               color = 'green';
             }
           } else if (componentName === 'vae') {
-            if (effectiveFlags.vae_on_cpu) {
+            if (resolvedFlags.vae_on_cpu) {
               placement = 'cpu';
               color = 'orange';
-            } else if (effectiveFlags.offload_to_cpu) {
+            } else if (resolvedFlags.offload_to_cpu) {
               placement = 'offload';
               color = 'yellow';
             } else {
@@ -286,10 +471,10 @@ export function registerModelRoutes(app) {
               color = 'green';
             }
           } else if (['clip-l', 't5-xxl', 'clip', 'clip-g', 'llm', 'qwen2vl', 'text-encoder'].includes(componentName)) {
-            if (effectiveFlags.clip_on_cpu) {
+            if (resolvedFlags.clip_on_cpu) {
               placement = 'cpu';
               color = 'orange';
-            } else if (effectiveFlags.offload_to_cpu) {
+            } else if (resolvedFlags.offload_to_cpu) {
               placement = 'offload';
               color = 'yellow';
             } else {
@@ -297,8 +482,8 @@ export function registerModelRoutes(app) {
               color = 'green';
             }
           } else {
-            placement = effectiveFlags.offload_to_cpu ? 'offload' : 'gpu';
-            color = effectiveFlags.offload_to_cpu ? 'yellow' : 'green';
+            placement = resolvedFlags.offload_to_cpu ? 'offload' : 'gpu';
+            color = resolvedFlags.offload_to_cpu ? 'yellow' : 'green';
           }
 
           components.push({
@@ -314,7 +499,7 @@ export function registerModelRoutes(app) {
       res.json({
         modelId,
         components,
-        memoryFlags: effectiveFlags,
+        memoryFlags: resolvedFlags,
       });
     } catch (error) {
       logger.error({ error }, 'Error fetching memory components');

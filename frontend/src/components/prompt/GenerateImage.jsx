@@ -1,6 +1,4 @@
 import { Textarea } from "../ui/textarea";
-import { Button } from "../ui/button";
-import { Sparkles, Loader2 } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
 
 /**
@@ -60,28 +58,6 @@ export function GenerateImage({
             Strength: {strength.toFixed(2)}
           </div>
         )}
-      </div>
-
-      {/* Generate button */}
-      <div className="flex items-center justify-end">
-        <Button
-          onClick={onGenerate}
-          disabled={disabled || isLoading || requiresPrompt && !prompt.trim()}
-          className="gap-2 px-6"
-          data-testid="generate-button"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="hidden sm:inline">Generating...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4" />
-              Generate
-            </>
-          )}
-        </Button>
       </div>
 
       {/* Hint text */}

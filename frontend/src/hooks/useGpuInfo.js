@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { authenticatedFetch } from '../utils/api';
 
+const DEFAULT_POLL_INTERVAL_MS = 2000;
+
 /**
  * Hook to fetch and cache GPU information
  */
-export function useGpuInfo() {
+export function useGpuInfo(pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
   const [gpuInfo, setGpuInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,6 +21,7 @@ export function useGpuInfo() {
         const data = await response.json();
         if (!cancelled) {
           setGpuInfo(data);
+          setError(null);
           setLoading(false);
         }
       } catch (err) {
@@ -30,8 +33,13 @@ export function useGpuInfo() {
     }
 
     fetchGpuInfo();
-    return () => { cancelled = true; };
-  }, []);
+    const intervalId = setInterval(fetchGpuInfo, pollIntervalMs);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [pollIntervalMs]);
 
   return { gpuInfo, loading, error };
 }

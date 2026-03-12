@@ -31,8 +31,11 @@ import { cn } from "../lib/utils";
 import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
 import { useDownloadProgress, useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
+import { useMemoryEstimate } from "../hooks/useMemoryEstimate";
 
 const API_V1 = "/api/v1/models";
+const SETTINGS_STATE_KEY = "sd-cpp-studio-settings-form-state";
+const SETTINGS_STATE_EVENT = "sd-cpp-studio-settings-form-updated";
 
 const MEMORY_FLAG_LABELS = {
   offloadToCpu: { label: "Offload to CPU", icon: ArrowDownToLine, iconAlt: ArrowUpFromLine },
@@ -46,7 +49,17 @@ function loadMemoryFlagsFromStorage(modelId) {
   try {
     const stored = localStorage.getItem(`memoryFlags:${modelId}`);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object" && parsed.flags) {
+        return {
+          flags: parsed.flags,
+          manual: Boolean(parsed.manual),
+        };
+      }
+      return {
+        flags: parsed,
+        manual: true,
+      };
     }
   } catch (e) {
     // silently fail
@@ -54,9 +67,9 @@ function loadMemoryFlagsFromStorage(modelId) {
   return null;
 }
 
-function saveMemoryFlagsToStorage(modelId, flags) {
+function saveMemoryFlagsToStorage(modelId, flags, manual = true) {
   try {
-    localStorage.setItem(`memoryFlags:${modelId}`, JSON.stringify(flags));
+    localStorage.setItem(`memoryFlags:${modelId}`, JSON.stringify({ flags, manual }));
   } catch (e) {
     // silently fail
   }
@@ -69,6 +82,70 @@ const DEFAULT_FLAGS = {
   vaeTiling: false,
   diffusionFa: true,
 };
+
+function getEstimateDimensions() {
+  try {
+    const stored = localStorage.getItem(SETTINGS_STATE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        width: Number(parsed?.width) || 1024,
+        height: Number(parsed?.height) || 1024,
+      };
+    }
+  } catch (e) {
+    // silently fail
+  }
+  return { width: 1024, height: 1024 };
+}
+
+function formatProjectedGb(mb) {
+  if (!Number.isFinite(mb) || mb <= 0) {
+    return "0";
+  }
+  const gb = mb / 1024;
+  if (gb >= 10) {
+    return gb.toFixed(0);
+  }
+  return gb.toFixed(1).replace(/\.0$/, "");
+}
+
+function getProjectedPeakMB(estimate) {
+  return estimate?.cli?.usage?.peakVramMB || estimate?.cliMode?.peakVramMB || estimate?.peakVramMB || 0;
+}
+
+function ProjectedMemoryBadge({ modelId, width, height, flags }) {
+  const { estimate } = useMemoryEstimate(modelId, width, height, flags);
+  const peakMB = getProjectedPeakMB(estimate);
+  const budgetMB = estimate?.availableVramMB || estimate?.gpuFreeVramMB || estimate?.gpuVramMB || 0;
+
+  if (!peakMB) {
+    return null;
+  }
+
+  const percent = budgetMB > 0 ? Math.min(100, Math.round((peakMB / budgetMB) * 100)) : 0;
+  const fits = budgetMB > 0 ? peakMB <= budgetMB : true;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-xs font-mono",
+        fits
+          ? "bg-green-500/10 text-green-400 border-green-500/20"
+          : "bg-red-500/10 text-red-400 border-red-500/20"
+      )}
+      title={`Projected VRAM peak (${width}x${height}): ${peakMB}MB / ${budgetMB || 0}MB free`}
+    >
+      [{formatProjectedGb(peakMB)}/{formatProjectedGb(budgetMB)}]
+      <span className="h-1 w-8 rounded-full bg-muted/70 overflow-hidden">
+        <span
+          className={cn("block h-full", fits ? "bg-green-500" : "bg-red-500")}
+          style={{ width: `${percent}%` }}
+        />
+      </span>
+    </span>
+  );
+}
 
 /**
  * Analyze model args and return array of component types
@@ -214,6 +291,7 @@ export function MultiModelSelector({
   onModelsChange,
   filterCapabilities = null,
   mode = null,
+  enableMemoryControls = true,
   className = "",
 }) {
   const [allModels, setAllModels] = useState([]);
@@ -227,6 +305,34 @@ export function MultiModelSelector({
   const [memoryFlags, setMemoryFlags] = useState({});
   const [serverConfigModal, setServerConfigModal] = useState({ open: false, modelId: null, model: null });
   const [serverConfig, setServerConfig] = useState({ steps: 9, threads: "", extraArgs: "" });
+  const [estimateDimensions, setEstimateDimensions] = useState(() => getEstimateDimensions());
+
+  useEffect(() => {
+    function syncEstimateDimensions() {
+      const next = getEstimateDimensions();
+      setEstimateDimensions((prev) => {
+        if (prev.width === next.width && prev.height === next.height) {
+          return prev;
+        }
+        return next;
+      });
+    }
+
+    function handleStorage(event) {
+      if (event.key === SETTINGS_STATE_KEY) {
+        syncEstimateDimensions();
+      }
+    }
+
+    syncEstimateDimensions();
+    window.addEventListener(SETTINGS_STATE_EVENT, syncEstimateDimensions);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(SETTINGS_STATE_EVENT, syncEstimateDimensions);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   // Keep a ref to the latest fetchModels function for polling
   const fetchModelsRef = useRef(null);
@@ -512,9 +618,8 @@ export function MultiModelSelector({
       return memoryFlags[modelId];
     }
     const stored = loadMemoryFlagsFromStorage(modelId);
-    if (stored) {
-      setMemoryFlags(prev => ({ ...prev, [modelId]: stored }));
-      return stored;
+    if (stored?.flags) {
+      return { ...DEFAULT_FLAGS, ...stored.flags };
     }
     return DEFAULT_FLAGS;
   };
@@ -524,7 +629,7 @@ export function MultiModelSelector({
     const currentFlags = getMemoryFlags(modelId);
     const newFlags = { ...currentFlags, [flagKey]: !currentFlags[flagKey] };
     setMemoryFlags(prev => ({ ...prev, [modelId]: newFlags }));
-    saveMemoryFlagsToStorage(modelId, newFlags);
+    saveMemoryFlagsToStorage(modelId, newFlags, true);
   };
 
   // Select all models (only visible models based on showMissingModels filter)
@@ -775,6 +880,17 @@ export function MultiModelSelector({
                         {model.quant}
                       </span>
                     )}
+                    {enableMemoryControls && isSelected && isServerMode && (
+                      <div className="inline-flex items-center gap-1 flex-shrink-0">
+                        <span className="text-muted-foreground text-xs">Memory:</span>
+                        <ProjectedMemoryBadge
+                          modelId={model.id}
+                          width={estimateDimensions.width}
+                          height={estimateDimensions.height}
+                          flags={getMemoryFlags(model.id)}
+                        />
+                      </div>
+                    )}
                     {isSelected && (() => {
                       const components = getModelComponents(model);
                       return components.length > 0 ? (
@@ -906,7 +1022,7 @@ export function MultiModelSelector({
                   </div>
 
                   {/* Memory flags - only show when model is selected AND expanded */}
-                  {isSelected && isServerMode && (
+                  {enableMemoryControls && isSelected && isServerMode && (
                     <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-border/50">
                       <span className="text-muted-foreground text-xs mr-1">Memory:</span>
                       {Object.entries(MEMORY_FLAG_LABELS).map(([key, { label, icon: Icon, iconAlt }]) => {

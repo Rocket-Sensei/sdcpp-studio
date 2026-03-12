@@ -1,6 +1,56 @@
 import { Sparkles, Settings, Loader2, Clock } from "lucide-react";
 import { Button } from "../ui/button";
 import { WebSocketStatusIndicator } from "../WebSocketStatusIndicator";
+import { cn } from "../../lib/utils";
+import { useGpuInfo } from "../../hooks/useGpuInfo";
+
+function formatGbCompact(mb) {
+  if (!Number.isFinite(mb) || mb <= 0) {
+    return "0";
+  }
+  const gb = mb / 1024;
+  if (gb >= 10) {
+    return gb.toFixed(0);
+  }
+  return gb.toFixed(1).replace(/\.0$/, "");
+}
+
+function UsageLine({ label, usedMB, totalMB, colorClass = "bg-primary" }) {
+  if (!Number.isFinite(totalMB) || totalMB <= 0) {
+    return null;
+  }
+
+  const percent = Math.min(100, Math.max(0, Math.round((usedMB / totalMB) * 100)));
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
+      <span className="uppercase">{label}</span>
+      <span className="text-foreground/90">[{formatGbCompact(usedMB)}/{formatGbCompact(totalMB)}]</span>
+      <span className="h-1 w-8 rounded-full bg-muted/70 overflow-hidden">
+        <span className={cn("block h-full", colorClass)} style={{ width: `${percent}%` }} />
+      </span>
+    </span>
+  );
+}
+
+function HeaderResourceWidget() {
+  const { gpuInfo } = useGpuInfo();
+  const vramTotalMB = gpuInfo?.vramTotalMB || 0;
+  const vramUsedMB = gpuInfo?.vramUsedMB || 0;
+  const ramTotalMB = gpuInfo?.ram?.totalMB || 0;
+  const ramUsedMB = gpuInfo?.ram?.usedMB || 0;
+
+  if (!vramTotalMB && !ramTotalMB) {
+    return null;
+  }
+
+  return (
+    <div className="hidden sm:flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2 py-1">
+      <UsageLine label="vram" usedMB={vramUsedMB} totalMB={vramTotalMB} colorClass="bg-amber-400" />
+      <UsageLine label="ram" usedMB={ramUsedMB} totalMB={ramTotalMB} colorClass="bg-blue-500" />
+    </div>
+  );
+}
 
 export function Header({
   onSettingsClick,
@@ -16,6 +66,7 @@ export function Header({
           <div className="flex items-center gap-2 flex-shrink-0">
             <Sparkles className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-bold hidden sm:block">sd.cpp Studio</h1>
+            <HeaderResourceWidget />
           </div>
 
           <div className="flex items-center gap-3">
