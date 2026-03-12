@@ -45,6 +45,19 @@ vi.mock('react-use-websocket', () => ({
   })),
 }));
 
+// Mock useMemoryEstimate hook
+vi.mock('../frontend/src/hooks/useMemoryEstimate', () => ({
+  useMemoryEstimate: vi.fn(() => ({
+    estimate: {
+      cli: { usage: { peakVramMB: 2662 } },
+      availableVramMB: 6800,
+    },
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+
 // Mock models data
 const createMockModels = (overrides = {}) => [
   {
@@ -1117,6 +1130,272 @@ describe('MultiModelSelector', () => {
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('Inline memory settings', () => {
+    const renderWithMemoryControls = async (overrides = {}) => {
+      const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
+
+      // Mock fetch to return models + memory estimate endpoint
+      global.fetch = vi.fn((url, options) => {
+        mockFetchCalls.push({ url, options });
+        if (url === '/api/v1/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              object: 'list',
+              data: createMockModels(overrides.modelOverrides || {}),
+            }),
+          });
+        }
+        // Memory flags persist endpoint
+        if (url.includes('/memory-flags')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      await act(async () => {
+        render(
+          React.createElement(MultiModelSelector, {
+            selectedModels: overrides.selectedModels || ['qwen-image'],
+            onModelsChange: mockOnModelsChange,
+            enableMemoryControls: true,
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      return { MultiModelSelector };
+    };
+
+    it('should show memory badge for selected server-mode models when enableMemoryControls is true', async () => {
+      await renderWithMemoryControls();
+
+      // ProjectedMemoryBadge renders [peakGB/budgetGB] format
+      await waitFor(() => {
+        expect(screen.getByText(/\[2\.6\/6\.6\]/)).toBeInTheDocument();
+      });
+    });
+
+    it('should show memory settings gear button next to memory badge', async () => {
+      await renderWithMemoryControls();
+
+      await waitFor(() => {
+        const gearButton = screen.getByTitle('Memory settings');
+        expect(gearButton).toBeInTheDocument();
+      });
+    });
+
+    it('should not show memory badge for unselected models', async () => {
+      await renderWithMemoryControls({ selectedModels: [] });
+
+      // No memory badge or gear should appear
+      expect(screen.queryByTitle('Memory settings')).not.toBeInTheDocument();
+    });
+
+    it('should not show memory badge for CLI mode models', async () => {
+      await renderWithMemoryControls({ selectedModels: ['cli-model'] });
+
+      // CLI models don't get memory controls (server-mode only)
+      expect(screen.queryByTitle('Memory settings')).not.toBeInTheDocument();
+    });
+
+    it('should toggle inline memory flag buttons when gear button is clicked', async () => {
+      await renderWithMemoryControls();
+
+      // Initially, memory flag buttons should not be visible
+      expect(screen.queryByTitle('Offload to CPU')).not.toBeInTheDocument();
+
+      // Click the gear button to expand inline settings
+      const gearButton = screen.getByTitle('Memory settings');
+      await act(async () => {
+        fireEvent.click(gearButton);
+      });
+
+      // Now all 5 memory flag buttons should be visible
+      await waitFor(() => {
+        expect(screen.getByTitle('Offload to CPU')).toBeInTheDocument();
+        expect(screen.getByTitle('CLIP on CPU')).toBeInTheDocument();
+        expect(screen.getByTitle('VAE on CPU')).toBeInTheDocument();
+        expect(screen.getByTitle('VAE Tiling')).toBeInTheDocument();
+        expect(screen.getByTitle('Flash Attention')).toBeInTheDocument();
+      });
+
+      // Click gear again to collapse
+      await act(async () => {
+        fireEvent.click(gearButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTitle('Offload to CPU')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should toggle individual memory flags when clicked', async () => {
+      await renderWithMemoryControls();
+
+      // Open inline settings
+      const gearButton = screen.getByTitle('Memory settings');
+      await act(async () => {
+        fireEvent.click(gearButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Offload to CPU')).toBeInTheDocument();
+      });
+
+      // Click the "Offload to CPU" flag button to toggle it
+      const offloadButton = screen.getByTitle('Offload to CPU');
+      await act(async () => {
+        fireEvent.click(offloadButton);
+      });
+
+      // The flag should have been saved to localStorage
+      const stored = localStorage.getItem('memoryFlags:qwen-image');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored);
+      // Since DEFAULT_FLAGS has offloadToCpu: true, toggling it should make it false
+      expect(parsed.flags.offloadToCpu).toBe(false);
+      expect(parsed.manual).toBe(true);
+    });
+
+    it('should persist memory flags to backend when toggled', async () => {
+      mockFetchCalls = [];
+      await renderWithMemoryControls();
+
+      // Open inline settings
+      const gearButton = screen.getByTitle('Memory settings');
+      await act(async () => {
+        fireEvent.click(gearButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTitle('VAE on CPU')).toBeInTheDocument();
+      });
+
+      // Clear fetch calls to track only the flag toggle call
+      mockFetchCalls = [];
+
+      // Toggle "VAE on CPU" flag
+      const vaeButton = screen.getByTitle('VAE on CPU');
+      await act(async () => {
+        fireEvent.click(vaeButton);
+      });
+
+      // Should have posted to the backend memory-flags endpoint
+      await waitFor(() => {
+        const flagsCall = mockFetchCalls.find(call =>
+          call.url === '/api/models/qwen-image/memory-flags'
+        );
+        expect(flagsCall).toBeDefined();
+        expect(flagsCall.options?.method).toBe('POST');
+        const body = JSON.parse(flagsCall.options.body);
+        // DEFAULT_FLAGS has vaeOnCpu: true, toggling makes it false
+        expect(body.vaeOnCpu).toBe(false);
+      });
+    });
+
+    it('should maintain per-model memory flags independently', async () => {
+      const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
+
+      global.fetch = vi.fn((url, options) => {
+        mockFetchCalls.push({ url, options });
+        if (url === '/api/v1/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              object: 'list',
+              data: createMockModels(),
+            }),
+          });
+        }
+        if (url.includes('/memory-flags')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ success: true }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      // Pre-set different flags for two models in localStorage
+      localStorage.setItem('memoryFlags:qwen-image', JSON.stringify({
+        flags: { offloadToCpu: false, clipOnCpu: true, vaeOnCpu: true, vaeTiling: false, diffusionFa: true },
+        manual: true,
+      }));
+      localStorage.setItem('memoryFlags:flux-schnell', JSON.stringify({
+        flags: { offloadToCpu: true, clipOnCpu: false, vaeOnCpu: false, vaeTiling: true, diffusionFa: false },
+        manual: true,
+      }));
+
+      await act(async () => {
+        render(
+          React.createElement(MultiModelSelector, {
+            selectedModels: ['qwen-image', 'flux-schnell'],
+            onModelsChange: mockOnModelsChange,
+            enableMemoryControls: true,
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+        expect(screen.getByText('FLUX.1 Schnell')).toBeInTheDocument();
+      });
+
+      // Both models should have their own gear buttons
+      const gearButtons = screen.getAllByTitle('Memory settings');
+      expect(gearButtons.length).toBe(2);
+
+      // Verify each model kept its own flags in localStorage
+      const qwenFlags = JSON.parse(localStorage.getItem('memoryFlags:qwen-image'));
+      const fluxFlags = JSON.parse(localStorage.getItem('memoryFlags:flux-schnell'));
+      expect(qwenFlags.flags.offloadToCpu).toBe(false);
+      expect(fluxFlags.flags.offloadToCpu).toBe(true);
+      expect(qwenFlags.flags.clipOnCpu).toBe(true);
+      expect(fluxFlags.flags.clipOnCpu).toBe(false);
+    });
+
+    it('should not show memory controls when enableMemoryControls is false', async () => {
+      const { MultiModelSelector } = await import('../frontend/src/components/MultiModelSelector');
+
+      global.fetch = vi.fn((url) => {
+        if (url === '/api/v1/models') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({
+              object: 'list',
+              data: createMockModels(),
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      });
+
+      await act(async () => {
+        render(
+          React.createElement(MultiModelSelector, {
+            selectedModels: ['qwen-image'],
+            onModelsChange: mockOnModelsChange,
+            enableMemoryControls: false,
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Qwen Image')).toBeInTheDocument();
+      });
+
+      // No memory settings gear should appear
+      expect(screen.queryByTitle('Memory settings')).not.toBeInTheDocument();
     });
   });
 });

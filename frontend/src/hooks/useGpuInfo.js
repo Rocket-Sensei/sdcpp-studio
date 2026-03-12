@@ -1,45 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { authenticatedFetch } from '../utils/api';
+import { useWebSocket, WS_CHANNELS } from '../contexts/WebSocketContext';
 
-const DEFAULT_POLL_INTERVAL_MS = 2000;
+const GPU_CHANNELS = ['gpu'];
 
-/**
- * Hook to fetch and cache GPU information
- */
-export function useGpuInfo(pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
+export function useGpuInfo(pollIntervalMs = 2000) {
   const [gpuInfo, setGpuInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const initialFetchDone = useRef(false);
+
+  const handleGpuMessage = useCallback((message) => {
+    if (message.channel === 'gpu' && message.type === 'gpu_info' && message.data) {
+      setGpuInfo(message.data);
+      setError(null);
+      setLoading(false);
+    }
+  }, []);
+
+  const wsOptions = useMemo(() => ({
+    channels: GPU_CHANNELS,
+    onMessage: handleGpuMessage,
+  }), [handleGpuMessage]);
+
+  useWebSocket(wsOptions);
 
   useEffect(() => {
-    let cancelled = false;
+    if (initialFetchDone.current) {
+      return;
+    }
 
-    async function fetchGpuInfo() {
+    async function fetchInitialGpuInfo() {
       try {
         const response = await authenticatedFetch('/api/gpu-info');
         if (!response.ok) throw new Error('Failed to fetch GPU info');
         const data = await response.json();
-        if (!cancelled) {
+        if (!initialFetchDone.current) {
           setGpuInfo(data);
           setError(null);
           setLoading(false);
+          initialFetchDone.current = true;
         }
       } catch (err) {
-        if (!cancelled) {
+        if (!initialFetchDone.current) {
           setError(err.message);
           setLoading(false);
         }
       }
     }
 
-    fetchGpuInfo();
-    const intervalId = setInterval(fetchGpuInfo, pollIntervalMs);
+    fetchInitialGpuInfo();
 
     return () => {
-      cancelled = true;
-      clearInterval(intervalId);
+      initialFetchDone.current = true;
     };
-  }, [pollIntervalMs]);
+  }, []);
 
   return { gpuInfo, loading, error };
 }

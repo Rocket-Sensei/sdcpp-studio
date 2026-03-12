@@ -42,6 +42,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+// Mock WebSocketContext and useGpuInfo
+vi.mock('../../contexts/WebSocketContext', () => ({
+  WebSocketProvider: ({ children }) => children,
+  useWebSocket: () => ({ isConnected: false, subscribe: vi.fn(() => () => {}), sendMessage: vi.fn() }),
+  useQueueUpdates: () => ({ isConnected: false, subscribe: vi.fn(() => () => {}) }),
+  WS_CHANNELS: { QUEUE: 'queue', GENERATIONS: 'generations', MODELS: 'models', GPU: 'gpu' },
+}));
+
+vi.mock('../../hooks/useGpuInfo', () => ({
+  useGpuInfo: () => ({ gpuInfo: { vramTotalMB: 8192, vramUsedMB: 4096, vramFreeMB: 4096 }, loading: false, error: null }),
+}));
+
 // Mock authenticatedFetch
 vi.mock('../../utils/api', () => ({
   authenticatedFetch: vi.fn(),

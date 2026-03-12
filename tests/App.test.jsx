@@ -33,6 +33,15 @@ vi.mock('../frontend/src/contexts/WebSocketContext', () => ({
     subscribe: vi.fn(),
     unsubscribe: vi.fn(),
   }),
+  useQueueUpdates: () => ({
+    isConnected: false,
+    subscribe: vi.fn(),
+  }),
+  WS_CHANNELS: {
+    QUEUE: 'queue',
+    GENERATIONS: 'generations',
+    MODELS: 'models',
+  },
 }));
 
 // Mock WebSocketStatusIndicator

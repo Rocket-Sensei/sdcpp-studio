@@ -23,6 +23,7 @@ export const CHANNELS = {
   GENERATIONS: 'generations',
   MODELS: 'models',
   DOWNLOAD: 'download',
+  GPU: 'gpu',
 };
 
 // Channel subscriptions
@@ -334,6 +335,17 @@ export function broadcastDownloadProgress(eventType, downloadData = {}) {
   });
 }
 
+/**
+ * Broadcast GPU info update
+ * @param {Object} gpuData - GPU info data
+ */
+export function broadcastGpuInfo(gpuData) {
+  broadcast(CHANNELS.GPU, {
+    type: 'gpu_info',
+    data: gpuData,
+  });
+}
+
 export default {
   initializeWebSocket,
   getWebSocketServer,
@@ -342,6 +354,7 @@ export default {
   broadcastGenerationComplete,
   broadcastModelStatus,
   broadcastDownloadProgress,
+  broadcastGpuInfo,
   getStats,
   CHANNELS,
 };

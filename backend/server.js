@@ -21,6 +21,7 @@ import { startQueueProcessor } from './services/queueProcessor.js';
 import { modelManager } from './services/modelManager.js';
 import { getDownloadMethod } from './services/modelDownloader.js';
 import { initializeWebSocket } from './services/websocket.js';
+import { startGpuBroadcaster } from './services/gpuBroadcaster.js';
 import { createLogger } from './utils/logger.js';
 import { authenticateRequest } from './middleware/auth.js';
 
@@ -143,6 +144,9 @@ const server = http.createServer(app);
 
 // Initialize WebSocket server
 const wsServer = initializeWebSocket(server);
+
+// Start GPU info broadcaster (2 second interval)
+startGpuBroadcaster(2000);
 
 // Graceful shutdown handler
 function gracefulShutdown(signal) {

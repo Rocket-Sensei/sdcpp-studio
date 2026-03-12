@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Filter, Search, X, Clock, XCircle, CheckCircle2, Cpu, Trash2 } from "lucide-react";
 import { Toaster } from "./components/ui/sonner";
 import { Studio } from "./components/Studio";
 import { Header } from "./components/header/Header";
-import { WebSocketProvider } from "./contexts/WebSocketContext";
+import { WebSocketProvider, useQueueUpdates } from "./contexts/WebSocketContext";
 import { AppBoot } from "./components/AppBoot";
 import { ApiKeyProvider as ApiKeyContextProvider, useApiKeyContext } from "./contexts/ApiKeyContext";
 import { SettingsModal } from "./components/SettingsModal";
@@ -108,6 +108,16 @@ function App() {
   useEffect(() => {
     fetchGenerations();
   }, [fetchGenerations, apiKeyVersion]);
+
+  // Subscribe to queue events so the header widget updates in real-time
+  const fetchGenerationsRef = useRef(fetchGenerations);
+  fetchGenerationsRef.current = fetchGenerations;
+  const handleQueueUpdate = useCallback((message) => {
+    if (message.type === 'job_updated' || message.type === 'job_completed' || message.type === 'job_failed') {
+      fetchGenerationsRef.current();
+    }
+  }, []);
+  useQueueUpdates(handleQueueUpdate);
 
   // Persist filter panel state to localStorage
   useEffect(() => {

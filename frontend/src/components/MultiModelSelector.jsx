@@ -19,6 +19,7 @@ import {
   Image,
   LetterText,
   Settings,
+  Settings2,
   Server,
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -32,6 +33,25 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "../utils/api";
 import { useDownloadProgress, useWebSocket, WS_CHANNELS } from "../hooks/useWebSocket";
 import { useMemoryEstimate } from "../hooks/useMemoryEstimate";
+
+async function persistMemoryFlagsToBackend(modelId, flags) {
+  if (!modelId) return;
+  try {
+    await authenticatedFetch(`/api/models/${modelId}/memory-flags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        offloadToCpu: flags.offloadToCpu,
+        clipOnCpu: flags.clipOnCpu,
+        vaeOnCpu: flags.vaeOnCpu,
+        vaeTiling: flags.vaeTiling,
+        diffusionFa: flags.diffusionFa,
+      }),
+    });
+  } catch (e) {
+    // silently fail
+  }
+}
 
 const API_V1 = "/api/v1/models";
 const SETTINGS_STATE_KEY = "sd-cpp-studio-settings-form-state";
@@ -303,6 +323,7 @@ export function MultiModelSelector({
   const [showMissingModels, setShowMissingModels] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [memoryFlags, setMemoryFlags] = useState({});
+  const [inlineSettingsOpen, setInlineSettingsOpen] = useState({});
   const [serverConfigModal, setServerConfigModal] = useState({ open: false, modelId: null, model: null });
   const [serverConfig, setServerConfig] = useState({ steps: 9, threads: "", extraArgs: "" });
   const [estimateDimensions, setEstimateDimensions] = useState(() => getEstimateDimensions());
@@ -630,6 +651,12 @@ export function MultiModelSelector({
     const newFlags = { ...currentFlags, [flagKey]: !currentFlags[flagKey] };
     setMemoryFlags(prev => ({ ...prev, [modelId]: newFlags }));
     saveMemoryFlagsToStorage(modelId, newFlags, true);
+    persistMemoryFlagsToBackend(modelId, newFlags);
+  };
+
+  // Toggle inline settings visibility for a model
+  const toggleInlineSettings = (modelId) => {
+    setInlineSettingsOpen(prev => ({ ...prev, [modelId]: !prev[modelId] }));
   };
 
   // Select all models (only visible models based on showMissingModels filter)
@@ -882,13 +909,48 @@ export function MultiModelSelector({
                     )}
                     {enableMemoryControls && isSelected && isServerMode && (
                       <div className="inline-flex items-center gap-1 flex-shrink-0">
-                        <span className="text-muted-foreground text-xs">Memory:</span>
                         <ProjectedMemoryBadge
                           modelId={model.id}
                           width={estimateDimensions.width}
                           height={estimateDimensions.height}
                           flags={getMemoryFlags(model.id)}
                         />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleInlineSettings(model.id); }}
+                          className={cn(
+                            "h-5 w-5 rounded flex items-center justify-center transition-colors",
+                            inlineSettingsOpen[model.id]
+                              ? "bg-accent text-accent-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          )}
+                          title="Memory settings"
+                        >
+                          <Settings2 className="h-3 w-3" />
+                        </button>
+                        {inlineSettingsOpen[model.id] && (
+                          <div className="inline-flex items-center gap-0.5">
+                            {Object.entries(MEMORY_FLAG_LABELS).map(([key, { label, icon: Icon, iconAlt }]) => {
+                              const flags = getMemoryFlags(model.id);
+                              const isEnabled = flags[key];
+                              const ToggleIcon = isEnabled ? Icon : iconAlt;
+                              return (
+                                <button
+                                  key={key}
+                                  onClick={(e) => { e.stopPropagation(); toggleMemoryFlag(model.id, key); }}
+                                  className={cn(
+                                    "h-5 w-5 rounded flex items-center justify-center transition-colors",
+                                    isEnabled
+                                      ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  )}
+                                  title={label}
+                                >
+                                  <ToggleIcon className="h-3 w-3" />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                     {isSelected && (() => {
@@ -1020,33 +1082,6 @@ export function MultiModelSelector({
                       </div>
                     )}
                   </div>
-
-                  {/* Memory flags - only show when model is selected AND expanded */}
-                  {enableMemoryControls && isSelected && isServerMode && (
-                    <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-border/50">
-                      <span className="text-muted-foreground text-xs mr-1">Memory:</span>
-                      {Object.entries(MEMORY_FLAG_LABELS).map(([key, { label, icon: Icon, iconAlt }]) => {
-                        const flags = getMemoryFlags(model.id);
-                        const isEnabled = flags[key];
-                        const ToggleIcon = isEnabled ? Icon : iconAlt;
-                        return (
-                          <button
-                            key={key}
-                            onClick={() => toggleMemoryFlag(model.id, key)}
-                            className={cn(
-                              "h-5 w-5 rounded flex items-center justify-center transition-colors",
-                              isEnabled
-                                ? "bg-primary/20 text-primary hover:bg-primary/30"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            )}
-                            title={label}
-                          >
-                            <ToggleIcon className="h-3 w-3" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
 
                   {/* Files status */}
                   {filesStatus && filesStatus.files && (

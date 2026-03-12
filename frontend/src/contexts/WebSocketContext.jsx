@@ -30,6 +30,7 @@ export const WS_CHANNELS = {
   QUEUE: 'queue',
   GENERATIONS: 'generations',
   MODELS: 'models',
+  GPU: 'gpu',
 };
 
 // Default reconnect interval (ms)
@@ -193,33 +194,56 @@ export function useWebSocket(options = {}) {
   const { isConnected, isConnecting, subscribe, onConnectionChange, sendMessage, getWebSocket } = context;
   const { channels: initialChannels = [], onMessage, onConnectionChange: userConnectionCallback } = options;
 
+  // Use a ref for the message callback to avoid re-subscribing when the callback changes
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
+
+  // Serialize channels to a string for stable dependency comparison
+  const channelsKey = initialChannels.join(',');
+
   // Subscribe to channels
   useEffect(() => {
+    const channels = channelsKey ? channelsKey.split(',') : [];
     const unsubscribers = [];
 
-    initialChannels.forEach((channel) => {
-      const unsubscribe = subscribe(channel, onMessage);
+    const stableCallback = (message) => {
+      if (onMessageRef.current) {
+        onMessageRef.current(message);
+      }
+    };
+
+    channels.forEach((channel) => {
+      const unsubscribe = subscribe(channel, stableCallback);
       unsubscribers.push(unsubscribe);
     });
 
-    // If onMessage is provided but no channels, listen to all messages
-    if (initialChannels.length === 0 && onMessage) {
-      const unsubscribe = subscribe(null, onMessage);
+    // If no channels but onMessage is provided, listen to all messages
+    if (channels.length === 0 && onMessageRef.current) {
+      const unsubscribe = subscribe(null, stableCallback);
       unsubscribers.push(unsubscribe);
     }
 
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [subscribe, initialChannels, onMessage]);
+  }, [subscribe, channelsKey]);
 
   // Subscribe to connection state changes
+  const connectionCallbackRef = useRef(userConnectionCallback);
+  connectionCallbackRef.current = userConnectionCallback;
+
   useEffect(() => {
-    if (userConnectionCallback) {
-      const unsubscribe = onConnectionChange(userConnectionCallback);
-      return unsubscribe;
-    }
-  }, [onConnectionChange, userConnectionCallback]);
+    if (!connectionCallbackRef.current) return;
+
+    const stableCallback = (connected) => {
+      if (connectionCallbackRef.current) {
+        connectionCallbackRef.current(connected);
+      }
+    };
+
+    const unsubscribe = onConnectionChange(stableCallback);
+    return unsubscribe;
+  }, [onConnectionChange]);
 
   return {
     isConnected,

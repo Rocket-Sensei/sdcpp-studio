@@ -33,6 +33,8 @@ vi.mock('../frontend/src/components/header/Header', () => ({
 
 vi.mock('../frontend/src/contexts/WebSocketContext', () => ({
   WebSocketProvider: ({ children }) => React.createElement('div', { 'data-testid': 'websocket-provider' }, children),
+  useQueueUpdates: () => ({ isConnected: false, subscribe: vi.fn() }),
+  WS_CHANNELS: { QUEUE: 'queue', GENERATIONS: 'generations', MODELS: 'models', GPU: 'gpu' },
 }));
 
 vi.mock('../frontend/src/hooks/useImageGeneration', () => ({

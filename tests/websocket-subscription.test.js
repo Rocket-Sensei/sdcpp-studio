@@ -104,26 +104,30 @@ describe('WebSocketContext - useEffect Dependencies', () => {
     expect(source).toMatch(/useEffect\(\(\)[\s\S]*\[subscribe/);
   });
 
-  it('should have initialChannels in dependencies', () => {
+  it('should use channelsKey (serialized) for stable dependencies', () => {
     const source = getWebSocketContextSource();
 
-    // Check that initialChannels is in the dependency array
+    // The new implementation uses channelsKey to serialize the array for stable comparison
     const useEffextMatch = source.match(/useEffect\(\(\)[\s\S]*\[\s*subscribe\s*,\s*([^\]]+)\]/);
 
     expect(useEffextMatch).toBeTruthy();
     const deps = useEffextMatch[1];
-    expect(deps).toContain('initialChannels');
+    expect(deps).toContain('channelsKey');
   });
 
-  it('should have onMessage in dependencies', () => {
+  it('should use onMessageRef instead of onMessage in dependencies for stability', () => {
     const source = getWebSocketContextSource();
 
-    // Check that onMessage is in the dependency array
-    const useEffectMatch = source.match(/useEffect\(\(\)[\s\S]*\[subscribe,\s*initialChannels,\s*([^\]]+)\]/);
+    // The new implementation uses onMessageRef to avoid re-subscriptions on callback changes
+    const hasOnMessageRef = source.includes('onMessageRef.current = onMessage');
+    const usesRefPattern = source.includes('onMessageRef.current');
 
-    expect(useEffectMatch).toBeTruthy();
-    const lastDep = useEffectMatch[1];
-    expect(lastDep).toContain('onMessage');
+    if (hasOnMessageRef && usesRefPattern) {
+      console.log('✓ Found onMessageRef pattern for stable subscriptions');
+    }
+
+    expect(hasOnMessageRef).toBe(true);
+    expect(usesRefPattern).toBe(true);
   });
 });
 
