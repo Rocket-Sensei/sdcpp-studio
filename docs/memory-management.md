@@ -145,7 +145,7 @@ memory_defaults:
   
   # Component-specific CPU placement
   clip_on_cpu: true        # CLIP-L, T5-XXL, LLM text encoders
-  vae_on_cpu: false        # VAE encoder/decoder
+  vae_on_cpu: true         # VAE encoder/decoder (required for 8GB GPUs)
   
   # Memory optimization flags
   vae_tiling: false         # Process VAE in tiles (saves VRAM)

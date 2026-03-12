@@ -34,7 +34,7 @@ default_models:
 memory_defaults:
   offload_to_cpu: true
   clip_on_cpu: true
-  vae_on_cpu: false
+  vae_on_cpu: true
   vae_tiling: false
   diffusion_fa: true
 

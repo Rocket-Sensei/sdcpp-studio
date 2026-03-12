@@ -336,11 +336,11 @@ export function MemoryPanel({
 }) {
   const { gpuInfo } = useGpuInfo();
 
-  // Memory flags state
+  // Memory flags state (defaults match settings.yml memory_defaults)
   const [flags, setFlags] = useState({
     offloadToCpu: true,
     clipOnCpu: true,
-    vaeOnCpu: false,
+    vaeOnCpu: true,
     vaeTiling: false,
     diffusionFa: true,
   });
