@@ -24,12 +24,10 @@ models:
       - "--t5xxl"
       - "./models/clips/t5xxl_fp16.safetensors"
       - "-v"
-      - "--offload-to-cpu"
-      - "--clip-on-cpu"
       - "--steps"
       - "20"
     mode: "on_demand"
-    exec_mode: "server"
+    exec_mode: "auto"
     # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"

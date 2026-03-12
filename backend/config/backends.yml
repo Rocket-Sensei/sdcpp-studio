@@ -15,22 +15,18 @@ backends:
   # ==================== SD Server (Image Generation) ====================
   sd-server:
     command: "./bin/sd-server"
-    exec_mode: "server"
+    exec_mode: "auto"
     mode: "on_demand"
     base_args:
       - "-v"
-      - "--offload-to-cpu"
-      - "--clip-on-cpu"
     description: "Stable Diffusion server for image generation"
     
   sd-server-flux:
     command: "./bin/sd-server"
-    exec_mode: "server"
+    exec_mode: "auto"
     mode: "on_demand"
     base_args:
       - "-v"
-      - "--offload-to-cpu"
-      - "--clip-on-cpu"
     description: "Stable Diffusion server optimized for FLUX models"
     
   sd-cli:
@@ -39,7 +35,6 @@ backends:
     mode: "on_demand"
     base_args:
       - "-v"
-      - "--offload-to-cpu"
     description: "Stable Diffusion CLI for one-shot generation"
 
   # ==================== Llama Server (Text Generation) ====================

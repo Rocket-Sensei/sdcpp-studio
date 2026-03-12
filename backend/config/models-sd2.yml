@@ -12,11 +12,10 @@ models:
       - "-m"
       - "./models/sd/v2-1_768-ema-pruned.safetensors"
       - "-v"
-      - "--offload-to-cpu"
       - "--steps"
       - "25"
     mode: "on_demand"
-    exec_mode: "server"
+    exec_mode: "auto"
     # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "768x768"

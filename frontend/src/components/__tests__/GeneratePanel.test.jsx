@@ -214,7 +214,7 @@ describe('GeneratePanel', () => {
         />
       );
 
-      const headerButton = screen.getByRole('button', { name: /settings/i });
+      const headerButton = screen.getByRole('button', { name: /^Settings/i });
       expect(headerButton).toBeInTheDocument();
     });
 
@@ -228,7 +228,7 @@ describe('GeneratePanel', () => {
         />
       );
 
-      const headerButton = screen.getByRole('button', { name: /settings/i });
+      const headerButton = screen.getByRole('button', { name: /^Settings/i });
       fireEvent.click(headerButton);
 
       expect(mockOnOpenChange).toHaveBeenCalledWith(false);

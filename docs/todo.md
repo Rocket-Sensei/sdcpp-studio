@@ -113,8 +113,30 @@ models:
 - [ ] Test multi-model INI mode for llama.cpp
 - [ ] Test Wan2GP integration
 
+### Memory Management & Model UI
+**Status:** In Progress
+
+- [ ] Per-model component indicators (Model/VAE/LLM badges) visible per-model when multiple models are selected
+- [ ] Enable `vae_on_cpu: true` by default in `settings.yml` (required for 8GB GPUs to avoid OOM)
+- [ ] Persist memory flag toggles per model in localStorage (not just session state)
+- [ ] Per-model memory flag toggles merged with quant badge in model list (next to Q2_K badge)
+- [ ] Restore start/stop server buttons for models in the model list
+  - Allow manual sd-server start for specific models
+  - If server is running, generation must use it instead of sd-cli
+  - Server-only settings UI (e.g. `--steps`) configurable at start time
+- [ ] Warning banner when memory flags change while model is running
+- [ ] Real-time VRAM usage tracking (poll `nvidia-smi` for actual usage, not just estimates)
+
 ## Completed
 - [x] Update model list API to OpenRouter format
 - [x] Add quant badges to UI
 - [x] Migrate frontend to v1 models endpoint
 - [x] Fix default model loading
+- [x] GPU detection service (`gpuService.js`)
+- [x] Memory calculator (`memoryCalculator.js`)
+- [x] Centralized memory defaults in `settings.yml`
+- [x] Model YAML cleanup (removed duplicate memory flags, exec_mode → auto)
+- [x] Auto exec_mode (CLI by default, server when model has server=true)
+- [x] Memory API endpoints (gpu-info, estimate, components, flags)
+- [x] Frontend MemoryPanel (inline bar + popover)
+- [x] Fix: memory flags now injected into CLI args via `_mergeMemoryFlags()`

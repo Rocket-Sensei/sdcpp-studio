@@ -27,3 +27,19 @@ default_model: qwen-image
 default_models:
   text_to_image: qwen-image
   image_to_image: qwen-image-edit-2511-q4-0
+
+# Global memory management defaults
+# These apply to all models unless overridden per-model via memory_overrides
+# Flags are automatically injected into model args by modelManager
+memory_defaults:
+  offload_to_cpu: true
+  clip_on_cpu: true
+  vae_on_cpu: false
+  vae_tiling: false
+  diffusion_fa: true
+
+# Default execution mode for models
+# "auto" = CLI for single images, server for batches (saves VRAM)
+# "server" = always use server mode (legacy)
+# "cli" = always use CLI mode
+default_exec_mode: "auto"

@@ -743,9 +743,26 @@ Set memory flags for a model (triggers restart if running).
 - [ ] Add VRAM usage bar in MemoryPanel (estimated / total)
 - [ ] Live-update estimation when image size or flags change
 
-### Phase 7: Polish & Testing
+### Phase 7: Per-Model UI & Persistence
 
-- [ ] Add localStorage persistence for user memory flag preferences
+- [ ] Per-model component indicators (Model/VAE/LLM badges) in multi-model selector list
+- [ ] Per-model memory flag toggles inline with quant badge (e.g. next to `Q2_K` badge)
+- [ ] localStorage persistence for per-model memory flag preferences (key: `memoryFlags:{modelId}`)
+- [ ] Start/stop server buttons restored in model list
+  - Allow manual sd-server start for specific models
+  - If server is running, generation must use it instead of sd-cli
+  - Server-only settings UI (e.g. `--steps`) configurable at start time
+- [ ] Warning banner when memory flags change while model is running
+
+### Phase 8: Real-Time VRAM Tracking
+
+- [ ] Poll `nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader,nounits` periodically (e.g. every 5s)
+- [ ] Add `GET /api/gpu-usage` endpoint returning current VRAM used/total
+- [ ] Display actual VRAM usage bar alongside estimated usage in MemoryPanel
+- [ ] WebSocket broadcast of VRAM usage updates during generation for live monitoring
+
+### Phase 9: Polish & Testing
+
 - [ ] Error handling: GPU detection failures, estimation errors
 - [ ] Loading states for VRAM estimation
 - [ ] Test on systems without NVIDIA GPU (graceful "?" display)

@@ -11,11 +11,10 @@ models:
       - "-m"
       - "./models/sd/sd1_5.ckpt"
       - "-v"
-      - "--offload-to-cpu"
       - "--steps"
       - "40"
     mode: "on_demand"
-    exec_mode: "server"
+    exec_mode: "auto"
     # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "512x512"

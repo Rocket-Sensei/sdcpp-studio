@@ -11,6 +11,7 @@ import { ImageSettings } from "./settings/ImageSettings";
 import { EditSettings } from "./settings/EditSettings";
 import { VideoSettings } from "./settings/VideoSettings";
 import { UpscaleSettings } from "./settings/UpscaleSettings";
+import { MemoryPanel } from "./settings/MemoryPanel";
 
 // localStorage key for settings form state persistence (different from Studio's key)
 const SETTINGS_STATE_KEY = "sd-cpp-studio-settings-form-state";
@@ -676,27 +677,42 @@ export function GeneratePanel({
             />
           )}
 
-          {/* Generate Button - only show for modes that need it (not upscale which has its own button) */}
+          {/* Generate Button row with inline memory info */}
           {localMode !== "upscale" && (
-            <div className="flex items-center justify-end pt-4 border-t">
-              <Button
-                onClick={handleGenerate}
-                disabled={isLoading || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
-                className="gap-2 px-6"
-                data-testid="generate-button"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    Generate
-                  </>
+            <div className="flex items-center justify-between gap-3 pt-4 border-t">
+              {/* Left: GPU info + component badges (always visible) */}
+              <div className="min-w-0 flex-1">
+                {selectedModels.length > 0 && (
+                  <MemoryPanel
+                    selectedModelId={selectedModels[0]}
+                    modelConfig={modelsMap?.[selectedModels[0]]}
+                    width={width}
+                    height={height}
+                  />
                 )}
-              </Button>
+              </div>
+
+              {/* Right: Memory settings popover + Generate button */}
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isLoading || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
+                  className="gap-2 px-6"
+                  data-testid="generate-button"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </div>

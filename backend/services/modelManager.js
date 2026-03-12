@@ -44,6 +44,7 @@ export const ModelStatus = {
 
 // Execution mode constants
 export const ExecMode = {
+  AUTO: 'auto',   // Automatically select CLI or server based on queue
   SERVER: 'server',
   CLI: 'cli',
   API: 'api'  // External API (OpenAI-compatible, no local server needed)
@@ -319,6 +320,16 @@ export class ModelManager {
         mergedConfig.backend_settings = { ...mergedConfig.backend_settings, ...config.backend_settings };
       }
 
+      // Capture memory defaults
+      if (config.memory_defaults) {
+        mergedConfig.memory_defaults = { ...mergedConfig.memory_defaults, ...config.memory_defaults };
+      }
+
+      // Capture default exec mode
+      if (config.default_exec_mode) {
+        mergedConfig.default_exec_mode = config.default_exec_mode;
+      }
+
       loadedFiles.push(configPath);
         logger.debug({ configPath }, 'Loaded configuration from file');
       }
@@ -350,6 +361,20 @@ export class ModelManager {
       // Store backend enablement settings
       this.backendSettings = mergedConfig.backend_settings || {};
       logger.info({ backends: this.backendSettings }, 'Backend settings loaded');
+
+      // Store memory defaults
+      this.memoryDefaults = mergedConfig.memory_defaults || {
+        offload_to_cpu: true,
+        clip_on_cpu: true,
+        vae_on_cpu: false,
+        vae_tiling: false,
+        diffusion_fa: true,
+      };
+      logger.info({ memoryDefaults: this.memoryDefaults }, 'Memory defaults loaded');
+
+      // Store default exec mode
+      this.defaultExecMode = mergedConfig.default_exec_mode || 'auto';
+      logger.info({ defaultExecMode: this.defaultExecMode }, 'Default exec mode');
 
       logger.info({ defaultModel: this.defaultModelId || 'none' }, 'Default model');
       if (this.defaultModels) {
@@ -395,9 +420,11 @@ export class ModelManager {
           continue;
         }
         // Determine exec_mode first
-        if (!modelConfig.exec_mode || !Object.values(ExecMode).includes(modelConfig.exec_mode)) {
-          logger.warn({ modelId }, 'Model has invalid exec_mode, defaulting to server');
-          modelConfig.exec_mode = ExecMode.SERVER;
+        if (!modelConfig.exec_mode) {
+          modelConfig.exec_mode = this.defaultExecMode || ExecMode.AUTO;
+        } else if (!Object.values(ExecMode).includes(modelConfig.exec_mode)) {
+          logger.warn({ modelId, execMode: modelConfig.exec_mode }, 'Model has invalid exec_mode, defaulting to auto');
+          modelConfig.exec_mode = ExecMode.AUTO;
         }
         // Command is required for SERVER and CLI modes, but not for API mode
         // If backend is specified, command will be inherited from backend preset
@@ -535,7 +562,8 @@ export class ModelManager {
         status: modelStatus.status,
         pid: modelStatus.pid || null,
         port: modelStatus.port || null,
-        quant
+        quant,
+        memoryFlags: this.getEffectiveMemoryFlags(model.id),
       };
     });
   }
@@ -675,7 +703,9 @@ export class ModelManager {
 
       // Build command and args
       const command = options.command || model.command;
-      const args = options.args || model.args || [];
+      let args = options.args || model.args || [];
+      // Merge memory default flags into args
+      args = this._mergeMemoryFlags(args, model);
 
       // Replace port in args if needed
       const processedArgs = this._processArgs(args, { port, model });
@@ -1066,6 +1096,54 @@ export class ModelManager {
   }
 
   /**
+   * Merge memory default flags into model args
+   * Priority: per-model memory_overrides > global memory_defaults
+   * Only adds flags that aren't already present in args
+   * @param {Array} args - Model arguments array
+   * @param {Object} modelConfig - Model configuration (may have memory_overrides)
+   * @returns {Array} Args with memory flags merged in
+   * @private
+   */
+  _mergeMemoryFlags(args, modelConfig) {
+    // Merge: per-model overrides take precedence over global defaults
+    const effectiveFlags = {
+      ...this.memoryDefaults,
+      ...(modelConfig.memory_overrides || {}),
+    };
+
+    const FLAG_MAP = {
+      offload_to_cpu: '--offload-to-cpu',
+      clip_on_cpu: '--clip-on-cpu',
+      vae_on_cpu: '--vae-on-cpu',
+      vae_tiling: '--vae-tiling',
+      diffusion_fa: '--diffusion-fa',
+      vae_conv_direct: '--vae-conv-direct',
+    };
+
+    const VALUE_FLAG_MAP = {
+      vae_tile_size: '--vae-tile-size',
+    };
+
+    const mergedArgs = [...args];
+
+    // Add boolean flags
+    for (const [key, cliFlag] of Object.entries(FLAG_MAP)) {
+      if (effectiveFlags[key] === true && !mergedArgs.includes(cliFlag)) {
+        mergedArgs.push(cliFlag);
+      }
+    }
+
+    // Add value flags
+    for (const [key, cliFlag] of Object.entries(VALUE_FLAG_MAP)) {
+      if (effectiveFlags[key] !== undefined && effectiveFlags[key] !== false && !mergedArgs.includes(cliFlag)) {
+        mergedArgs.push(cliFlag, String(effectiveFlags[key]));
+      }
+    }
+
+    return mergedArgs;
+  }
+
+  /**
    * Process arguments, replacing placeholders
    * @param {Array} args - Arguments array
    * @param {Object} context - Context for replacements
@@ -1320,6 +1398,20 @@ export class ModelManager {
     }
 
     return model.generation_params;
+  }
+
+  /**
+   * Get the effective memory flags for a model (merged defaults + overrides)
+   * @param {string} modelId - Model identifier
+   * @returns {Object} Effective memory flags
+   */
+  getEffectiveMemoryFlags(modelId) {
+    const model = this.getModel(modelId);
+    const effectiveFlags = {
+      ...this.memoryDefaults,
+      ...(model?.memory_overrides || {}),
+    };
+    return effectiveFlags;
   }
 
   /**

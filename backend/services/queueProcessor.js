@@ -119,6 +119,17 @@ export function stopQueueProcessor() {
 }
 
 /**
+ * Reset internal state for testing purposes.
+ * Clears the isProcessing flag and current job tracking.
+ */
+export function resetQueueProcessorState() {
+  isProcessing = false;
+  currentJob = null;
+  currentModelId = null;
+  currentModelLoadingStartTime = null;
+}
+
+/**
  * Get current job being processed
  */
 export function getCurrentJob() {
@@ -197,21 +208,44 @@ async function processQueue() {
       }, 'job_updated');
 
       // Prepare model based on execution mode
-      if (modelConfig.exec_mode === ExecMode.SERVER) {
+      // First, resolve effective exec_mode for this job
+      let effectiveExecMode = modelConfig.exec_mode;
+      
+      if (effectiveExecMode === ExecMode.AUTO) {
+        // Auto mode: check if there are more pending jobs for this model
+        // If model is already running as server, reuse it
+        if (modelManager.isModelRunning(modelId)) {
+          effectiveExecMode = ExecMode.SERVER;
+          logger.info({ modelId }, 'Auto mode: model already running as server, reusing');
+        } else if (modelConfig.server === true) {
+          // Model explicitly prefers server mode
+          effectiveExecMode = ExecMode.SERVER;
+          logger.info({ modelId }, 'Auto mode: model has server=true, using server mode');
+        } else {
+          // Default to CLI mode (saves VRAM)
+          effectiveExecMode = ExecMode.CLI;
+          logger.info({ modelId }, 'Auto mode: using CLI mode (lower VRAM)');
+        }
+      }
+
+      genLogger.info({ modelId, configExecMode: modelConfig.exec_mode, effectiveExecMode }, 'Resolved execution mode');
+
+      // Prepare model based on effective execution mode
+      if (effectiveExecMode === ExecMode.SERVER) {
         // For server mode, stop conflicting servers and start the required one
         const prepareResult = await prepareModelForJob(modelId, job.id);
         if (!prepareResult) {
           throw new Error(`Failed to prepare model ${modelId}: prepareModelForJob returned undefined`);
         }
         modelLoadingTimeMs = prepareResult.loadingTimeMs;
-      } else if (modelConfig.exec_mode === ExecMode.CLI) {
-        // For CLI mode, stop any running servers (they're not needed)
+      } else if (effectiveExecMode === ExecMode.CLI) {
+        // For CLI mode, stop any running servers (they're not needed and waste VRAM)
         await stopAllServerModels();
         // CLI mode doesn't have model loading overhead (model loads per generation)
         modelLoadingTimeMs = 0;
         logger.info({ modelId }, 'Model uses CLI mode');
         genLogger.info({ modelId }, 'Model uses CLI mode');
-      } else if (modelConfig.exec_mode === ExecMode.API) {
+      } else if (effectiveExecMode === ExecMode.API) {
         // For API mode, stop any running servers (external API is used)
         await stopAllServerModels();
         // API mode uses external service, no local model loading
@@ -219,7 +253,7 @@ async function processQueue() {
         logger.info({ modelId }, 'Model uses external API mode');
         genLogger.info({ modelId }, 'Model uses external API mode');
       } else {
-        throw new Error(`Unknown or invalid execution mode: ${modelConfig.exec_mode} for model ${modelId}`);
+        throw new Error(`Unknown or invalid execution mode: ${effectiveExecMode} for model ${modelId}`);
       }
 
       // Update to PROCESSING state when model is ready and we're about to generate
@@ -233,16 +267,19 @@ async function processQueue() {
         modelName: modelConfig.name
       }, 'job_updated');
 
+      // Create a working copy of modelConfig with resolved exec_mode
+      const effectiveModelConfig = { ...modelConfig, exec_mode: effectiveExecMode };
+
       // For other job types, proceed with model-based generation
       switch (job.type) {
         case 'generate':
-          result = await processGenerateJob(job, modelConfig, genLogger);
+          result = await processGenerateJob(job, effectiveModelConfig, genLogger);
           break;
         case 'edit':
-          result = await processEditJob(job, modelConfig, genLogger);
+          result = await processEditJob(job, effectiveModelConfig, genLogger);
           break;
         case 'variation':
-          result = await processVariationJob(job, modelConfig, genLogger);
+          result = await processVariationJob(job, effectiveModelConfig, genLogger);
           break;
         default:
           throw new Error(`Unknown job type: ${job.type}`);
@@ -541,6 +578,7 @@ async function processGenerateJob(job, modelConfig, genLogger) {
   // Use job.id as generation_id since queue is now merged into generations
   const generationId = job.id;
 
+  // Use the resolved exec_mode from effectiveModelConfig (passed from processQueue)
   if (modelConfig.exec_mode === ExecMode.CLI) {
     // Use CLI handler for CLI mode models
     logger.debug({ modelId, execMode: 'CLI' }, 'Using CLI mode for model');
@@ -812,8 +850,15 @@ async function processCLIGeneration(job, modelConfig, params, genLogger) {
     logger.info({ modelId: modelConfig.id }, 'Generating with CLI');
     genLogger.info({ modelId: modelConfig.id }, 'Starting CLI generation');
 
+    // Merge memory flags (--offload-to-cpu, --clip-on-cpu, --diffusion-fa, etc.)
+    // into model args before passing to CLI handler.
+    // For server mode this happens in modelManager.startModel(), but CLI mode
+    // bypasses startModel() so we must merge here.
+    const mergedArgs = modelManager._mergeMemoryFlags(modelConfig.args || [], modelConfig);
+    const configWithMemoryFlags = { ...modelConfig, args: mergedArgs };
+
     // Use CLI handler to generate image, passing generation ID for logging
-    const imageBuffer = await cliHandler.generateImage(modelConfig.id, params, modelConfig, job.id);
+    const imageBuffer = await cliHandler.generateImage(configWithMemoryFlags.id, params, configWithMemoryFlags, job.id);
 
     // Convert to same format as HTTP API response
     const b64Json = imageBuffer.toString('base64');

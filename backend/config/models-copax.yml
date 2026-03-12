@@ -18,12 +18,10 @@ models:
       - "--llm"
       - "./models/qwen3/Qwen3-4B-Instruct-2507-Q8_0.gguf"
       - "-v"
-      - "--offload-to-cpu"
-      - "--diffusion-fa"
       - "--steps"
       - "14"
     mode: "on_demand"
-    exec_mode: "server"
+    exec_mode: "auto"
     # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"

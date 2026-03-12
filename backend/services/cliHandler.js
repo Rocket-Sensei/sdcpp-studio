@@ -185,11 +185,34 @@ class CLIHandler {
    * @returns {string[]} Command and arguments array
    */
   buildCommand(modelConfig, params) {
-    const cmd = [modelConfig.command];
+    // Derive CLI command: if model uses sd-server, swap to sd-cli
+    let command = modelConfig.cli_command || modelConfig.command;
+    if (command.includes('sd-server')) {
+      command = command.replace('sd-server', 'sd-cli');
+    }
+    const cmd = [command];
 
     // Add base arguments from model configuration
+    // Filter out server-specific args that don't apply to CLI mode
+    const SERVER_ONLY_ARGS = ['--listen-port', '-l'];
     if (modelConfig.args && Array.isArray(modelConfig.args)) {
-      cmd.push(...modelConfig.args);
+      let skipNext = false;
+      for (const arg of modelConfig.args) {
+        if (skipNext) {
+          skipNext = false;
+          continue;
+        }
+        if (SERVER_ONLY_ARGS.includes(arg)) {
+          skipNext = true; // Skip the arg and its value
+          continue;
+        }
+        // Also skip --steps for CLI mode (CLI gets steps from params, not startup args)
+        if (arg === '--steps') {
+          skipNext = true;
+          continue;
+        }
+        cmd.push(arg);
+      }
     }
 
     // Parse and validate parameters

@@ -51,7 +51,27 @@ const { getMockModelManagerState, setMockModelManagerState, getMockModelManagerI
       sampling_method: 'euler',
       sample_steps: 20
     })),
-    getModelStepsFromArgs: vi.fn(() => 20)
+    getModelStepsFromArgs: vi.fn(() => 20),
+    _mergeMemoryFlags: vi.fn((args, modelConfig) => {
+      // Default mock: append memory flags like the real implementation
+      const merged = [...args];
+      merged.push('--offload-to-cpu', '--clip-on-cpu', '--diffusion-fa');
+      return merged;
+    }),
+    getEffectiveMemoryFlags: vi.fn(() => ({
+      offload_to_cpu: true,
+      clip_on_cpu: true,
+      vae_on_cpu: false,
+      vae_tiling: false,
+      diffusion_fa: true,
+    })),
+    memoryDefaults: {
+      offload_to_cpu: true,
+      clip_on_cpu: true,
+      vae_on_cpu: false,
+      vae_tiling: false,
+      diffusion_fa: true,
+    }
   });
 
   return {
@@ -97,6 +117,7 @@ vi.mock('../backend/db/queries.js', () => ({
 vi.mock('../backend/services/modelManager.js', () => ({
   getModelManager: vi.fn(() => getMockModelManagerInstance()),
   ExecMode: {
+    AUTO: 'auto',
     SERVER: 'server',
     CLI: 'cli',
     API: 'api'
@@ -197,7 +218,7 @@ import { getModelManager, ExecMode, ModelStatus } from '../backend/services/mode
 import { generateImageDirect } from '../backend/services/imageService.js';
 import { cliHandler } from '../backend/services/cliHandler.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from '../backend/services/websocket.js';
-import { startQueueProcessor, stopQueueProcessor, getCurrentJob } from '../backend/services/queueProcessor.js';
+import { startQueueProcessor, stopQueueProcessor, getCurrentJob, resetQueueProcessorState } from '../backend/services/queueProcessor.js';
 import { loggedFetch } from '../backend/utils/logger.js';
 
 // Helper to get the mocked model manager instance
@@ -1058,5 +1079,165 @@ describe('Queue Processor - Serial Execution', () => {
 
     // Second job should not have been claimed yet
     expect(claimNextPendingGeneration).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Queue Processor - Memory Flags Injection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    // Reset queue processor internal state (isProcessing flag) from previous tests
+    resetQueueProcessorState();
+    // Restore _mergeMemoryFlags implementation after clearAllMocks resets call history
+    // (clearAllMocks preserves implementations but we re-set for safety)
+    getMockModelManager()._mergeMemoryFlags.mockImplementation((args, modelConfig) => {
+      const merged = [...args];
+      if (!merged.includes('--offload-to-cpu')) merged.push('--offload-to-cpu');
+      if (!merged.includes('--clip-on-cpu')) merged.push('--clip-on-cpu');
+      if (!merged.includes('--diffusion-fa')) merged.push('--diffusion-fa');
+      return merged;
+    });
+    // Reset loggedFetch mock to return success by default
+    loggedFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        created: Math.floor(Date.now() / 1000),
+        data: [{ b64_json: Buffer.from('test').toString('base64') }]
+      })
+    });
+    getMockModelManager().getDefaultModelForType.mockReturnValue({
+      id: 'default-model',
+      name: 'Default Model',
+      exec_mode: 'server',
+      api: 'http://localhost:1234/v1'
+    });
+  });
+
+  afterEach(() => {
+    stopQueueProcessor();
+    vi.useRealTimers();
+  });
+
+  it('should inject memory flags into CLI model args via _mergeMemoryFlags', async () => {
+    const job = {
+      id: randomUUID(),
+      type: 'generate',
+      model: 'cli-model',
+      prompt: 'test prompt',
+      status: GenerationStatus.PENDING,
+      created_at: Date.now()
+    };
+
+    claimNextPendingGeneration.mockReturnValueOnce(job).mockReturnValue(null);
+    getMockModelManager().getModel.mockReturnValue({
+      id: 'cli-model',
+      name: 'CLI Model',
+      exec_mode: ExecMode.CLI,
+      command: './bin/sd-server',
+      args: ['--diffusion-model', './models/test.gguf', '--vae', './models/vae.safetensors']
+    });
+    getMockModelManager().getRunningModels.mockReturnValue([]);
+    cliHandler.generateImage.mockResolvedValue(Buffer.from('test image'));
+    updateGenerationProgress.mockResolvedValue({});
+    createGeneratedImage.mockResolvedValue({});
+    updateGenerationStatus.mockResolvedValue({});
+
+    startQueueProcessor(100);
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Verify _mergeMemoryFlags was called with the model's raw args
+    expect(getMockModelManager()._mergeMemoryFlags).toHaveBeenCalledWith(
+      ['--diffusion-model', './models/test.gguf', '--vae', './models/vae.safetensors'],
+      expect.objectContaining({ id: 'cli-model', exec_mode: ExecMode.CLI })
+    );
+
+    // Verify the CLI handler received the model config with merged args (including memory flags)
+    expect(cliHandler.generateImage).toHaveBeenCalled();
+    const callArgs = cliHandler.generateImage.mock.calls[0];
+    const passedModelConfig = callArgs[2]; // 3rd argument is modelConfig
+    // The merged args should include the memory flags added by _mergeMemoryFlags mock
+    expect(passedModelConfig.args).toContain('--offload-to-cpu');
+    expect(passedModelConfig.args).toContain('--clip-on-cpu');
+    expect(passedModelConfig.args).toContain('--diffusion-fa');
+    // And still contain the original args
+    expect(passedModelConfig.args).toContain('--diffusion-model');
+    expect(passedModelConfig.args).toContain('./models/test.gguf');
+  });
+
+  it('should not duplicate memory flags if already present in model args', async () => {
+    const job = {
+      id: randomUUID(),
+      type: 'generate',
+      model: 'cli-model-with-flags',
+      prompt: 'test prompt',
+      status: GenerationStatus.PENDING,
+      created_at: Date.now()
+    };
+
+    claimNextPendingGeneration.mockReturnValueOnce(job).mockReturnValue(null);
+    // This model already has --offload-to-cpu in its args
+    getMockModelManager().getModel.mockReturnValue({
+      id: 'cli-model-with-flags',
+      name: 'CLI Model With Flags',
+      exec_mode: ExecMode.CLI,
+      command: './bin/sd-server',
+      args: ['--diffusion-model', './models/test.gguf', '--offload-to-cpu']
+    });
+    getMockModelManager().getRunningModels.mockReturnValue([]);
+    cliHandler.generateImage.mockResolvedValue(Buffer.from('test image'));
+    updateGenerationProgress.mockResolvedValue({});
+    createGeneratedImage.mockResolvedValue({});
+    updateGenerationStatus.mockResolvedValue({});
+
+    startQueueProcessor(100);
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Verify the CLI handler received args without duplicate --offload-to-cpu
+    expect(cliHandler.generateImage).toHaveBeenCalled();
+    const callArgs = cliHandler.generateImage.mock.calls[0];
+    const passedModelConfig = callArgs[2];
+    const offloadCount = passedModelConfig.args.filter(a => a === '--offload-to-cpu').length;
+    expect(offloadCount).toBe(1); // Should appear exactly once, not duplicated
+  });
+
+  it('should inject memory flags for CLI mode in auto-resolved exec_mode', async () => {
+    const job = {
+      id: randomUUID(),
+      type: 'generate',
+      model: 'auto-model',
+      prompt: 'test prompt',
+      status: GenerationStatus.PENDING,
+      created_at: Date.now()
+    };
+
+    claimNextPendingGeneration.mockReturnValueOnce(job).mockReturnValue(null);
+    // Model has exec_mode: 'auto' which resolves to CLI for single image
+    getMockModelManager().getModel.mockReturnValue({
+      id: 'auto-model',
+      name: 'Auto Model',
+      exec_mode: ExecMode.AUTO,
+      command: './bin/sd-server',
+      args: ['--diffusion-model', './models/test.gguf']
+    });
+    getMockModelManager().getRunningModels.mockReturnValue([]);
+    getMockModelManager().isModelRunning.mockReturnValue(false);
+    cliHandler.generateImage.mockResolvedValue(Buffer.from('test image'));
+    updateGenerationProgress.mockResolvedValue({});
+    createGeneratedImage.mockResolvedValue({});
+    updateGenerationStatus.mockResolvedValue({});
+
+    startQueueProcessor(100);
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Auto mode with single image should resolve to CLI
+    // _mergeMemoryFlags should have been called
+    expect(getMockModelManager()._mergeMemoryFlags).toHaveBeenCalled();
+
+    // And the CLI handler should have been called with memory flags
+    expect(cliHandler.generateImage).toHaveBeenCalled();
+    const passedModelConfig = cliHandler.generateImage.mock.calls[0][2];
+    expect(passedModelConfig.args).toContain('--offload-to-cpu');
+    expect(passedModelConfig.args).toContain('--clip-on-cpu');
+    expect(passedModelConfig.args).toContain('--diffusion-fa');
   });
 });

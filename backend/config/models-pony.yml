@@ -12,11 +12,10 @@ models:
       - "--vae"
       - "./models/sdxl-other/CyberRealisticPony_V12.7-vae_f16-q8_0.gguf"
       - "-v"
-      - "--offload-to-cpu"
       - "--steps"
       - "30"
     mode: "on_demand"
-    exec_mode: "server"
+    exec_mode: "auto"
     # Port is dynamically allocated (40000-49000 range)
     model_type: "text-to-image"
     default_size: "1024x1024"
