@@ -139,7 +139,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q5-k-m:
+  flux2-klein-4b-q5km:
     enabled: false
     name: "FLUX.2 Klein 4B Q5_K_M"
     quant: "Q5_K_M"
@@ -167,7 +167,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q5-k-s:
+  flux2-klein-4b-q5ks:
     enabled: false
     name: "FLUX.2 Klein 4B Q5_K_S"
     quant: "Q5_K_S"
@@ -195,7 +195,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q5-0:
+  flux2-klein-4b-q50:
     enabled: false
     name: "FLUX.2 Klein 4B Q5_0"
     quant: "Q5_0"
@@ -223,7 +223,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q5-1:
+  flux2-klein-4b-q51:
     enabled: false
     name: "FLUX.2 Klein 4B Q5_1"
     quant: "Q5_1"
@@ -251,7 +251,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q4-k-m:
+  flux2-klein-4b-q4km:
     enabled: false
     name: "FLUX.2 Klein 4B Q4_K_M"
     quant: "Q4_K_M"
@@ -279,7 +279,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q4-k-s:
+  flux2-klein-4b-q4ks:
     enabled: false
     name: "FLUX.2 Klein 4B Q4_K_S"
     quant: "Q4_K_S"
@@ -307,7 +307,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q4-0:
+  flux2-klein-4b-q40:
     enabled: true
     name: "FLUX.2 Klein 4B Q4_0"
     quant: "Q4_0"
@@ -335,7 +335,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q4-1:
+  flux2-klein-4b-q41:
     enabled: false
     name: "FLUX.2 Klein 4B Q4_1"
     quant: "Q4_1"
@@ -363,7 +363,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q3-k-m:
+  flux2-klein-4b-q3km:
     enabled: false
     name: "FLUX.2 Klein 4B Q3_K_M"
     quant: "Q3_K_M"
@@ -391,7 +391,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q3-k-s:
+  flux2-klein-4b-q3ks:
     enabled: false
     name: "FLUX.2 Klein 4B Q3_K_S"
     quant: "Q3_K_S"
@@ -419,7 +419,7 @@ models:
       sample_steps: 6
       sampling_method: "euler"
 
-  flux2-klein-4b-q2-k:
+  flux2-klein-4b-q2k:
     enabled: false
     name: "FLUX.2 Klein 4B Q2_K"
     quant: "Q2_K"
@@ -513,63 +513,6 @@ models:
     args:
       - "--diffusion-model"
       - "./models/flux-klein-9b/flux-2-klein-9b-Q8_0.gguf"
-      - "--vae"
-      - "./models/vae/flux2_klein_vae.safetensors"
-      - "--llm"
-      - "./models/qwen3/qwen_3_8b.safetensors"
-      - "-v"
-      - "--steps"
-      - "6"
-    mode: "on_demand"
-    exec_mode: "auto"
-    # Port is dynamically allocated (40000-49000 range)
-    model_type: "imgedit"
-    default_size: "1024x1024"
-    startup_timeout: 120000
-    generation_params:
-      cfg_scale: 1.0
-      sample_steps: 4
-      sampling_method: "euler"
-
-      
-  unstable-revolution-f2k-4b:
-    enabled: false
-    name: "Unstable Revolution FLUX.2 Klein 4B"
-    description: " Unstable Revolution FLUX.2 [klein] unifies generation and editing in a single compact architecture"
-    capabilities: ["text-to-image", "imgedit"]
-    supports_negative_prompt: false
-    command: "./bin/sd-server"
-    args:
-      - "--diffusion-model"
-      - "./models/unstableRevolutionF2K_AlphaF2K4B.safetensors"
-      - "--vae"
-      - "./models/vae/flux2_klein_vae.safetensors"
-      - "--llm"
-      - "./models/qwen3/qwen_3_4b.safetensors"
-      - "-v"
-      - "--steps"
-      - "6"
-    mode: "on_demand"
-    exec_mode: "auto"
-    # Port is dynamically allocated (40000-49000 range)
-    model_type: "imgedit"
-    default_size: "1024x1024"
-    startup_timeout: 120000
-    generation_params:
-      cfg_scale: 1.0
-      sample_steps: 4
-      sampling_method: "euler"
-
-  unstable-revolution-f2k-9b:
-    enabled: false
-    name: "Unstable Revolution FLUX.2 Klein 9B"
-    description: " Unstable Revolution FLUX.2 [klein] unifies generation and editing in a single compact architecture"
-    capabilities: ["text-to-image", "imgedit"]
-    supports_negative_prompt: false
-    command: "./bin/sd-server"
-    args:
-      - "--diffusion-model"
-      - "./models/unstableRevolutionF2K_AlphaF2K4B.safetensors"
       - "--vae"
       - "./models/vae/flux2_klein_vae.safetensors"
       - "--llm"
