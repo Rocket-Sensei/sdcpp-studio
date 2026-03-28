@@ -2,13 +2,14 @@ models:
   # ==================== Flux Models ====================
   flux2-klein-4b:
     name: "FLUX.2 Klein 4B"
+    quant: "BF16"
     description: " FLUX.2 [klein] unifies generation and editing in a single compact architecture"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     command: "./bin/sd-server"
     args:
       - "--diffusion-model"
-      - "./models/flux-klein-4b/flux-2-klein-4b.safetensors"
+      - "./models/flux-klein-4b/flux-2-klein-4b-BF16.safetensors"
       - "--vae"
       - "./models/vae/flux2_klein_vae.safetensors"
       - "--llm"
@@ -28,8 +29,8 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-bf16:
-    enabled: false
-    name: "FLUX.2 Klein 4B BF16"
+    enabled: true
+    name: "FLUX.2 Klein 4B GGUF"
     quant: "BF16"
     description: "FLUX.2 [klein] 4B BF16 - High quality FP16/BF16 variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -56,7 +57,7 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-f16:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B F16"
     quant: "F16"
     description: "FLUX.2 [klein] 4B F16 - Full precision variant"
