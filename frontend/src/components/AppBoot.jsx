@@ -32,6 +32,7 @@ const BOOT_STATE = {
 export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
   const [bootState, setBootState] = useState(BOOT_STATE.INITIALIZING);
   const [error, setError] = useState(null);
+  const [serverConfig, setServerConfig] = useState(null);
 
   // Initialize: Try to fetch config with stored API key
   useEffect(() => {
@@ -39,6 +40,7 @@ export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
       try {
         const storedKey = getStoredApiKey();
         const config = await getServerConfig(storedKey);
+        setServerConfig(config);
 
         // Check if auth is required and if the key is valid
         if (config.authEnabled && !config.keyValid) {
@@ -59,6 +61,13 @@ export function AppBoot({ children, onBootComplete, onApiKeyChange }) {
 
     initialize();
   }, [onBootComplete]);
+
+  // Auto-redirect to /terminal when terminalUiMode is true
+  useEffect(() => {
+    if (bootState === BOOT_STATE.READY && serverConfig?.terminalUiMode) {
+      window.location.href = '/terminal';
+    }
+  }, [bootState, serverConfig]);
 
   // Handle API key submission
   const handleApiKeySubmit = useCallback(async (apiKey) => {

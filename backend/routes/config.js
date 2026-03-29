@@ -1,6 +1,13 @@
 import { modelManager } from '../services/modelManager.js';
 import { isAuthEnabled, extractApiToken } from '../middleware/auth.js';
 
+// Terminal UI mode flag - set by server.js via setTerminalUiMode
+let TERMINAL_UI_MODE = false;
+
+export function setTerminalUiMode(mode) {
+  TERMINAL_UI_MODE = mode;
+}
+
 /**
  * Config endpoint - returns API configuration for client
  * This endpoint does NOT require authentication
@@ -24,7 +31,8 @@ export function registerConfigRoutes(app) {
       model: defaultModel?.id || 'qwen-image',
       authEnabled,
       keyPassed,
-      keyValid
+      keyValid,
+      terminalUiMode: TERMINAL_UI_MODE
     });
   });
 }

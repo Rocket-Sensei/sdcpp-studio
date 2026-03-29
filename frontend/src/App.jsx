@@ -17,6 +17,7 @@ import { Checkbox } from "./components/ui/checkbox";
 import { authenticatedFetch } from "./utils/api";
 import { toast } from "sonner";
 import { MultiModelSelector } from "./components/MultiModelSelector";
+import { TerminalPage } from "./components/TerminalPage";
 
 const FILTER_PANEL_KEY = "sd-cpp-studio-filter-panel-open";
 
@@ -404,6 +405,9 @@ function App() {
               filterSheet={filterSheet}
             />
           } />
+
+          {/* Terminal route for terminal UI mode */}
+          <Route path="/terminal" element={<TerminalPage />} />
 
           {/* Backward compatibility redirects */}
           <Route path="/generate" element={<Navigate to="/studio" replace />} />

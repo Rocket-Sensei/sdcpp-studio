@@ -33,7 +33,7 @@ import upload from './middleware/upload.js';
 
 // Routes
 import registerHealthRoutes from './routes/health.js';
-import registerConfigRoutes from './routes/config.js';
+import registerConfigRoutes, { setTerminalUiMode } from './routes/config.js';
 import registerGenerationRoutes from './routes/generations.js';
 import registerQueueRoutes from './routes/queue.js';
 import registerModelRoutes from './routes/models.js';
@@ -102,6 +102,9 @@ await runMigrations();
 // Health and config endpoints (no auth required)
 registerHealthRoutes(app);
 registerConfigRoutes(app);
+
+// Set terminal UI mode for client to know
+setTerminalUiMode(TERMINAL_UI_MODE);
 
 // Image serving routes (auth required)
 registerImageRoutes(app);
