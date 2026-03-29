@@ -55,8 +55,10 @@ export const QUANT_ALIASES = {
   'Q6_K':   'Q6_K',
   'Q8_0':   'Q8_0',
   'F16':    'F16',
+  'FP16':   'F16',
   'BF16':   'BF16',
   'F32':    'F32',
+  'FP32':   'F32',
 };
 
 
@@ -198,7 +200,8 @@ export const ARCHITECTURES = {
  * @throws {Error} If quant type is unknown
  */
 export function getBitsPerWeight(quantType) {
-  const normalized = QUANT_ALIASES[quantType] || quantType;
+  const upperQuantType = quantType.toUpperCase();
+  const normalized = QUANT_ALIASES[upperQuantType] || upperQuantType;
   const info = GGUF_QUANT_TYPES[normalized];
   if (!info) throw new Error(`Unknown quant type: ${quantType}`);
   return info.bpw;

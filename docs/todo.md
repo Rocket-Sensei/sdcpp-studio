@@ -15,7 +15,7 @@ backends:
     command: "./bin/sd-server"
     exec_mode: "server"
     base_args: ["-v", "--offload-to-cpu", "--clip-on-cpu"]
-    
+
   llama-server:
     command: "./bin/llama-server"
     exec_mode: "server"
@@ -127,6 +127,107 @@ models:
 - [ ] Warning banner when memory flags change while model is running
 - [ ] Real-time VRAM usage tracking (poll `nvidia-smi` for actual usage, not just estimates)
 
+## New Requests (March 2026)
+
+### Terminal UI for SD.cpp/llama.cpp/wan Tools
+**Status:** New Request
+
+**Goal:** Implement proper terminal UI for agent sessions showing SD.cpp, llama.cpp, and wan tool outputs with scrolling and copy functionality.
+
+**Reference:** opencode app at `/data/agents/_competitors-cli/opencode/` has excellent terminal UI implementation
+
+**Implementation Tasks:**
+- [ ] Create TerminalUI component similar to opencode's terminal.tsx
+  - Use PTY session management via pty_spawn/pty_read/pty_write/pty_kill tools
+  - Implement proper scrolling with auto-scroll control
+  - Add copy selection functionality
+- [ ] Create LogViewer component to display stdout from tools
+  - Parse log entries to extract `stdout` field only
+  - Display in terminal-like format with ANSI color support
+  - Right-click menu on each message for generation info
+- [ ] Add `--terminal-ui` flag to app startup
+  - Default: concise logs for non-interactive terminals
+  - Terminal UI mode: full interactive terminal display
+- [ ] Wire up SD.cpp/llama.cpp/wan process outputs to terminal UI
+
+### Generation Event Logging (Console Output)
+**Status:** New Request
+
+**Goal:** When not in terminal UI mode, output concise generation events to console.
+
+**Implementation Tasks:**
+- [ ] Log generation start event with:
+  - Model name
+  - Resolution (width x height)
+  - Seed
+  - Sampler
+  - Steps
+  - CFG scale
+  - Full prompt
+  - Reference image files list
+  - Upscale enable and kind
+- [ ] Log generation end event with:
+  - Model load time (seconds with tenths, e.g., 12.5s)
+  - Generation time (seconds with tenths, e.g., 12.5s)
+  - Memory settings (vae-on-cpu, offload-to-cpu, flash-attention, diffusion-fa)
+- [ ] Store sd-cli binary version before each generation
+  - Run `./bin/sd-cli --version` and capture output
+  - Display in generation details modal
+
+### Generation Details Modal Improvements
+**Status:** New Request
+
+**Implementation Tasks:**
+- [ ] Remove duplicate prompt display (line-clamp-2)
+- [ ] Show full prompt without truncation in modal
+- [ ] Add upscale enable and sampler to modal
+- [ ] Add memory settings used to modal
+- [ ] Add sd-cli binary version to modal
+- [ ] Prepare for multiple sd-cli binary version selection
+
+### Memory Settings Modal Fixes
+**Status:** New Request
+
+**Goal:** Ensure Memory Settings modal is properly wired and per-model.
+
+**Implementation Tasks:**
+- [ ] Verify all toggles in modal are wired correctly:
+  - VAE on CPU
+  - Offload to CPU
+  - CLIP on CPU
+  - VAE Tiling
+  - Flash Attention
+  - diffusion-fa flag
+- [ ] Ensure settings are per-model, not global
+- [ ] Move Memory Settings button next to per-model memory buttons
+- [ ] Persist per-model memory settings
+
+### Config Cleanup - Remove command Field
+**Status:** New Request
+
+**Goal:** Remove hardcoded `command: "./bin/sd-server"` or `command: "./bin/sd-cli"` from all config files since execution mode is now auto-managed.
+
+**Implementation Tasks:**
+- [ ] Remove `command` field from `backend/config/models-qwen-cli.yml`
+- [ ] Remove `command` field from `backend/config/models-qwen-image.yml`
+- [ ] Remove `command` field from `backend/config/models-qwen-edit.yml`
+- [ ] Remove `command` field from `backend/config/models-z-turbo.yml`
+- [ ] Remove `command` field from `backend/config/models-shuttle.yml`
+- [ ] Remove `command` field from `backend/config/models-flux.yml`
+- [ ] Remove `command` field from `backend/config/models-copax.yml`
+- [ ] Update modelManager to auto-detect binary from exec_mode
+
+### Testing Infrastructure
+**Status:** Ongoing
+
+**Implementation Tasks:**
+- [ ] Create vitest specs for terminal UI components
+- [ ] Create vitest specs for log parsing/extraction
+- [ ] Create vitest specs for generation event logging
+- [ ] Create vitest specs validating proper command execution with args
+- [ ] Create vitest specs for memory settings wiring
+- [ ] Run all tests before each commit
+
 ## Completed
 - [x] Update model list API to OpenRouter format
 - [x] Add quant badges to UI
@@ -140,3 +241,5 @@ models:
 - [x] Memory API endpoints (gpu-info, estimate, components, flags)
 - [x] Frontend MemoryPanel (inline bar + popover)
 - [x] Fix: memory flags now injected into CLI args via `_mergeMemoryFlags()`
+
+(End of file - total 217 lines)
