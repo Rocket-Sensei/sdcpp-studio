@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { Wifi, WifiOff, Loader2 } from 'lucide-react';
-import { LogViewer } from './LogViewer';
+import { TerminalUI } from './TerminalUI';
 import {
   Dialog,
   DialogPortal,
@@ -49,7 +49,7 @@ export function WebSocketStatusIndicator() {
         <DialogPortal>
           <DialogOverlay />
           <div className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-4xl h-[80vh] px-2 sm:px-4">
-            <LogViewer onClose={() => setIsLogModalOpen(false)} />
+            <TerminalUI onClose={() => setIsLogModalOpen(false)} />
           </div>
         </DialogPortal>
       </Dialog>

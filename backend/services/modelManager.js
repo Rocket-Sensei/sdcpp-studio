@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import { spawn } from 'child_process';
 import { pickPort } from 'pick-port';
-import { broadcastModelStatus } from './websocket.js';
+import { broadcastModelStatus, broadcastTerminalLog } from './websocket.js';
 import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger, flushSdCppLogger } from '../utils/logger.js';
 import { extractFilenameFromArgs, extractQuantFromFilename } from '../utils/modelHelpers.js';
 import { getBackendRegistry } from './backendRegistry.js';
@@ -800,6 +800,15 @@ export class ModelManager {
           const sdcppLogger = getSdCppLogger();
           sdcppLogger.info({ modelId, stdout: output.trim() }, 'Server output');
           flushSdCppLogger();
+
+          // Broadcast to WebSocket terminal channel
+          broadcastTerminalLog({
+            generationId: modelId,
+            content: output,
+            raw: output,
+            level: 'info',
+            timestamp: new Date().toISOString(),
+          });
         }
 
         // Detect when server is ready (looks for common patterns)
@@ -829,6 +838,15 @@ export class ModelManager {
           const sdcppLogger = getSdCppLogger();
           sdcppLogger.warn({ modelId, stderr: error.trim() }, 'Server error');
           flushSdCppLogger();
+
+          // Broadcast to WebSocket terminal channel
+          broadcastTerminalLog({
+            generationId: modelId,
+            content: error,
+            raw: error,
+            level: 'warn',
+            timestamp: new Date().toISOString(),
+          });
         }
       });
 

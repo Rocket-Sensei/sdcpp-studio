@@ -1,8 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Terminal, X, RefreshCw, Filter, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { authenticatedFetch } from "../utils/api";
+import { useTerminalLogs } from "../contexts/WebSocketContext";
+import { stripAnsiCodes } from "../utils/logParser";
 
 const LOG_LEVEL_COLORS = {
   trace: "text-gray-400",
@@ -29,7 +31,9 @@ export function LogViewer({ generationId, onClose }) {
   const [levelFilter, setLevelFilter] = useState("all"); // all, error, warn, info, debug
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [wsConnected, setWsConnected] = useState(false);
   const logContainerRef = useRef(null);
+  const logIdCounter = useRef(0);
 
   const fetchLogs = async () => {
     setIsLoading(true);
@@ -63,10 +67,40 @@ export function LogViewer({ generationId, onClose }) {
 
   useEffect(() => {
     fetchLogs();
-    // Auto-refresh every 5 seconds
-    const interval = setInterval(fetchLogs, 5000);
+    // Auto-refresh every 30 seconds as fallback when WebSocket isn't receiving updates
+    const interval = setInterval(fetchLogs, 30000);
     return () => clearInterval(interval);
   }, [generationId]);
+
+  const handleTerminalLog = useCallback((logData) => {
+    if (generationId && logData.generationId !== generationId) {
+      return;
+    }
+    
+    const newLog = {
+      id: `ws-log-${logIdCounter.current++}`,
+      level: logData.level || 'info',
+      time: logData.timestamp,
+      module: 'sdcpp',
+      stdout: logData.content,
+      raw: logData.raw,
+      isWebSocket: true,
+    };
+    
+    setLogs(prevLogs => {
+      const exists = prevLogs.some(
+        log => log.raw === logData.raw
+      );
+      if (exists) return prevLogs;
+      return [...prevLogs, newLog];
+    });
+  }, [generationId]);
+
+  const { isConnected } = useTerminalLogs(handleTerminalLog);
+
+  useEffect(() => {
+    setWsConnected(isConnected);
+  }, [isConnected]);
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
@@ -136,6 +170,10 @@ export function LogViewer({ generationId, onClose }) {
               {filteredLogs.length} entries
             </Badge>
           )}
+          <div 
+            className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-gray-500'}`}
+            title={wsConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+          />
         </div>
         <div className="flex items-center gap-1">
           <Button

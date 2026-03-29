@@ -10,6 +10,7 @@ import { Terminal, X, RefreshCw, Filter, Maximize2, Minimize2, ChevronDown, Chev
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { authenticatedFetch } from "../utils/api";
+import { useTerminalLogs, WS_CHANNELS } from "../contexts/WebSocketContext";
 import {
   stripAnsiCodes,
   isProgressBarLine,
@@ -52,6 +53,8 @@ export function TerminalUI({ generationId, onClose, initialMode = "logs" }) {
   const [contextMenu, setContextMenu] = useState(null);
   const logContainerRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const logIdCounter = useRef(0);
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
@@ -85,6 +88,36 @@ export function TerminalUI({ generationId, onClose, initialMode = "logs" }) {
     const interval = setInterval(fetchLogs, 2000);
     return () => clearInterval(interval);
   }, [fetchLogs]);
+
+  const handleTerminalLog = useCallback((logData) => {
+    if (generationId && logData.generationId !== generationId) {
+      return;
+    }
+    
+    const newLog = {
+      id: `ws-log-${logIdCounter.current++}`,
+      content: logData.content,
+      level: logData.level || 'info',
+      timestamp: logData.timestamp ? formatLogTimestamp(logData.timestamp) : '',
+      generationId: logData.generationId,
+      original: logData,
+      isWebSocket: true,
+    };
+    
+    setLogs(prevLogs => {
+      const exists = prevLogs.some(
+        log => log.original?.raw === logData.raw
+      );
+      if (exists) return prevLogs;
+      return [...prevLogs, newLog];
+    });
+  }, [generationId]);
+
+  const { isConnected } = useTerminalLogs(handleTerminalLog);
+
+  useEffect(() => {
+    setWsConnected(isConnected);
+  }, [isConnected]);
 
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
@@ -183,6 +216,10 @@ export function TerminalUI({ generationId, onClose, initialMode = "logs" }) {
               {filteredLogs.length} entries
             </Badge>
           )}
+          <div 
+            className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-gray-500'}`}
+            title={wsConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+          />
         </div>
         <div className="flex items-center gap-1">
           <Button

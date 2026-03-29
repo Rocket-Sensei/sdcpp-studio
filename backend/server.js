@@ -21,6 +21,7 @@ import { startQueueProcessor } from './services/queueProcessor.js';
 import { modelManager } from './services/modelManager.js';
 import { getDownloadMethod } from './services/modelDownloader.js';
 import { initializeWebSocket } from './services/websocket.js';
+import { killAllPtySessions } from './services/ptyManager.js';
 import { startGpuBroadcaster } from './services/gpuBroadcaster.js';
 import { createLogger } from './utils/logger.js';
 import { authenticateRequest } from './middleware/auth.js';
@@ -166,6 +167,14 @@ function gracefulShutdown(signal) {
 
   server.close(() => {
     logger.info('HTTP server closed');
+
+    // Kill all PTY sessions
+    try {
+      killAllPtySessions();
+      logger.info('PTY sessions cleaned up');
+    } catch (error) {
+      logger.error({ error }, 'Error cleaning up PTY sessions');
+    }
 
     // Close database connection
     try {

@@ -24,6 +24,7 @@ export const CHANNELS = {
   MODELS: 'models',
   DOWNLOAD: 'download',
   GPU: 'gpu',
+  TERMINAL: 'terminal',
 };
 
 // Channel subscriptions
@@ -346,6 +347,22 @@ export function broadcastGpuInfo(gpuData) {
   });
 }
 
+/**
+ * Broadcast terminal log entry
+ * @param {Object} logData - Log data to broadcast
+ * @param {string} logData.generationId - Generation ID
+ * @param {string} logData.content - Log content (stdout stripped of ANSI)
+ * @param {string} logData.raw - Raw log line
+ * @param {string} logData.level - Log level (info, warn, error, etc.)
+ * @param {string} logData.timestamp - ISO timestamp
+ */
+export function broadcastTerminalLog(logData) {
+  broadcast(CHANNELS.TERMINAL, {
+    type: 'log',
+    data: logData,
+  });
+}
+
 export default {
   initializeWebSocket,
   getWebSocketServer,
@@ -355,6 +372,7 @@ export default {
   broadcastModelStatus,
   broadcastDownloadProgress,
   broadcastGpuInfo,
+  broadcastTerminalLog,
   getStats,
   CHANNELS,
 };

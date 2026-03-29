@@ -13,6 +13,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { logCliCommand, logCliOutput, logCliError, createLogger, getSdCppLogger } from '../utils/logger.js';
+import { broadcastTerminalLog } from './websocket.js';
 
 const logger = createLogger('cliHandler');
 
@@ -357,6 +358,16 @@ class CLIHandler {
         const lines = text.split('\n').filter(line => line.trim());
         for (const line of lines) {
           sdCppLogger.info({ stdout: line }, line);
+          // Broadcast to WebSocket terminal subscribers
+          if (generationId) {
+            broadcastTerminalLog({
+              generationId,
+              content: line,
+              raw: line,
+              level: 'info',
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       });
 
@@ -369,6 +380,16 @@ class CLIHandler {
         const lines = text.split('\n').filter(line => line.trim());
         for (const line of lines) {
           sdCppLogger.warn({ stderr: line }, line);
+          // Broadcast to WebSocket terminal subscribers
+          if (generationId) {
+            broadcastTerminalLog({
+              generationId,
+              content: line,
+              raw: line,
+              level: 'warn',
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       });
 

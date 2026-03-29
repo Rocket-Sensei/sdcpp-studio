@@ -31,6 +31,7 @@ export const WS_CHANNELS = {
   GENERATIONS: 'generations',
   MODELS: 'models',
   GPU: 'gpu',
+  TERMINAL: 'terminal',
 };
 
 // Default reconnect interval (ms)
@@ -300,6 +301,23 @@ export function useModelStatusUpdates(onModelStatusChange) {
     onMessage: (message) => {
       if (message.channel === WS_CHANNELS.MODELS && onModelStatusChange) {
         onModelStatusChange(message);
+      }
+    },
+  });
+}
+
+/**
+ * Specialized hook for terminal log updates
+ *
+ * @param {Function} onLog - Callback when terminal log received (receives the log data object)
+ * @returns {Object} Hook API
+ */
+export function useTerminalLogs(onLog) {
+  return useWebSocket({
+    channels: [WS_CHANNELS.TERMINAL],
+    onMessage: (message) => {
+      if (message.channel === WS_CHANNELS.TERMINAL && message.type === 'log' && onLog) {
+        onLog(message.data);
       }
     },
   });
