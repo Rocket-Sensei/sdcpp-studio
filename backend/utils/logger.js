@@ -696,3 +696,118 @@ export default createLogger('app');
 
 // Export pino for advanced usage
 export { pino };
+
+/**
+ * Check if running in terminal UI mode
+ * @returns {boolean} True if terminal UI mode is enabled
+ */
+export function isTerminalUIMode() {
+  return process.argv.includes('--terminal-ui');
+}
+
+/**
+ * Format memory flags for display
+ * @param {Object} flags - Memory flags object
+ * @returns {string} Formatted string like "vae-on-cpu,offload-to-cpu,flash-attn,diffusion-fa"
+ */
+function formatMemoryFlags(flags) {
+  if (!flags) return 'none';
+  const activeFlags = [];
+  if (flags.vae_on_cpu) activeFlags.push('vae-on-cpu');
+  if (flags.offload_to_cpu) activeFlags.push('offload-to-cpu');
+  if (flags.diffusion_fa) activeFlags.push('diffusion-fa');
+  if (flags.flash_attention) activeFlags.push('flash-attn');
+  return activeFlags.length > 0 ? activeFlags.join(',') : 'none';
+}
+
+/**
+ * Format time in seconds with tenths
+ * @param {number} ms - Time in milliseconds
+ * @returns {string} Formatted time like "12.5s"
+ */
+function formatTime(ms) {
+  if (ms === undefined || ms === null) return 'N/A';
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * Log generation start event to console
+ * Outputs concise event when NOT in terminal UI mode
+ * @param {Object} options - Generation options
+ * @param {string} options.modelName - Model display name
+ * @param {string} options.prompt - Full prompt
+ * @param {string} options.size - Resolution (WxH)
+ * @param {number|string} options.seed - Seed value
+ * @param {string} options.sampling_method - Sampler name
+ * @param {number} options.sample_steps - Number of steps
+ * @param {number} options.cfg_scale - CFG scale
+ * @param {string} options.type - Generation type (generate/edit/variation/upscale)
+ * @param {string[]} [options.referenceImages] - List of reference image paths
+ * @param {boolean} [options.upscaleEnabled] - Whether upscaling is enabled
+ * @param {string} [options.upscaleKind] - Upscaler kind if enabled
+ */
+export function logGenerationStart(options) {
+  if (isTerminalUIMode()) return;
+
+  const {
+    modelName,
+    prompt,
+    size,
+    seed,
+    sampling_method,
+    sample_steps,
+    cfg_scale,
+    type,
+    referenceImages,
+    upscaleEnabled,
+    upscaleKind,
+  } = options;
+
+  const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+  let message = `[GEN-START] ${timestamp} | ${modelName} | ${size} | seed:${seed} | ${sampling_method} | steps:${sample_steps} | cfg:${cfg_scale}`;
+
+  if (type === 'edit' || type === 'variation') {
+    const images = referenceImages || [];
+    message += ` | ref-images:${images.length}`;
+    if (images.length > 0) {
+      const filenames = images.map(p => p.split('/').pop()).join(',');
+      message += `(${filenames})`;
+    }
+  }
+
+  if (upscaleEnabled) {
+    message += ` | upscale:${upscaleKind || 'enabled'}`;
+  }
+
+  console.log(message);
+  console.log(`[GEN-START] prompt: ${prompt}`);
+}
+
+/**
+ * Log generation end event to console
+ * Outputs concise event when NOT in terminal UI mode
+ * @param {Object} options - Generation result
+ * @param {number} options.modelLoadTimeMs - Model loading time in ms
+ * @param {number} options.generationTimeMs - Generation time in ms
+ * @param {Object} [options.memoryFlags] - Memory flags used
+ * @param {boolean} [options.memoryFlags.vae_on_cpu] - VAE on CPU flag
+ * @param {boolean} [options.memoryFlags.offload_to_cpu] - Offload to CPU flag
+ * @param {boolean} [options.memoryFlags.diffusion_fa] - Diffusion flash attention flag
+ * @param {boolean} [options.memoryFlags.flash_attention] - Flash attention flag
+ */
+export function logGenerationEnd(options) {
+  if (isTerminalUIMode()) return;
+
+  const {
+    modelLoadTimeMs,
+    generationTimeMs,
+    memoryFlags,
+  } = options;
+
+  const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+  const modelLoadStr = formatTime(modelLoadTimeMs);
+  const genTimeStr = formatTime(generationTimeMs);
+  const memFlagsStr = formatMemoryFlags(memoryFlags);
+
+  console.log(`[GEN-END] ${timestamp} | model-load:${modelLoadStr} | gen:${genTimeStr} | mem:${memFlagsStr}`);
+}

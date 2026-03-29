@@ -162,6 +162,9 @@ vi.mock('../backend/utils/logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   })),
+  logGenerationStart: vi.fn(),
+  logGenerationEnd: vi.fn(),
+  isTerminalUIMode: vi.fn(() => false),
 }));
 
 // Mock fs/promises - need to mock properly since vitest has issues with default export

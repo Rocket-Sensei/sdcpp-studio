@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
 import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
-import { loggedFetch, createLogger, createGenerationLogger } from '../utils/logger.js';
+import { loggedFetch, createLogger, createGenerationLogger, logGenerationStart, logGenerationEnd } from '../utils/logger.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from './websocket.js';
 import { upscaleImage } from './upscalerService.js';
 
@@ -157,6 +157,7 @@ async function processQueue() {
   currentModelLoadingStartTime = null; // Reset model loading start time
   const startTime = Date.now();
   let modelLoadingTimeMs = 0; // Will be set when model is prepared
+  let effectiveFlags = {}; // Will be set for non-upscale jobs, remains {} for upscale
 
   // Create generation-specific logger for this job
   const genLogger = createGenerationLogger(job.id, 'queueProcessor');
@@ -199,7 +200,7 @@ async function processQueue() {
       };
       
       // Per-generation flags take precedence if explicitly specified (not null)
-      const effectiveFlags = {
+      effectiveFlags = {
         ...baseFlags,
         // Only override with job flags if they were explicitly set (not null/undefined)
         offload_to_cpu: job.offload_to_cpu !== undefined && job.offload_to_cpu !== null ? job.offload_to_cpu : baseFlags.offload_to_cpu,
@@ -393,6 +394,12 @@ async function processQueue() {
       totalTimeMs,
       result: 'completed',
     }, 'Generation completed successfully');
+
+    logGenerationEnd({
+      modelLoadTimeMs: modelLoadingTimeMs,
+      generationTimeMs,
+      memoryFlags: effectiveFlags || {},
+    });
   } catch (error) {
     // Check if the callback already handled the failure (by setting currentJob to null)
     // This prevents double-updating the status
@@ -608,6 +615,19 @@ async function processGenerateJob(job, modelConfig, genLogger) {
 
   updateGenerationProgress(job.id, 0.25, 'Generating image...');
   genLogger.info({ params: { ...params, prompt: params.prompt?.substring(0, 50) + '...' } }, 'Starting image generation');
+
+  logGenerationStart({
+    modelName: modelConfig.name,
+    prompt: job.prompt,
+    size: job.size,
+    seed: params.seed,
+    sampling_method: params.sampling_method || 'euler',
+    sample_steps: params.sample_steps,
+    cfg_scale: params.cfg_scale,
+    type: job.type,
+    referenceImages: [],
+    upscaleEnabled: false,
+  });
 
   let response;
   // Use job.id as generation_id since queue is now merged into generations
@@ -979,6 +999,20 @@ async function processEditJob(job, modelConfig, genLogger) {
   updateGenerationProgress(job.id, 0.25, 'Generating edit...');
   genLogger.info({ hasMask: !!job.mask_image_path }, 'Starting image edit');
 
+  const referenceImages = [job.input_image_path].filter(Boolean);
+  logGenerationStart({
+    modelName: modelConfig.name,
+    prompt: job.prompt,
+    size: job.size,
+    seed: params.seed,
+    sampling_method: params.sampling_method || 'euler',
+    sample_steps: params.sample_steps,
+    cfg_scale: params.cfg_scale,
+    type: job.type,
+    referenceImages,
+    upscaleEnabled: false,
+  });
+
   let response;
   // Use job.id as generation_id since queue is now merged into generations
   const generationId = job.id;
@@ -1095,6 +1129,20 @@ async function processVariationJob(job, modelConfig, genLogger) {
   updateGenerationProgress(job.id, 0.25, 'Generating variation...');
   genLogger.info({ strength: params.strength }, 'Starting image variation');
 
+  const referenceImages = [job.input_image_path].filter(Boolean);
+  logGenerationStart({
+    modelName: modelConfig.name,
+    prompt: job.prompt,
+    size: job.size,
+    seed: params.seed,
+    sampling_method: params.sampling_method || 'euler',
+    sample_steps: params.sample_steps,
+    cfg_scale: params.cfg_scale,
+    type: job.type,
+    referenceImages,
+    upscaleEnabled: false,
+  });
+
   let response;
   // Use job.id as generation_id since queue is now merged into generations
   const generationId = job.id;
@@ -1177,6 +1225,20 @@ async function processUpscaleJob(job, genLogger) {
     resizeMode: job.resize_mode,
     factor: job.upscale_factor
   }, 'Starting image upscaling');
+
+  logGenerationStart({
+    modelName: 'Upscaler',
+    prompt: job.prompt || 'Image upscale',
+    size: job.size || `${job.target_width}x${job.target_height}`,
+    seed: null,
+    sampling_method: 'N/A',
+    sample_steps: null,
+    cfg_scale: null,
+    type: job.type,
+    referenceImages: [job.input_image_path].filter(Boolean),
+    upscaleEnabled: true,
+    upscaleKind: job.upscaler || 'RealESRGAN 4x+',
+  });
 
   // Call the upscaler service
   const resultBuffer = await upscaleImage(imageBuffer, {

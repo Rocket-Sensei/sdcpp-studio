@@ -231,4 +231,4 @@ server.listen(PORT, HOST, async () => {
   logger.info({ modelsDir: process.env.MODELS_DIR || './models' }, `Models directory`);
 });
 
-export { app, server, wsServer };
+export { app, server, wsServer, TERMINAL_UI_MODE };
