@@ -3,16 +3,27 @@ node_modules/
 **/node_modules/
 
 # Database
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 data/*.db
 data/*.db-shm
 data/*.db-wal
+data/*.sqlite
+data/*.sqlite3
 backend/data/*.db
 backend/data/*.db-shm
 backend/data/*.db-wal
+backend/data/*.sqlite
+backend/data/*.sqlite3
 backend/data/input/
 tests/backend/data/*.db
 tests/backend/data/*.db-shm
 tests/backend/data/*.db-wal
+tests/backend/data/*.sqlite
+tests/backend/data/*.sqlite3
 
 # Generated images
 data/images/
