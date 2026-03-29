@@ -786,16 +786,6 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Generation Details</DialogTitle>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DialogDescription className="line-clamp-2 cursor-help">
-                    {mobileInfoGeneration?.prompt || "No prompt"}
-                  </DialogDescription>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs">
-                  <p className="whitespace-pre-wrap break-words">{mobileInfoGeneration?.prompt || "No prompt"}</p>
-                </TooltipContent>
-              </Tooltip>
             </DialogHeader>
             {mobileInfoGeneration && (
               <div className="space-y-3">
@@ -821,14 +811,7 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
                       <Sparkles className="h-3.5 w-3.5" />
                       <span>Prompt</span>
                     </div>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="text-sm line-clamp-2 cursor-help pl-6">{mobileInfoGeneration.prompt}</p>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs">
-                        <p className="whitespace-pre-wrap break-words">{mobileInfoGeneration.prompt}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <p className="text-sm pl-6 whitespace-pre-wrap break-words">{mobileInfoGeneration.prompt}</p>
                   </div>
                 )}
                 {mobileInfoGeneration.negative_prompt && (
@@ -868,6 +851,18 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
                       <span className="text-sm">CFG: {mobileInfoGeneration.cfg_scale}</span>
                     </div>
                   )}
+                  {mobileInfoGeneration.sampling_method && (
+                    <div className="flex items-center gap-2">
+                      <Box className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate" title={mobileInfoGeneration.sampling_method}>Sampler: {mobileInfoGeneration.sampling_method}</span>
+                    </div>
+                  )}
+                  {mobileInfoGeneration.type === 'upscale' && mobileInfoGeneration.upscaler && (
+                    <div className="flex items-center gap-2">
+                      <Box className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate" title={mobileInfoGeneration.upscaler}>Upscaler: {mobileInfoGeneration.upscaler}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Cpu className="h-4 w-4 flex-shrink-0" />
@@ -880,6 +875,30 @@ export function UnifiedQueue({ onCreateMore, onEditImage, onUpscaleImage, onCrea
                     </TooltipContent>
                   </Tooltip>
                 </div>
+                {(mobileInfoGeneration.vae_on_cpu !== undefined || mobileInfoGeneration.offload_to_cpu !== undefined || mobileInfoGeneration.diffusion_fa !== undefined) && (
+                  <div className="flex items-center gap-2">
+                    <Box className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm">
+                      Memory: 
+                      {mobileInfoGeneration.vae_on_cpu === 1 && <span className="ml-1 text-muted-foreground">VAE-CPU</span>}
+                      {mobileInfoGeneration.offload_to_cpu === 1 && <span className="ml-1 text-muted-foreground">Offload</span>}
+                      {mobileInfoGeneration.diffusion_fa === 1 && <span className="ml-1 text-muted-foreground">Flash-Attn</span>}
+                    </span>
+                  </div>
+                )}
+                {mobileInfoGeneration.binary_version && (
+                  <div className="flex items-center gap-2">
+                    <Box className="h-4 w-4 flex-shrink-0" />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-sm truncate cursor-help" title={mobileInfoGeneration.binary_version}>Binary: {mobileInfoGeneration.binary_version.substring(0, 20)}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <p className="whitespace-pre-wrap">{mobileInfoGeneration.binary_version}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
                 {(mobileInfoGeneration.model_loading_time_ms !== undefined || mobileInfoGeneration.generation_time_ms !== undefined) && (
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 flex-shrink-0" />

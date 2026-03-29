@@ -363,6 +363,36 @@ export function updateGenerationStatus(id, status, additionalData = {}) {
     params.push(additionalData.generation_time_ms);
   }
 
+  if (additionalData.upscale_enable !== undefined) {
+    query += ', upscale_enable = ?';
+    params.push(additionalData.upscale_enable ? 1 : 0);
+  }
+
+  if (additionalData.vae_on_cpu !== undefined) {
+    query += ', vae_on_cpu = ?';
+    params.push(additionalData.vae_on_cpu ? 1 : 0);
+  }
+
+  if (additionalData.offload_to_cpu !== undefined) {
+    query += ', offload_to_cpu = ?';
+    params.push(additionalData.offload_to_cpu ? 1 : 0);
+  }
+
+  if (additionalData.diffusion_fa !== undefined) {
+    query += ', diffusion_fa = ?';
+    params.push(additionalData.diffusion_fa ? 1 : 0);
+  }
+
+  if (additionalData.sample_steps !== undefined) {
+    query += ', sample_steps = ?';
+    params.push(additionalData.sample_steps);
+  }
+
+  if (additionalData.binary_version !== undefined) {
+    query += ', binary_version = ?';
+    params.push(additionalData.binary_version);
+  }
+
   query += ' WHERE id = ?';
   params.push(id);
 

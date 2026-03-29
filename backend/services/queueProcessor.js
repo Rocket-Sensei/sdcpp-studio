@@ -190,6 +190,23 @@ async function processQueue() {
         throw new Error(`Model not found: ${modelId}`);
       }
 
+      // Compute effective memory flags from model config and global defaults
+      const effectiveFlags = {
+        ...modelManager.memoryDefaults,
+        ...(modelConfig.memory_overrides || {}),
+      };
+
+      // Get binary version for CLI mode
+      let binaryVersion = null;
+      if (modelConfig.exec_mode === ExecMode.CLI || modelConfig.exec_mode === ExecMode.AUTO) {
+        try {
+          binaryVersion = await cliHandler.getCLIVersion(modelConfig);
+          genLogger.debug({ binaryVersion }, 'Got CLI binary version');
+        } catch (err) {
+          genLogger.warn({ error: err.message }, 'Failed to get CLI binary version');
+        }
+      }
+
       // Track the current model ID for crash detection
       currentModelId = modelId;
 
@@ -257,8 +274,13 @@ async function processQueue() {
       }
 
       // Update to PROCESSING state when model is ready and we're about to generate
+      // Store memory flags and binary version with the generation for display in modal
       updateGenerationStatus(job.id, GenerationStatus.PROCESSING, {
         progress: 0,
+        vae_on_cpu: effectiveFlags.vae_on_cpu,
+        offload_to_cpu: effectiveFlags.offload_to_cpu,
+        diffusion_fa: effectiveFlags.diffusion_fa,
+        binary_version: binaryVersion,
       });
       broadcastQueueEvent({
         ...job,
