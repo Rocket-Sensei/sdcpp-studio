@@ -7,7 +7,6 @@ models:
     name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2511/qwen-image-edit-2511-Q4_0.gguf"
@@ -39,7 +38,6 @@ models:
     description: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2511/qwen-image-edit-2511-Q5_K_S.gguf"
@@ -70,7 +68,6 @@ models:
     name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2511/qwen-image-edit-2511-Q5_K_M.gguf"
@@ -101,7 +98,6 @@ models:
     name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2511/qwen-image-edit-2511-Q5_0.gguf"
@@ -131,7 +127,6 @@ models:
     name: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2511/qwen-image-edit-2511-Q5_1.gguf"
@@ -163,7 +158,6 @@ models:
     description: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2511/qwen-image-edit-2511-Q2_K.gguf"
@@ -194,7 +188,6 @@ models:
     description: "Qwen Image Edit 2509 [Q4_K_M] - image-to-image editing model with object manipulation and style transformation"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-edit-2509/Qwen-Image-Edit-2509-Q4_K_M.gguf"

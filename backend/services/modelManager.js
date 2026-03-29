@@ -428,11 +428,12 @@ export class ModelManager {
         }
         // Command is required for SERVER and CLI modes, but not for API mode
         // If backend is specified, command will be inherited from backend preset
+        // exec_mode can auto-detect command if not specified (server -> sd-server, cli -> sd-cli)
         const hasBackend = !!modelConfig.backend;
         const hasCommand = !!modelConfig.command || (hasBackend && this.backendRegistry.hasBackend(modelConfig.backend));
         if ((modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.CLI) && !hasCommand) {
-          logger.warn({ modelId, execMode: modelConfig.exec_mode }, 'Model missing command and no backend specified, skipping');
-          continue;
+          // Allow models without explicit command - will be auto-detected from exec_mode
+          logger.debug({ modelId, execMode: modelConfig.exec_mode }, 'No explicit command, will auto-detect from exec_mode');
         }
         // API key is required for API mode
         if (modelConfig.exec_mode === ExecMode.API && !modelConfig.api_key) {
@@ -702,7 +703,19 @@ export class ModelManager {
       }
 
       // Build command and args
-      const command = options.command || model.command;
+      // Auto-detect command from exec_mode if not specified
+      let command = options.command || model.command;
+      if (!command) {
+        if (model.exec_mode === ExecMode.SERVER) {
+          command = './bin/sd-server';
+        } else if (model.exec_mode === ExecMode.CLI) {
+          command = './bin/sd-cli';
+        }
+        // For API mode, command remains undefined (no local process)
+        if (command) {
+          logger.debug({ modelId, execMode: model.exec_mode, command }, 'Auto-detected command from exec_mode');
+        }
+      }
       let args = options.args || model.args || [];
       // Merge memory default flags into args
       args = this._mergeMemoryFlags(args, model);
@@ -736,7 +749,23 @@ export class ModelManager {
         }
       }
 
-      // Spawn process
+      // Spawn process (skip for API mode which uses external API)
+      if (model.exec_mode === ExecMode.API) {
+        logger.debug({ modelId }, 'API mode - no local process to spawn');
+        // For API mode, we just return a mock process entry
+        const processEntry = new ProcessEntry(modelId, null, null, model.exec_mode, {
+          command: null,
+          args: [],
+          status: ModelStatus.RUNNING
+        });
+        this.processes.set(modelId, processEntry);
+        return processEntry;
+      }
+
+      if (!command) {
+        throw new Error(`Cannot start model ${modelId}: exec_mode is ${model.exec_mode} but no command specified and auto-detection failed`);
+      }
+
       const processOptions = {
         cwd: options.cwd || PROJECT_ROOT,  // Default to project root so paths resolve correctly
         env: { ...process.env, ...options.env },
@@ -921,6 +950,11 @@ export class ModelManager {
     const processEntry = this.processes.get(modelId);
     if (!processEntry) {
       return false;
+    }
+
+    // API mode is always "running" once started (no local process)
+    if (processEntry.execMode === ExecMode.API) {
+      return processEntry.status === ModelStatus.RUNNING;
     }
 
     // Check if process is still alive

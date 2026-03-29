@@ -6,7 +6,6 @@ models:
     description: "FLUX.1 Schnell - Fast generation model [Q8_0]"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/flux1-schnell/flux1-schnell-Q8_0.gguf"
@@ -37,8 +36,6 @@ models:
     description: "FLUX.1 Schnell FP8 used via sd-cli"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    # CLI mode command
-    command: "./bin/sd-cli"
     args:
       - "--diffusion-model"
       - "./models/flux1-schnell/flux1-schnell-Q8_0.gguf"
@@ -70,7 +67,6 @@ models:
     description: "FluxedUp Flux 61 - Q8 quantized (12GB)"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/fluxedUpFluxNSFW_61FP16.q8_0.gguf"
@@ -99,7 +95,6 @@ models:
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/fluxedUpFluxNSFW_v51Q4KSV2.gguf"
@@ -128,7 +123,6 @@ models:
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/fuxCapacityNSFWPornFlux_40Q80.gguf"
@@ -157,7 +151,6 @@ models:
     description: "FLUX.1 Krea Dev - Drop-in replacement for FLUX.1 dev"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/flux1-krea/flux1-krea-dev-Q8_0.gguf"

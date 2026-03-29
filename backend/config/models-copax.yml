@@ -9,7 +9,6 @@ models:
     description: "Copax Timeless XL+Z1 - SDXL/Z-Image hybrid model for high quality outputs"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/sdxl-other/copaxTimeless_xplusZ1.safetensors"

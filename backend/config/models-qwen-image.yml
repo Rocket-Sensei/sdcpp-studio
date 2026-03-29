@@ -7,8 +7,6 @@ models:
     default: true
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    # Server mode command
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image-2512/qwen-image-2512-Q3_K_M.gguf"
@@ -40,8 +38,6 @@ models:
     default: true
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    # Server mode command
-    command: "./bin/sd-server"
     args:
       - "--diffusion-model"
       - "./models/qwen-image/Qwen_Image-Q4_K_M.gguf"
@@ -74,8 +70,6 @@ models:
     description: "Qwen Image used via sd-cli"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false
-    # CLI mode command
-    command: "./bin/sd-cli"
     args:
       - "--diffusion-model"
       - "./models/qwen-image/Qwen_Image-Q4_K_M.gguf"
