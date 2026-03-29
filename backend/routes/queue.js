@@ -44,6 +44,12 @@ export function registerQueueRoutes(app, upload) {
         sampling_method: req.body.sampling_method,
         sample_steps: req.body.sample_steps,
         clip_skip: req.body.clip_skip,
+        // Per-generation memory flags (override model defaults)
+        offload_to_cpu: req.body.offload_to_cpu,
+        clip_on_cpu: req.body.clip_on_cpu,
+        vae_on_cpu: req.body.vae_on_cpu,
+        vae_tiling: req.body.vae_tiling,
+        diffusion_fa: req.body.diffusion_fa,
       };
       await createGeneration(params);
       res.json({ job_id: id, status: GenerationStatus.PENDING });
@@ -88,6 +94,12 @@ export function registerQueueRoutes(app, upload) {
         sampling_method: req.body.sampling_method,
         sample_steps: req.body.sample_steps,
         clip_skip: req.body.clip_skip,
+        // Per-generation memory flags (override model defaults)
+        offload_to_cpu: req.body.offload_to_cpu,
+        clip_on_cpu: req.body.clip_on_cpu,
+        vae_on_cpu: req.body.vae_on_cpu,
+        vae_tiling: req.body.vae_tiling,
+        diffusion_fa: req.body.diffusion_fa,
       };
 
       // Handle optional mask upload
@@ -145,6 +157,12 @@ export function registerQueueRoutes(app, upload) {
         sampling_method: req.body.sampling_method,
         sample_steps: req.body.sample_steps,
         clip_skip: req.body.clip_skip,
+        // Per-generation memory flags (override model defaults)
+        offload_to_cpu: req.body.offload_to_cpu,
+        clip_on_cpu: req.body.clip_on_cpu,
+        vae_on_cpu: req.body.vae_on_cpu,
+        vae_tiling: req.body.vae_tiling,
+        diffusion_fa: req.body.diffusion_fa,
       };
 
       await createGeneration(params);

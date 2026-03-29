@@ -11,7 +11,6 @@ import { ImageSettings } from "./settings/ImageSettings";
 import { EditSettings } from "./settings/EditSettings";
 import { VideoSettings } from "./settings/VideoSettings";
 import { UpscaleSettings } from "./settings/UpscaleSettings";
-import { MemoryPanel } from "./settings/MemoryPanel";
 
 // localStorage key for settings form state persistence (different from Studio's key)
 const SETTINGS_STATE_KEY = "sd-cpp-studio-settings-form-state";
@@ -23,6 +22,30 @@ const MODES = [
   { value: "video", label: "Video", needsImage: false, description: "Text/Image to Video" },
   { value: "upscale", label: "Upscale", needsImage: true, description: "Upscale" },
 ];
+
+const DEFAULT_FLAGS = {
+  offloadToCpu: true,
+  clipOnCpu: true,
+  vaeOnCpu: true,
+  vaeTiling: false,
+  diffusionFa: true,
+};
+
+function loadMemoryFlagsFromStorage(modelId) {
+  try {
+    const stored = localStorage.getItem(`memoryFlags:${modelId}`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object" && parsed.flags) {
+        return { ...DEFAULT_FLAGS, ...parsed.flags };
+      }
+      return { ...DEFAULT_FLAGS, ...parsed };
+    }
+  } catch (e) {
+    // silently fail
+  }
+  return DEFAULT_FLAGS;
+}
 
 /**
  * GeneratePanel - Settings panel (collapsible, bottom)
@@ -494,15 +517,25 @@ export function GeneratePanel({
 
       const promises = [];
       for (const modelId of selectedModels) {
+        // Load per-model memory flags from localStorage
+        const modelMemoryFlags = loadMemoryFlagsFromStorage(modelId);
+        const generationParams = {
+          ...baseParams,
+          model: modelId,
+          offloadToCpu: modelMemoryFlags.offloadToCpu,
+          clipOnCpu: modelMemoryFlags.clipOnCpu,
+          vaeOnCpu: modelMemoryFlags.vaeOnCpu,
+          vaeTiling: modelMemoryFlags.vaeTiling,
+          diffusionFa: modelMemoryFlags.diffusionFa,
+        };
         if (n === 1) {
-          promises.push(generateQueued({ ...baseParams, model: modelId }));
+          promises.push(generateQueued(generationParams));
         } else {
           for (let i = 0; i < n; i++) {
             const randomSeed = Math.floor(Math.random() * 4294967295);
             promises.push(
               generateQueued({
-                ...baseParams,
-                model: modelId,
+                ...generationParams,
                 seed: randomSeed,
               })
             );
@@ -684,25 +717,10 @@ export function GeneratePanel({
         </div>
       )}
 
-      {/* Generate Button row with inline memory info */}
+      {/* Generate Button row */}
       {localMode !== "upscale" && (
-        <div className="flex items-center justify-between gap-3 pt-4 border-t">
-          {/* Left: GPU info + component badges (always visible) */}
-          <div className="min-w-0 flex-1">
-            {selectedModels.length > 0 && (
-              <MemoryPanel
-                selectedModelId={selectedModels[0]}
-                modelConfig={modelsMap?.[selectedModels[0]]}
-                width={width}
-                height={height}
-                showInlineBar={false}
-              />
-            )}
-          </div>
-
-          {/* Right: Memory settings popover + Generate button */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
+        <div className="flex items-center justify-end gap-2 pt-4 border-t">
+          <Button
               onClick={handleGenerate}
               disabled={isLoading || selectedModels.length === 0 || (localMode !== "upscale" && localMode !== "video" && !prompt.trim())}
               className="gap-2 px-6"
@@ -720,7 +738,6 @@ export function GeneratePanel({
                 </>
               )}
             </Button>
-          </div>
         </div>
       )}
     </div>

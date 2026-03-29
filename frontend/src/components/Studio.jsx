@@ -17,6 +17,30 @@ const FORM_STATE_KEY = "sd-cpp-studio-generate-form-state";
 // Default editing model
 const DEFAULT_EDIT_MODEL = "qwen-image-edit";
 
+const DEFAULT_FLAGS = {
+  offloadToCpu: true,
+  clipOnCpu: true,
+  vaeOnCpu: true,
+  vaeTiling: false,
+  diffusionFa: true,
+};
+
+function loadMemoryFlagsFromStorage(modelId) {
+  try {
+    const stored = localStorage.getItem(`memoryFlags:${modelId}`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object" && parsed.flags) {
+        return { ...DEFAULT_FLAGS, ...parsed.flags };
+      }
+      return { ...DEFAULT_FLAGS, ...parsed };
+    }
+  } catch (e) {
+    // silently fail
+  }
+  return DEFAULT_FLAGS;
+}
+
 /**
  * Studio Component - Main application page
  *
@@ -314,10 +338,17 @@ export function Studio({ searchQuery, selectedStatuses, selectedModelsFilter, fi
     try {
       // Build params for each selected model
       const promises = currentModels.map((modelId) => {
+        // Load per-model memory flags from localStorage
+        const modelMemoryFlags = loadMemoryFlagsFromStorage(modelId);
         const baseParams = {
           model: modelId,
           prompt,
           n: 1,
+          offloadToCpu: modelMemoryFlags.offloadToCpu,
+          clipOnCpu: modelMemoryFlags.clipOnCpu,
+          vaeOnCpu: modelMemoryFlags.vaeOnCpu,
+          vaeTiling: modelMemoryFlags.vaeTiling,
+          diffusionFa: modelMemoryFlags.diffusionFa,
         };
 
         // Set mode and params based on current mode

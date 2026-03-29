@@ -72,8 +72,9 @@ export async function createGeneration(data) {
       status, progress, error,
       input_image_path, input_image_mime_type,
       mask_image_path, mask_image_mime_type,
-      strength, sample_steps, cfg_scale, sampling_method, clip_skip
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      strength, sample_steps, cfg_scale, sampling_method, clip_skip,
+      offload_to_cpu, clip_on_cpu, vae_on_cpu, vae_tiling, diffusion_fa
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   return stmt.run(
     data.id,
@@ -101,7 +102,13 @@ export async function createGeneration(data) {
     data.sample_steps || null,
     data.cfg_scale || null,
     data.sampling_method || null,
-    data.clip_skip || null
+    data.clip_skip || null,
+    // Per-generation memory flags (null means use model defaults)
+    data.offload_to_cpu ?? null,
+    data.clip_on_cpu ?? null,
+    data.vae_on_cpu ?? null,
+    data.vae_tiling ?? null,
+    data.diffusion_fa ?? null
   );
 }
 

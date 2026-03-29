@@ -51,6 +51,12 @@ export function useImageGeneration() {
           if (params.mode === 'variation' && params.strength !== undefined) {
             formData.append('strength', String(params.strength));
           }
+          // Add per-generation memory flags if provided
+          if (params.offloadToCpu !== undefined) formData.append('offload_to_cpu', params.offloadToCpu ? '1' : '0');
+          if (params.clipOnCpu !== undefined) formData.append('clip_on_cpu', params.clipOnCpu ? '1' : '0');
+          if (params.vaeOnCpu !== undefined) formData.append('vae_on_cpu', params.vaeOnCpu ? '1' : '0');
+          if (params.vaeTiling !== undefined) formData.append('vae_tiling', params.vaeTiling ? '1' : '0');
+          if (params.diffusionFa !== undefined) formData.append('diffusion_fa', params.diffusionFa ? '1' : '0');
         }
 
         body = formData;

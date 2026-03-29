@@ -664,6 +664,128 @@ describe('GeneratePanel', () => {
         expect(mockToast.success).toHaveBeenCalledWith('2 job(s) added to queue!');
       });
     });
+
+    it('should pass default memory flags to generateQueued when no localStorage override', async () => {
+      render(
+        <GeneratePanel
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedModels={['model1']}
+          onModelsChange={mockOnModelsChange}
+          mode="image"
+          prompt="A test prompt"
+        />
+      );
+
+      const generateButton = screen.getByRole('button', { name: /^Generate$/i });
+      fireEvent.click(generateButton);
+
+      await waitFor(() => {
+        expect(mockGenerateQueued).toHaveBeenCalledWith(
+          expect.objectContaining({
+            offloadToCpu: true,
+            clipOnCpu: true,
+            vaeOnCpu: true,
+            vaeTiling: false,
+            diffusionFa: true,
+          })
+        );
+      });
+    });
+
+    it('should pass per-model memory flags from localStorage to generateQueued', async () => {
+      const customFlags = {
+        offloadToCpu: false,
+        clipOnCpu: false,
+        vaeOnCpu: false,
+        vaeTiling: true,
+        diffusionFa: false,
+      };
+      localStorage.setItem('memoryFlags:model1', JSON.stringify({ flags: customFlags, manual: true }));
+
+      render(
+        <GeneratePanel
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedModels={['model1']}
+          onModelsChange={mockOnModelsChange}
+          mode="image"
+          prompt="A test prompt"
+        />
+      );
+
+      const generateButton = screen.getByRole('button', { name: /^Generate$/i });
+      fireEvent.click(generateButton);
+
+      await waitFor(() => {
+        expect(mockGenerateQueued).toHaveBeenCalledWith(
+          expect.objectContaining({
+            offloadToCpu: false,
+            clipOnCpu: false,
+            vaeOnCpu: false,
+            vaeTiling: true,
+            diffusionFa: false,
+          })
+        );
+      });
+    });
+
+    it('should pass per-model memory flags for each model in multi-model generation', async () => {
+      const model1Flags = {
+        offloadToCpu: true,
+        clipOnCpu: false,
+        vaeOnCpu: true,
+        vaeTiling: false,
+        diffusionFa: true,
+      };
+      const model2Flags = {
+        offloadToCpu: false,
+        clipOnCpu: true,
+        vaeOnCpu: false,
+        vaeTiling: true,
+        diffusionFa: false,
+      };
+      localStorage.setItem('memoryFlags:model1', JSON.stringify({ flags: model1Flags, manual: true }));
+      localStorage.setItem('memoryFlags:model2', JSON.stringify({ flags: model2Flags, manual: true }));
+
+      render(
+        <GeneratePanel
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedModels={['model1', 'model2']}
+          onModelsChange={mockOnModelsChange}
+          mode="image"
+          prompt="A test prompt"
+        />
+      );
+
+      const generateButton = screen.getByRole('button', { name: /^Generate$/i });
+      fireEvent.click(generateButton);
+
+      await waitFor(() => {
+        const calls = mockGenerateQueued.mock.calls;
+        expect(calls.length).toBe(2);
+
+        const model1Call = calls.find(call => call[0]?.model === 'model1');
+        const model2Call = calls.find(call => call[0]?.model === 'model2');
+
+        expect(model1Call[0]).toMatchObject({
+          offloadToCpu: true,
+          clipOnCpu: false,
+          vaeOnCpu: true,
+          vaeTiling: false,
+          diffusionFa: true,
+        });
+
+        expect(model2Call[0]).toMatchObject({
+          offloadToCpu: false,
+          clipOnCpu: true,
+          vaeOnCpu: false,
+          vaeTiling: true,
+          diffusionFa: false,
+        });
+      });
+    });
   });
 
   describe('Settings application', () => {

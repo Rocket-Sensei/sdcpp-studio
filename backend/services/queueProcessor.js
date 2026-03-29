@@ -190,10 +190,23 @@ async function processQueue() {
         throw new Error(`Model not found: ${modelId}`);
       }
 
-      // Compute effective memory flags from model config and global defaults
-      const effectiveFlags = {
+      // Compute effective memory flags from:
+      // 1. Model defaults + model memory overrides (base)
+      // 2. Per-generation flags from job (override) - if user specified them in the request
+      const baseFlags = {
         ...modelManager.memoryDefaults,
         ...(modelConfig.memory_overrides || {}),
+      };
+      
+      // Per-generation flags take precedence if explicitly specified (not null)
+      const effectiveFlags = {
+        ...baseFlags,
+        // Only override with job flags if they were explicitly set (not null/undefined)
+        offload_to_cpu: job.offload_to_cpu !== undefined && job.offload_to_cpu !== null ? job.offload_to_cpu : baseFlags.offload_to_cpu,
+        clip_on_cpu: job.clip_on_cpu !== undefined && job.clip_on_cpu !== null ? job.clip_on_cpu : baseFlags.clip_on_cpu,
+        vae_on_cpu: job.vae_on_cpu !== undefined && job.vae_on_cpu !== null ? job.vae_on_cpu : baseFlags.vae_on_cpu,
+        vae_tiling: job.vae_tiling !== undefined && job.vae_tiling !== null ? job.vae_tiling : baseFlags.vae_tiling,
+        diffusion_fa: job.diffusion_fa !== undefined && job.diffusion_fa !== null ? job.diffusion_fa : baseFlags.diffusion_fa,
       };
 
       // Get binary version for CLI mode
