@@ -536,16 +536,9 @@ export function MultiModelSelector({
 
   // Open server config modal for a model
   const openServerConfigModal = (model) => {
-    // Extract default steps from model args if available
-    let defaultSteps = 9;
-    if (model.args) {
-      const stepsIdx = model.args.findIndex(arg => arg === '--steps');
-      if (stepsIdx >= 0 && model.args[stepsIdx + 1]) {
-        defaultSteps = parseInt(model.args[stepsIdx + 1], 10) || 9;
-      } else if (model.generation_params?.sample_steps) {
-        defaultSteps = model.generation_params.sample_steps;
-      }
-    }
+    // Extract default steps from model.default_parameters.sample_steps (OpenRouter format)
+    // Fallback to 9 if not available
+    let defaultSteps = model?.default_parameters?.sample_steps || 9;
     setServerConfig({ steps: defaultSteps, threads: "", extraArgs: "" });
     setServerConfigModal({ open: true, modelId: model.id, model });
   };

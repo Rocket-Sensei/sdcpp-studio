@@ -160,9 +160,9 @@ export function GeneratePanel({
     setHasServerModeModel(serverModels.length > 0);
 
     if (serverModels.length > 0) {
-      // Get steps from defaultSteps field (set from generation_params.sample_steps)
+      // Get steps from default_parameters.sample_steps (OpenRouter format)
       const stepsValues = serverModels
-        .map(m => m.defaultSteps)
+        .map(m => m.default_parameters?.sample_steps)
         .filter(Boolean);
 
       if (stepsValues.length > 0) {
