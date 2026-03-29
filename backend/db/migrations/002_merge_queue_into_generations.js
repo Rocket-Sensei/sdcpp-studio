@@ -13,10 +13,14 @@
  * - mask_image_path, mask_image_mime_type: for edit with mask
  */
 
+import { createLogger } from '../../utils/logger.js';
+
 export const description = 'merge_queue_into_generations';
 
+const logger = createLogger('migration:002');
+
 export function up(db) {
-  console.log('  [002] Starting migration: Merge queue into generations');
+  logger.info('Starting migration: merge queue into generations');
 
   // Step 1: Add new columns to generations table
   const existingColumns = db.prepare("PRAGMA table_info(generations)").all();
@@ -38,9 +42,9 @@ export function up(db) {
     const colName = columnDef.split(' ')[0];
     if (!columnNames.includes(colName)) {
       db.exec(`ALTER TABLE generations ADD COLUMN ${columnDef};`);
-      console.log(`  [002] Added column ${colName} to generations`);
+      logger.info({ column: colName }, 'Added column to generations');
     } else {
-      console.log(`  [002] Column ${colName} already exists in generations, skipping`);
+      logger.info({ column: colName }, 'Column already exists in generations, skipping');
     }
   }
 
@@ -53,7 +57,7 @@ export function up(db) {
     ORDER BY created_at DESC
   `).all();
 
-  console.log(`  [002] Found ${queueItems.length} queue items to migrate`);
+  logger.info({ count: queueItems.length }, 'Found queue items to migrate');
 
   for (const item of queueItems) {
     if (item.generation_id) {
@@ -74,7 +78,7 @@ export function up(db) {
         item.completed_at || null,
         item.generation_id
       );
-      console.log(`  [002] Updated generation ${item.generation_id} with status ${item.status}`);
+      logger.info({ generationId: item.generation_id, status: item.status }, 'Updated generation from queue item');
     } else {
       // Queue item without generation - create new generation record
       // This preserves pending/processing jobs in the generations table
@@ -113,20 +117,20 @@ export function up(db) {
         item.started_at || null,
         item.completed_at || null
       );
-      console.log(`  [002] Migrated queue item ${item.id} as generation with status ${item.status}`);
+      logger.info({ queueId: item.id, status: item.status }, 'Migrated queue item as generation');
     }
   }
 
   // Step 3: Drop the queue table (data is now in generations)
   db.exec(`DROP TABLE IF EXISTS queue;`);
-  console.log('  [002] Dropped queue table');
+  logger.info('Dropped queue table');
 
-  console.log('  [002] Migration complete: queue merged into generations');
+  logger.info('Migration complete: queue merged into generations');
 }
 
 export function down(db) {
   // Rollback: Recreate queue table and move data back
-  console.log('  [002] Rolling back: Split generations back into queue and generations');
+  logger.info('Rolling back: split generations back into queue and generations');
 
   // Recreate queue table
   db.exec(`
@@ -193,5 +197,5 @@ export function down(db) {
     WHERE status = 'completed'
   `).run();
 
-  console.log('  [002] Rollback complete');
+  logger.info('Rollback complete');
 }

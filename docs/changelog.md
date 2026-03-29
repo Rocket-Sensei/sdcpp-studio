@@ -2,6 +2,25 @@
 
 ## Recent Changes
 
+### 2026-03-29 - Console TUI Runtime for `--terminal-ui` + Logger Cleanup
+
+**Added:**
+- Real in-console terminal UI runtime for backend startup with `--terminal-ui`
+  - Uses the launch TTY directly (not a web route) with a dedicated screen renderer
+  - Includes keyboard controls for scroll/navigation and graceful exit (`q`, `Ctrl+C`)
+- Terminal UI log capture stream for pino loggers
+  - App and SD.cpp logs now feed into the in-console TUI log pane
+- API endpoint for recent in-memory terminal lines:
+  - `GET /api/terminal/recent-logs?limit=50`
+
+**Changed:**
+- `--terminal-ui` mode now suppresses normal stdout logger output to prevent TUI corruption
+- Server startup/shutdown flow now updates terminal UI status phases
+
+**Fixed:**
+- Replaced backend runtime `console.log` usage in server startup and historical migration modules with structured logger calls
+- Generation start/end event helpers now use the shared logger instead of direct `console.log`
+
 ### 2026-03-09 - API Key Authentication Flow Improvements & HTTP Retry Logic
 
 **Fixed:**

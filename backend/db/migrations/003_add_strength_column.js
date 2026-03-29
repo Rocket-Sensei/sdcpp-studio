@@ -9,10 +9,14 @@
  * - Default: 0.75 (balanced variation)
  */
 
+import { createLogger } from '../../utils/logger.js';
+
 export const description = 'add_strength_column';
 
+const logger = createLogger('migration:003');
+
 export function up(db) {
-  console.log('  [003] Starting migration: Add strength column to generations');
+  logger.info('Starting migration: add strength column to generations');
 
   // Check if column already exists
   const existingColumns = db.prepare("PRAGMA table_info(generations)").all();
@@ -20,25 +24,25 @@ export function up(db) {
 
   if (!columnNames.includes('strength')) {
     db.exec(`ALTER TABLE generations ADD COLUMN strength REAL DEFAULT 0.75;`);
-    console.log('  [003] Added strength column to generations table (default: 0.75)');
+    logger.info('Added strength column to generations table (default: 0.75)');
   } else {
-    console.log('  [003] Column strength already exists in generations, skipping');
+    logger.info('Column strength already exists in generations, skipping');
   }
 
-  console.log('  [003] Migration complete: strength column added');
+  logger.info('Migration complete: strength column added');
 }
 
 export function down(db) {
   // Rollback: Remove strength column
   // Note: SQLite doesn't support DROP COLUMN directly, need to recreate table
-  console.log('  [003] Rolling back: Remove strength column');
+  logger.info('Rolling back: remove strength column');
 
   // Check if column exists
   const existingColumns = db.prepare("PRAGMA table_info(generations)").all();
   const columnNames = existingColumns.map(c => c.name);
 
   if (!columnNames.includes('strength')) {
-    console.log('  [003] Column strength does not exist, skipping rollback');
+    logger.info('Column strength does not exist, skipping rollback');
     return;
   }
 
@@ -98,5 +102,5 @@ export function down(db) {
     CREATE INDEX IF NOT EXISTS idx_generations_created_at ON generations(created_at DESC);
   `);
 
-  console.log('  [003] Rollback complete: strength column removed');
+  logger.info('Rollback complete: strength column removed');
 }

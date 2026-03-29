@@ -13,14 +13,18 @@ vi.mock('../frontend/src/contexts/WebSocketContext', async () => {
       isConnected: true,
       isConnecting: false,
     })),
+    useTerminalLogs: vi.fn(() => ({
+      isConnected: true,
+      isConnecting: false,
+    })),
   };
 });
 
-// Mock LogViewer
-vi.mock('../frontend/src/components/LogViewer', async () => {
+// Mock TerminalUI
+vi.mock('../frontend/src/components/TerminalUI', async () => {
   return {
-    LogViewer: vi.fn(({ onClose }) =>
-      React.createElement('div', { 'data-testid': 'log-viewer' }, 'LogViewer Content')
+    TerminalUI: vi.fn(({ onClose }) =>
+      React.createElement('div', { 'data-testid': 'terminal-ui' }, 'Terminal UI Content')
     ),
   };
 });
@@ -85,7 +89,7 @@ describe('WebSocketStatusIndicator Component', () => {
 
     // LogViewer should appear
     await waitFor(() => {
-      expect(screen.getByTestId('log-viewer')).toBeTruthy();
+      expect(screen.getByTestId('terminal-ui')).toBeTruthy();
     });
   });
 
@@ -119,16 +123,16 @@ describe('WebSocketStatusIndicator Component', () => {
 
     // Wait for modal to open
     await waitFor(() => {
-      expect(screen.getByTestId('log-viewer')).toBeTruthy();
+      expect(screen.getByTestId('terminal-ui')).toBeTruthy();
     });
 
     // Click outside (on overlay)
     const overlay = screen.getByTestId('dialog-overlay');
     fireEvent.click(overlay);
 
-    // Modal should close (LogViewer should be removed)
+    // Modal should close (terminal UI should be removed)
     await waitFor(() => {
-      expect(screen.queryByTestId('log-viewer')).toBeNull();
+      expect(screen.queryByTestId('terminal-ui')).toBeNull();
     });
   });
 });

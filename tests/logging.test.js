@@ -78,11 +78,15 @@ async function flushAllLoggers() {
 }
 
 describe('Logger Utility', () => {
+  let originalArgv;
+
   beforeEach(async () => {
     clearLogFiles();
     // Clear module cache to get fresh instances
     vi.clearAllMocks();
     vi.resetModules();
+    originalArgv = process.argv;
+    process.argv = ['node', 'server.js'];
     // Set environment for testing
     process.env.LOG_LEVEL = 'debug';
     process.env.LOG_API_CALLS = 'true';
@@ -91,6 +95,7 @@ describe('Logger Utility', () => {
   });
 
   afterEach(() => {
+    process.argv = originalArgv;
     clearLogFiles();
   });
 
@@ -792,6 +797,33 @@ describe('Logger Utility', () => {
       // File should still have the log
       const fileContent = readLogFile(appLogPath);
       expect(fileContent).toContain('test no stdout 0 message');
+    });
+
+    it('should suppress stdout when --terminal-ui flag is present', async () => {
+      process.env.LOG_TO_STDOUT = 'true';
+      process.argv = ['node', 'server.js', '--terminal-ui'];
+      vi.resetModules();
+
+      const stdoutWrite = process.stdout.write;
+      const writtenData = [];
+      process.stdout.write = vi.fn((data) => {
+        writtenData.push(data.toString());
+        return true;
+      });
+
+      const { createLogger } = await import('../backend/utils/logger.js');
+      const logger = createLogger('terminalModeStdoutTest');
+      logger.info('test terminal ui suppression');
+
+      await flushAllLoggers();
+
+      process.stdout.write = stdoutWrite;
+
+      const stdoutContent = writtenData.join('');
+      expect(stdoutContent).not.toContain('test terminal ui suppression');
+
+      const fileContent = readLogFile(appLogPath);
+      expect(fileContent).toContain('test terminal ui suppression');
     });
   });
 

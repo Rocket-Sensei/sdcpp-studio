@@ -19,6 +19,7 @@ import { build } from 'pino-pretty';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createTerminalUiPinoStream } from '../services/terminalUi.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,9 @@ const IS_DEVELOPMENT = process.env.NODE_ENV === 'development' || process.env.DEB
  * Check if logging to stdout is enabled
  */
 function isStdoutEnabled() {
+  if (isTerminalUIMode()) {
+    return false;
+  }
   return process.env.LOG_TO_STDOUT !== 'false' && process.env.LOG_TO_STDOUT !== '0';
 }
 
@@ -89,6 +93,11 @@ function createBaseLogger() {
     // All logs go to app.log
     { level: 'trace', stream: createFileDestination('app.log') },
   ];
+
+  const terminalUiStream = createTerminalUiPinoStream('app');
+  if (terminalUiStream) {
+    streams.push({ level: 'trace', stream: terminalUiStream });
+  }
 
   // Also output to console if LOG_TO_STDOUT is enabled (default: true)
   // Use pino-pretty for nice formatting
@@ -179,6 +188,11 @@ function createSdCppLogger() {
     // All SD.cpp logs go to sdcpp.log (sync writes to ensure logs are captured)
     { level: 'trace', stream: sdcppFileDestination },
   ];
+
+  const terminalUiStream = createTerminalUiPinoStream('sdcpp');
+  if (terminalUiStream) {
+    streams.push({ level: 'trace', stream: terminalUiStream });
+  }
 
   // Also output to console if LOG_TO_STDOUT is enabled (default: true)
   // Use pino-pretty for nice formatting with [SD.cpp] prefix
@@ -731,7 +745,7 @@ function formatTime(ms) {
 }
 
 /**
- * Log generation start event to console
+ * Log generation start event
  * Outputs concise event when NOT in terminal UI mode
  * @param {Object} options - Generation options
  * @param {string} options.modelName - Model display name
@@ -779,12 +793,12 @@ export function logGenerationStart(options) {
     message += ` | upscale:${upscaleKind || 'enabled'}`;
   }
 
-  console.log(message);
-  console.log(`[GEN-START] prompt: ${prompt}`);
+  baseLogger.info({ eventType: 'generation_start' }, message);
+  baseLogger.info({ eventType: 'generation_start_prompt', prompt }, `[GEN-START] prompt: ${prompt}`);
 }
 
 /**
- * Log generation end event to console
+ * Log generation end event
  * Outputs concise event when NOT in terminal UI mode
  * @param {Object} options - Generation result
  * @param {number} options.modelLoadTimeMs - Model loading time in ms
@@ -809,5 +823,13 @@ export function logGenerationEnd(options) {
   const genTimeStr = formatTime(generationTimeMs);
   const memFlagsStr = formatMemoryFlags(memoryFlags);
 
-  console.log(`[GEN-END] ${timestamp} | model-load:${modelLoadStr} | gen:${genTimeStr} | mem:${memFlagsStr}`);
+  baseLogger.info(
+    {
+      eventType: 'generation_end',
+      modelLoadTimeMs,
+      generationTimeMs,
+      memoryFlags,
+    },
+    `[GEN-END] ${timestamp} | model-load:${modelLoadStr} | gen:${genTimeStr} | mem:${memFlagsStr}`
+  );
 }

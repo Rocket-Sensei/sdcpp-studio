@@ -7,7 +7,17 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import { LogViewer } from '../frontend/src/components/LogViewer.jsx';
+
+vi.mock('../frontend/src/contexts/WebSocketContext', async () => {
+  return {
+    useTerminalLogs: vi.fn(() => ({
+      isConnected: false,
+      isConnecting: false,
+    })),
+  };
+});
+
+const { LogViewer } = await import('../frontend/src/components/LogViewer.jsx');
 
 // Mock the fetch API to prevent actual HTTP requests
 global.fetch = vi.fn(() =>

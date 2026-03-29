@@ -6,7 +6,11 @@
  * Images are saved to disk and the path is stored in the database.
  */
 
+import { createLogger } from '../../utils/logger.js';
+
 export const description = 'add_image_columns_to_queue_table';
+
+const logger = createLogger('migration:001');
 
 export function up(db) {
   // Get existing columns
@@ -16,30 +20,30 @@ export function up(db) {
   // Add columns only if they don't exist
   if (!columnNames.includes('input_image_path')) {
     db.exec(`ALTER TABLE queue ADD COLUMN input_image_path TEXT;`);
-    console.log('  [001] Added input_image_path column');
+    logger.info('Added input_image_path column');
   } else {
-    console.log('  [001] Column input_image_path already exists, skipping');
+    logger.info('Column input_image_path already exists, skipping');
   }
 
   if (!columnNames.includes('input_image_mime_type')) {
     db.exec(`ALTER TABLE queue ADD COLUMN input_image_mime_type TEXT;`);
-    console.log('  [001] Added input_image_mime_type column');
+    logger.info('Added input_image_mime_type column');
   } else {
-    console.log('  [001] Column input_image_mime_type already exists, skipping');
+    logger.info('Column input_image_mime_type already exists, skipping');
   }
 
   if (!columnNames.includes('mask_image_path')) {
     db.exec(`ALTER TABLE queue ADD COLUMN mask_image_path TEXT;`);
-    console.log('  [001] Added mask_image_path column');
+    logger.info('Added mask_image_path column');
   } else {
-    console.log('  [001] Column mask_image_path already exists, skipping');
+    logger.info('Column mask_image_path already exists, skipping');
   }
 
   if (!columnNames.includes('mask_image_mime_type')) {
     db.exec(`ALTER TABLE queue ADD COLUMN mask_image_mime_type TEXT;`);
-    console.log('  [001] Added mask_image_mime_type column');
+    logger.info('Added mask_image_mime_type column');
   } else {
-    console.log('  [001] Column mask_image_mime_type already exists, skipping');
+    logger.info('Column mask_image_mime_type already exists, skipping');
   }
 }
 
@@ -52,5 +56,5 @@ export function down(db) {
   // 4. Rename new table to old table
 
   // For now, we'll just note that rollback requires recreating the table
-  console.warn('  [001] Rollback not supported - requires table recreation');
+  logger.warn('Rollback not supported - requires table recreation');
 }

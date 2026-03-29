@@ -17,6 +17,7 @@ import {
   killPtySession,
   getAllPtySessions,
 } from '../services/ptyManager.js';
+import { getTerminalUIRecentLogs } from '../services/terminalUi.js';
 
 const logger = createLogger('routes:terminal');
 
@@ -125,6 +126,12 @@ export function getActiveSessions() {
  * Register terminal routes on the Express app
  */
 export function registerTerminalRoutes(app) {
+  app.get('/api/terminal/recent-logs', (req, res) => {
+    const requested = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requested) ? Math.max(1, Math.min(requested, 500)) : 50;
+    res.json({ logs: getTerminalUIRecentLogs(limit) });
+  });
+
   // Get active terminal sessions
   app.get('/api/terminal/sessions', (req, res) => {
     const sessions = Array.from(activeSessions.values()).map(s => ({

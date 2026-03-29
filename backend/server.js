@@ -23,6 +23,7 @@ import { getDownloadMethod } from './services/modelDownloader.js';
 import { initializeWebSocket } from './services/websocket.js';
 import { killAllPtySessions } from './services/ptyManager.js';
 import { startGpuBroadcaster } from './services/gpuBroadcaster.js';
+import { initializeTerminalUI, setTerminalUIStatus, shutdownTerminalUI } from './services/terminalUi.js';
 import { createLogger } from './utils/logger.js';
 import { authenticateRequest } from './middleware/auth.js';
 
@@ -43,6 +44,17 @@ import registerLogRoutes from './routes/logs.js';
 import registerOpenAIRoutes from './routes/openai.js';
 import { registerTerminalRoutes } from './routes/terminal.js';
 
+// Parse command-line flags
+const TERMINAL_UI_MODE = process.argv.includes('--terminal-ui');
+
+if (TERMINAL_UI_MODE) {
+  initializeTerminalUI({
+    title: 'sd.cpp Studio',
+    onExitRequest: () => process.kill(process.pid, 'SIGINT'),
+  });
+  setTerminalUIStatus({ phase: 'booting' });
+}
+
 // Create logger for server module
 const logger = createLogger('server');
 
@@ -62,16 +74,14 @@ if (process.env.HF_TOKEN) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Parse command-line flags
-const TERMINAL_UI_MODE = process.argv.includes('--terminal-ui');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';  // Default to all interfaces
 
 // Log terminal UI mode status
 if (TERMINAL_UI_MODE) {
-  console.log('[Terminal UI] Running in terminal UI mode');
+  logger.info('Running in terminal UI mode');
+  setTerminalUIStatus({ phase: 'initializing', host: HOST, port: PORT });
 }
 
 // ============================================================================
@@ -166,6 +176,9 @@ startGpuBroadcaster(2000);
 
 // Graceful shutdown handler
 function gracefulShutdown(signal) {
+  if (TERMINAL_UI_MODE) {
+    setTerminalUIStatus({ phase: `shutting_down:${signal}` });
+  }
   logger.info({ signal }, `Received ${signal}, closing server gracefully...`);
 
   server.close(() => {
@@ -189,6 +202,7 @@ function gracefulShutdown(signal) {
 
     // In test mode, don't call process.exit() - let the test framework control shutdown
     if (process.env.NODE_ENV !== 'test') {
+      shutdownTerminalUI();
       process.exit(0);
     }
   });
@@ -197,6 +211,7 @@ function gracefulShutdown(signal) {
   setTimeout(() => {
     logger.error('Forced shutdown after timeout');
     if (process.env.NODE_ENV !== 'test') {
+      shutdownTerminalUI();
       process.exit(1);
     }
   }, 10000);
@@ -207,6 +222,10 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 server.listen(PORT, HOST, async () => {
+  if (TERMINAL_UI_MODE) {
+    setTerminalUIStatus({ phase: 'running', host: HOST, port: PORT });
+  }
+
   logger.info(`Server running on http://${HOST}:${PORT}`);
   logger.info(`SD API endpoint: ${process.env.SD_API_ENDPOINT || 'http://192.168.2.180:1231/v1'}`);
   logger.info(`WebSocket server initialized at ws://${HOST}:${PORT}/ws`);

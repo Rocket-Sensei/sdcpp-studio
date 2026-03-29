@@ -141,9 +141,14 @@ models:
 - [x] Create LogViewer component to display stdout from tools
 - [x] Parse log entries to extract `stdout` field only
 - [x] Add `--terminal-ui` flag to app startup
-- [ ] Implement real WebSocket terminal streaming
+- [x] Implement real in-console TUI runtime for `--terminal-ui`
+- [x] Suppress normal stdout/stderr logger output in terminal mode to avoid TUI corruption
+- [x] Route startup and migration output through structured logger instead of direct `console.log`
+- [ ] Implement real WebSocket terminal streaming for app-level logs (not only model/process output)
 - [ ] Right-click menu on messages for generation info
-- [ ] Wire up SD.cpp/llama.cpp/wan process outputs to terminal UI
+- [x] Wire up SD.cpp process outputs to terminal UI (WebSocket channel + log files)
+- [ ] Wire up llama.cpp/wan tool outputs to terminal UI
+- [ ] Add bottom dock terminal frame in web UI with latest lines (VS Code style)
 
 ### Generation Event Logging (Console Output)
 **Status:** Completed ✅
