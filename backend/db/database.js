@@ -92,7 +92,14 @@ export function initializeDatabase() {
       sample_steps INTEGER,
       cfg_scale REAL,
       sampling_method TEXT,
-      clip_skip TEXT
+      clip_skip TEXT,
+      upscale_enable INTEGER DEFAULT 0,
+      vae_on_cpu INTEGER DEFAULT 0,
+      offload_to_cpu INTEGER DEFAULT 0,
+      clip_on_cpu INTEGER DEFAULT 0,
+      vae_tiling INTEGER DEFAULT 0,
+      diffusion_fa INTEGER DEFAULT 0,
+      binary_version TEXT
     )
   `);
 

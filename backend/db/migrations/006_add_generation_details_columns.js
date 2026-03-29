@@ -10,6 +10,8 @@ export function up(db) {
     { name: 'upscale_enable', sql: 'INTEGER DEFAULT 0' },
     { name: 'vae_on_cpu', sql: 'INTEGER DEFAULT 0' },
     { name: 'offload_to_cpu', sql: 'INTEGER DEFAULT 0' },
+    { name: 'clip_on_cpu', sql: 'INTEGER DEFAULT 0' },
+    { name: 'vae_tiling', sql: 'INTEGER DEFAULT 0' },
     { name: 'diffusion_fa', sql: 'INTEGER DEFAULT 0' },
     { name: 'binary_version', sql: 'TEXT' },
   ];

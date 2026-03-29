@@ -202,7 +202,7 @@ describe('WebSocket Integration Tests', () => {
     }
 
     // Set test database path via environment
-    process.env.GENERATIONS_DB_PATH = TEST_DB_PATH;
+    process.env.DB_PATH = TEST_DB_PATH;
 
     // Initialize test database
     await initializeDatabase();

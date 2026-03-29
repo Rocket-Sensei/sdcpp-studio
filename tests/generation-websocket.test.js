@@ -241,7 +241,7 @@ describe('Generation WebSocket Message Test', () => {
       unlinkSync(TEST_DB_PATH);
     }
 
-    process.env.GENERATIONS_DB_PATH = TEST_DB_PATH;
+    process.env.DB_PATH = TEST_DB_PATH;
     await initializeDatabase();
     cleanupFiles.push(TEST_DB_PATH);
 
