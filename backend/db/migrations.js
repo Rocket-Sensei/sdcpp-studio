@@ -18,6 +18,23 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 // Migration tracking table
 const MIGRATIONS_TABLE = '_migrations';
 
+const REQUIRED_GENERATION_COLUMNS = [
+  { name: 'strength', sql: 'REAL DEFAULT 0.75' },
+  { name: 'model_loading_time_ms', sql: 'INTEGER' },
+  { name: 'generation_time_ms', sql: 'INTEGER' },
+  { name: 'sample_steps', sql: 'INTEGER' },
+  { name: 'cfg_scale', sql: 'REAL' },
+  { name: 'sampling_method', sql: 'TEXT' },
+  { name: 'clip_skip', sql: 'TEXT' },
+  { name: 'upscale_enable', sql: 'INTEGER DEFAULT 0' },
+  { name: 'vae_on_cpu', sql: 'INTEGER DEFAULT 0' },
+  { name: 'offload_to_cpu', sql: 'INTEGER DEFAULT 0' },
+  { name: 'clip_on_cpu', sql: 'INTEGER DEFAULT 0' },
+  { name: 'vae_tiling', sql: 'INTEGER DEFAULT 0' },
+  { name: 'diffusion_fa', sql: 'INTEGER DEFAULT 0' },
+  { name: 'binary_version', sql: 'TEXT' },
+];
+
 /**
  * Get all migration files sorted by version number
  */
@@ -87,6 +104,27 @@ async function applyMigration(migrationFile) {
 }
 
 /**
+ * Repair generations schema drift by ensuring required columns exist.
+ * This protects startup when migrations were marked applied but the table is partially missing fields.
+ */
+export function ensureGenerationsSchema(db = getDatabase()) {
+  const columns = db.prepare('PRAGMA table_info(generations)').all();
+  const existingColumnNames = new Set(columns.map((column) => column.name));
+  let repairedColumns = 0;
+
+  for (const required of REQUIRED_GENERATION_COLUMNS) {
+    if (!existingColumnNames.has(required.name)) {
+      db.exec(`ALTER TABLE generations ADD COLUMN ${required.name} ${required.sql}`);
+      logger.warn({ column: required.name }, 'Schema drift detected: added missing generations column');
+      existingColumnNames.add(required.name);
+      repairedColumns += 1;
+    }
+  }
+
+  return { repairedColumns };
+}
+
+/**
  * Run all pending migrations
  */
 export async function runMigrations() {
@@ -98,18 +136,26 @@ export async function runMigrations() {
     return !appliedMigrations.includes(version);
   });
 
+  let appliedCount = 0;
+
   if (pendingMigrations.length === 0) {
     logger.info('No pending migrations');
-    return { applied: 0, total: migrationFiles.length };
+  } else {
+    logger.info({ count: pendingMigrations.length }, 'Found pending migrations');
+
+    for (const migrationFile of pendingMigrations) {
+      await applyMigration(migrationFile);
+    }
+
+    appliedCount = pendingMigrations.length;
   }
 
-  logger.info({ count: pendingMigrations.length }, 'Found pending migrations');
-
-  for (const migrationFile of pendingMigrations) {
-    await applyMigration(migrationFile);
+  const { repairedColumns } = ensureGenerationsSchema();
+  if (repairedColumns > 0) {
+    logger.warn({ repairedColumns }, 'Schema repair applied after migrations');
   }
 
-  return { applied: pendingMigrations.length, total: migrationFiles.length };
+  return { applied: appliedCount, total: migrationFiles.length, repairedColumns };
 }
 
 /**
