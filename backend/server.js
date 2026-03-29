@@ -40,6 +40,7 @@ import registerSdApiRoutes from './routes/sdapi.js';
 import registerImageRoutes from './routes/images.js';
 import registerLogRoutes from './routes/logs.js';
 import registerOpenAIRoutes from './routes/openai.js';
+import { registerTerminalRoutes } from './routes/terminal.js';
 
 // Create logger for server module
 const logger = createLogger('server');
@@ -60,9 +61,17 @@ if (process.env.HF_TOKEN) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Parse command-line flags
+const TERMINAL_UI_MODE = process.argv.includes('--terminal-ui');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';  // Default to all interfaces
+
+// Log terminal UI mode status
+if (TERMINAL_UI_MODE) {
+  console.log('[Terminal UI] Running in terminal UI mode');
+}
 
 // ============================================================================
 // Middleware Configuration
@@ -113,6 +122,9 @@ registerSdApiRoutes(app);
 
 // OpenAI-compatible API endpoints (auth required)
 registerOpenAIRoutes(app, upload);
+
+// Terminal session routes (for terminal UI mode)
+registerTerminalRoutes(app);
 
 // ============================================================================
 // Frontend Fallback
