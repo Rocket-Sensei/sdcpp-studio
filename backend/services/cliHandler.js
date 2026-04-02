@@ -188,6 +188,18 @@ class CLIHandler {
   buildCommand(modelConfig, params) {
     // Derive CLI command: if model uses sd-server, swap to sd-cli
     let command = modelConfig.cli_command || modelConfig.command;
+    
+    // Auto-detect command from exec_mode if not explicitly set
+    if (!command) {
+      const execMode = modelConfig.exec_mode || 'cli';
+      if (execMode === 'server') {
+        command = './bin/sd-server';
+      } else {
+        // For 'cli', 'auto', or any other mode, use sd-cli for one-shot generation
+        command = './bin/sd-cli';
+      }
+    }
+    
     if (command.includes('sd-server')) {
       command = command.replace('sd-server', 'sd-cli');
     }
