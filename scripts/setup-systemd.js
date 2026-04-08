@@ -2,17 +2,19 @@
 /**
  * SD.cpp Studio - Systemd User Service Setup
  * 
- * This script sets up the application as a systemd user service.
- * It creates the systemd unit file, enables it, and optionally starts it.
+ * This script sets up the application as systemd user services.
+ * It creates two services:
+ *   - sd-cpp-studio-backend:  The API server (loads backend/.env)
+ *   - sd-cpp-studio-frontend: The Vite dev server
  * 
  * Usage:
  *   npm run systemd:setup              # Interactive setup
  *   npm run systemd:setup -- --start   # Setup and start immediately
- *   npm run systemd:setup -- --force   # Overwrite existing service file
+ *   npm run systemd:setup -- --force   # Overwrite existing service files
  */
 
-import { execSync, spawn } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
+import { execSync } from 'child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -21,8 +23,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
 
 // Configuration
-const SERVICE_NAME = 'sd-cpp-studio';
-const SERVICE_TEMPLATE = join(PROJECT_ROOT, 'scripts', 'sd-cpp-studio.service.template');
+const SERVICES = [
+  { name: 'sd-cpp-studio-backend', template: 'sd-cpp-studio-backend.service.template' },
+  { name: 'sd-cpp-studio-frontend', template: 'sd-cpp-studio-frontend.service.template' }
+];
 const ENV_FILE = join(PROJECT_ROOT, '.env.production');
 const SYSTEMD_USER_DIR = join(homedir(), '.config', 'systemd', 'user');
 
@@ -90,13 +94,13 @@ function checkSystemd() {
 }
 
 /**
- * Get the full path to npm
+ * Get the full path to a command
  */
-function getNpmPath() {
+function getCommandPath(cmd) {
   try {
-    return exec('which npm', { stdio: 'pipe' }).trim();
+    return exec(`which ${cmd}`, { stdio: 'pipe' }).trim();
   } catch {
-    return 'npm';
+    return cmd;
   }
 }
 
@@ -111,20 +115,23 @@ function createSystemdDir() {
 }
 
 /**
- * Generate the service file from template
+ * Generate service file from template
  */
-function generateServiceFile() {
-  if (!existsSync(SERVICE_TEMPLATE)) {
-    throw new Error(`Service template not found: ${SERVICE_TEMPLATE}`);
+function generateServiceFile(templateName) {
+  const templatePath = join(PROJECT_ROOT, 'scripts', templateName);
+  if (!existsSync(templatePath)) {
+    throw new Error(`Service template not found: ${templatePath}`);
   }
 
-  const template = readFileSync(SERVICE_TEMPLATE, 'utf-8');
-  const npmPath = getNpmPath();
+  const template = readFileSync(templatePath, 'utf-8');
+  const npmPath = getCommandPath('npm');
+  const nodePath = getCommandPath('node');
   
   // Replace template variables
   let serviceContent = template
     .replace(/\{\{WORKING_DIRECTORY\}\}/g, PROJECT_ROOT)
     .replace(/\{\{NPM_PATH\}\}/g, npmPath)
+    .replace(/\{\{NODE_PATH\}\}/g, nodePath)
     .replace(/\{\{ENV_FILE\}\}/g, ENV_FILE)
     .replace(/\{\{ALLOWED_HOSTS\}\}/g, DEFAULTS.ALLOWED_HOSTS)
     .replace(/\{\{BACKEND_HOST\}\}/g, DEFAULTS.BACKEND_HOST)
@@ -134,14 +141,13 @@ function generateServiceFile() {
 }
 
 /**
- * Install the service file
+ * Install a service file
  */
-function installServiceFile(content) {
-  const servicePath = join(SYSTEMD_USER_DIR, `${SERVICE_NAME}.service`);
+function installServiceFile(name, content) {
+  const servicePath = join(SYSTEMD_USER_DIR, `${name}.service`);
   
   if (existsSync(servicePath) && !forceOverwrite) {
     log('warn', `Service file already exists: ${servicePath}`);
-    log('info', 'Use --force to overwrite');
     return false;
   }
 
@@ -160,25 +166,37 @@ function reloadDaemon() {
 }
 
 /**
- * Enable the service
+ * Enable a service
  */
-function enableService() {
-  log('info', `Enabling ${SERVICE_NAME} service...`);
-  exec(`systemctl --user enable ${SERVICE_NAME}.service`);
-  log('success', `Service ${SERVICE_NAME} enabled`);
+function enableService(name) {
+  log('info', `Enabling ${name} service...`);
+  exec(`systemctl --user enable ${name}.service`);
+  log('success', `Service ${name} enabled`);
 }
 
 /**
- * Start the service
+ * Start a service
  */
-function startService() {
-  log('info', `Starting ${SERVICE_NAME} service...`);
+function startService(name) {
+  log('info', `Starting ${name} service...`);
   try {
-    exec(`systemctl --user start ${SERVICE_NAME}.service`);
-    log('success', `Service ${SERVICE_NAME} started`);
+    exec(`systemctl --user start ${name}.service`);
+    log('success', `Service ${name} started`);
     return true;
   } catch (error) {
-    log('error', `Failed to start service: ${error.message}`);
+    log('error', `Failed to start ${name}: ${error.message}`);
+    return false;
+  }
+}
+
+/**
+ * Stop a service
+ */
+function stopService(name) {
+  try {
+    exec(`systemctl --user stop ${name}.service`, { ignoreError: true });
+    return true;
+  } catch {
     return false;
   }
 }
@@ -186,9 +204,9 @@ function startService() {
 /**
  * Check service status
  */
-function checkStatus() {
+function checkStatus(name) {
   try {
-    const status = exec(`systemctl --user status ${SERVICE_NAME}.service --no-pager`, { 
+    const status = exec(`systemctl --user status ${name}.service --no-pager`, { 
       stdio: 'pipe',
       ignoreError: true 
     });
@@ -201,10 +219,10 @@ function checkStatus() {
 /**
  * Print service status
  */
-function printStatus() {
-  const status = checkStatus();
+function printStatus(name) {
+  const status = checkStatus(name);
   if (status) {
-    console.log('\n--- Service Status ---\n');
+    console.log(`\n--- ${name} Status ---\n`);
     console.log(status);
   }
 }
@@ -214,19 +232,23 @@ function printStatus() {
  */
 function printUsage() {
   console.log(`
-Usage: npm run systemd:setup [options]
+Service Management Commands:
+  systemctl --user start sd-cpp-studio-backend   # Start backend only
+  systemctl --user start sd-cpp-studio-frontend  # Start frontend (auto-starts backend)
+  systemctl --user stop sd-cpp-studio-frontend   # Stop frontend only
+  systemctl --user stop sd-cpp-studio-backend    # Stop backend (stops both)
+  
+  # Or use npm shortcuts:
+  npm run systemd:start     # Start both services
+  npm run systemd:stop      # Stop both services
+  npm run systemd:restart   # Restart both services
+  npm run systemd:status    # Check status of both services
+  npm run systemd:logs      # Follow logs from both services
 
-Options:
-  --start     Start the service immediately after setup
-  --force     Overwrite existing service file
-  -v, --verbose  Show verbose output
-
-Commands after setup:
-  systemctl --user start ${SERVICE_NAME}      # Start the service
-  systemctl --user stop ${SERVICE_NAME}       # Stop the service
-  systemctl --user restart ${SERVICE_NAME}    # Restart the service
-  systemctl --user status ${SERVICE_NAME}     # Check service status
-  journalctl --user -u ${SERVICE_NAME} -f     # Follow logs
+Log Commands:
+  journalctl --user -u sd-cpp-studio-backend -f   # Backend logs
+  journalctl --user -u sd-cpp-studio-frontend -f  # Frontend logs
+  journalctl --user -u 'sd-cpp-studio*' -f        # All logs
 `);
 }
 
@@ -250,10 +272,19 @@ async function main() {
     process.exit(1);
   }
 
-  // Ensure environment file exists
+  // Check backend .env exists
+  const backendEnv = join(PROJECT_ROOT, 'backend', '.env');
+  if (!existsSync(backendEnv)) {
+    log('warn', `Backend .env not found: ${backendEnv}`);
+    log('info', 'The backend service will still work but may use default configuration.');
+  } else {
+    log('success', `Backend .env found: ${backendEnv}`);
+    log('info', 'The backend will load MODELS_DIR and other settings from this file.');
+  }
+
+  // Ensure frontend environment file exists
   if (!existsSync(ENV_FILE)) {
-    log('warn', `Environment file not found: ${ENV_FILE}`);
-    log('info', 'Creating default environment file...');
+    log('info', `Creating default environment file: ${ENV_FILE}`);
     const defaultEnv = `# SD.cpp Studio Production Environment Variables
 ALLOWED_HOSTS=${DEFAULTS.ALLOWED_HOSTS}
 BACKEND_HOST=${DEFAULTS.BACKEND_HOST}
@@ -263,41 +294,64 @@ NODE_ENV=production
     writeFileSync(ENV_FILE, defaultEnv);
   }
 
+  // Stop existing services if we're force-updating
+  if (forceOverwrite) {
+    log('info', 'Stopping existing services for update...');
+    stopService('sd-cpp-studio-frontend');
+    stopService('sd-cpp-studio-backend');
+  }
+
   // Create systemd directory
   createSystemdDir();
 
-  // Generate and install service file
-  try {
-    const serviceContent = generateServiceFile();
-    const installed = installServiceFile(serviceContent);
-    
-    if (!installed && !forceOverwrite) {
-      log('info', 'Setup skipped (service file exists)');
-      printUsage();
-      process.exit(0);
+  // Install both service files
+  let anyInstalled = false;
+  for (const service of SERVICES) {
+    try {
+      const content = generateServiceFile(service.template);
+      const installed = installServiceFile(service.name, content);
+      if (installed) anyInstalled = true;
+    } catch (error) {
+      log('error', `Failed to install ${service.name}: ${error.message}`);
+      process.exit(1);
     }
-  } catch (error) {
-    log('error', `Failed to install service: ${error.message}`);
-    process.exit(1);
+  }
+
+  if (!anyInstalled && !forceOverwrite) {
+    log('info', 'Setup skipped (service files exist)');
+    log('info', 'Use --force to overwrite');
+    printUsage();
+    process.exit(0);
   }
 
   // Reload daemon
   reloadDaemon();
 
-  // Enable service
-  enableService();
+  // Enable both services
+  for (const service of SERVICES) {
+    enableService(service.name);
+  }
 
-  // Start service if requested
+  // Start services if requested
   if (shouldStart) {
-    const started = startService();
-    if (started) {
-      // Wait a moment and show status
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      printStatus();
-    }
+    // Start backend first, then frontend
+    startService('sd-cpp-studio-backend');
+    
+    // Wait a moment for backend to initialize
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    startService('sd-cpp-studio-frontend');
+    
+    // Wait and show status
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('\n========================================');
+    console.log('  Services Status');
+    console.log('========================================');
+    printStatus('sd-cpp-studio-backend');
+    printStatus('sd-cpp-studio-frontend');
   } else {
-    log('info', 'Service is enabled but not started');
-    log('info', `Run: systemctl --user start ${SERVICE_NAME}`);
+    log('info', 'Services are enabled but not started');
+    log('info', 'Run: npm run systemd:start');
   }
 
   console.log('\n========================================');

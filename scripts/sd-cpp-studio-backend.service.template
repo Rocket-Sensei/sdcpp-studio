@@ -1,0 +1,46 @@
+# SD.cpp Studio Backend - Systemd User Service
+# Backend API server for Stable Diffusion
+#
+# This service must be running for the frontend to work properly.
+# It loads environment variables from backend/.env
+#
+[Unit]
+Description=SD.cpp Studio Backend API Server
+Documentation=https://github.com/rscx/studio
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{WORKING_DIRECTORY}}/backend
+
+# The backend loads its own .env file via dotenv,
+# but we set NODE_ENV here
+Environment=NODE_ENV=production
+
+# Start the backend server
+ExecStart={{NODE_PATH}} server.js
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sd-cpp-studio-backend
+
+# Security hardening for user services
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={{WORKING_DIRECTORY}}
+
+[Install]
+WantedBy=default.target
