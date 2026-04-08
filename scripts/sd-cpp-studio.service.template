@@ -1,0 +1,64 @@
+# SD.cpp Studio - Systemd User Service
+# Web interface for Stable Diffusion via stable-diffusion.cpp
+#
+# This is a user-mode systemd service. It runs as the current user, not root.
+#
+# Setup:
+#   npm run systemd:setup
+#
+# Manual setup (if needed):
+#   1. Copy this file to: ~/.config/systemd/user/sd-cpp-studio.service
+#   2. Run: systemctl --user daemon-reload
+#   3. Run: systemctl --user enable sd-cpp-studio.service
+#   4. Run: systemctl --user start sd-cpp-studio.service
+#
+# Management:
+#   systemctl --user {start,stop,restart,status} sd-cpp-studio
+#   journalctl --user -u sd-cpp-studio -f    # Follow logs
+#   journalctl --user -u sd-cpp-studio -n 100 # Last 100 lines
+#
+[Unit]
+Description=SD.cpp Studio - Web interface for Stable Diffusion
+Documentation=https://github.com/rscx/studio
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{WORKING_DIRECTORY}}
+
+# Environment variables
+Environment=ALLOWED_HOSTS={{ALLOWED_HOSTS}}
+Environment=BACKEND_HOST={{BACKEND_HOST}}
+Environment=HOST={{HOST}}
+Environment=NODE_ENV=production
+
+# If an environment file exists, load it
+EnvironmentFile=-{{ENV_FILE}}
+
+# Start the frontend with vite
+ExecStart={{NPM_PATH}} run dev:frontend
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sd-cpp-studio
+
+# Security hardening for user services
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={{WORKING_DIRECTORY}}
+
+[Install]
+WantedBy=default.target
