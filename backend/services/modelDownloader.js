@@ -276,7 +276,7 @@ async function downloadWithPython(repo, files, destDir, onProgress, jobId) {
 
     // Use file-specific dest or fall back to destDir, resolving relative paths from project root
     const fileDestDir = file.dest || destDir || DEFAULT_MODELS_DIR;
-    const resolvedDestDir = fileDestDir.startsWith('/') ? fileDestDir : resolve(PROJECT_ROOT, fileDestDir);
+    const resolvedDestDir = (fileDestDir.startsWith('/') || /^[A-Za-z]:/.test(fileDestDir)) ? fileDestDir : resolve(PROJECT_ROOT, fileDestDir);
 
     // Ensure destination directory exists
     if (!existsSync(resolvedDestDir)) {
@@ -622,7 +622,7 @@ async function downloadWithNode(repo, files, destDir, onProgress, jobId) {
     const file = files[i];
     const fileName = basename(file.path);
     const fileDestDir = file.dest || destDir || DEFAULT_MODELS_DIR;
-    const resolvedDestDir = fileDestDir.startsWith('/') ? fileDestDir : resolve(PROJECT_ROOT, fileDestDir);
+    const resolvedDestDir = (fileDestDir.startsWith('/') || /^[A-Za-z]:/.test(fileDestDir)) ? fileDestDir : resolve(PROJECT_ROOT, fileDestDir);
     const destPath = join(resolvedDestDir, fileName);
 
     if (!existsSync(resolvedDestDir)) {

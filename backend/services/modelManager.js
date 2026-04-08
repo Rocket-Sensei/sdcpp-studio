@@ -31,7 +31,7 @@ const DEFAULT_CONFIG_PATH = path.join(__dirname, '../config/models.yml');
 const CONFIG_DIR = path.join(__dirname, '../config');
 
 // Files that are NOT model configs (loaded in specific order)
-const NON_MODEL_CONFIGS = ['settings.yml', 'upscalers.yml'];
+const NON_MODEL_CONFIGS = ['settings.yml', 'settings.local.yml', 'upscalers.yml'];
 
 // Model status constants
 export const ModelStatus = {
@@ -235,6 +235,7 @@ export class ModelManager {
     this.defaultModelId = null;
     this.defaultModels = null; // Map of job type to default model ID
     this.defaultAutostop = null; // Global default auto-stop timeout (ms)
+    this.binaries = { sd_server: './bin/sd-server', sd_cli: './bin/sd-cli' }; // Binary paths
     this.configLoaded = false;
     this.isShuttingDown = false;
 
@@ -362,6 +363,12 @@ export class ModelManager {
       this.backendSettings = mergedConfig.backend_settings || {};
       logger.info({ backends: this.backendSettings }, 'Backend settings loaded');
 
+      // Parse binaries settings
+      if (mergedConfig.binaries) {
+        this.binaries = { ...this.binaries, ...mergedConfig.binaries };
+        logger.info({ binaries: this.binaries }, 'Binary paths configured');
+      }
+
       // Store memory defaults
       this.memoryDefaults = mergedConfig.memory_defaults || {
         offload_to_cpu: true,
@@ -432,8 +439,11 @@ export class ModelManager {
         const hasBackend = !!modelConfig.backend;
         const hasCommand = !!modelConfig.command || (hasBackend && this.backendRegistry.hasBackend(modelConfig.backend));
         if ((modelConfig.exec_mode === ExecMode.SERVER || modelConfig.exec_mode === ExecMode.CLI) && !hasCommand) {
-          // Allow models without explicit command - will be auto-detected from exec_mode
-          logger.debug({ modelId, execMode: modelConfig.exec_mode }, 'No explicit command, will auto-detect from exec_mode');
+          // Auto-detect command from binaries
+          modelConfig.command = modelConfig.exec_mode === ExecMode.SERVER 
+            ? this.binaries.sd_server 
+            : this.binaries.sd_cli;
+          logger.debug({ modelId, execMode: modelConfig.exec_mode, command: modelConfig.command }, 'Auto-detected command from binaries');
         }
         // API key is required for API mode
         if (modelConfig.exec_mode === ExecMode.API && !modelConfig.api_key) {
@@ -707,13 +717,13 @@ export class ModelManager {
       let command = options.command || model.command;
       if (!command) {
         if (model.exec_mode === ExecMode.SERVER) {
-          command = './bin/sd-server';
+          command = this.binaries.sd_server;
         } else if (model.exec_mode === ExecMode.CLI) {
-          command = './bin/sd-cli';
+          command = this.binaries.sd_cli;
         }
         // For API mode, command remains undefined (no local process)
         if (command) {
-          logger.debug({ modelId, execMode: model.exec_mode, command }, 'Auto-detected command from exec_mode');
+          logger.debug({ modelId, execMode: model.exec_mode, command }, 'Auto-detected command from binaries');
         }
       }
       let args = options.args || model.args || [];

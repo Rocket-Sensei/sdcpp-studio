@@ -90,7 +90,7 @@ export function extractFilesFromArgs(args) {
 
     if (FILE_FLAGS.includes(arg) && i + 1 < args.length) {
       const filePath = args[i + 1];
-      if (filePath && (filePath.startsWith('./') || filePath.startsWith('/') || filePath.includes('.'))) {
+      if (filePath && (filePath.startsWith('./') || filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath) || filePath.includes('.'))) {
         files.push({
           flag: arg,
           path: filePath

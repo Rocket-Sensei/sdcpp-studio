@@ -6,7 +6,7 @@
 import { getDatabase } from './database.js';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { createLogger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -83,7 +83,9 @@ async function applyMigration(migrationFile) {
   const migrationPath = path.join(MIGRATIONS_DIR, migrationFile);
 
   // Import and run the migration
-  const migration = await import(migrationPath);
+  // On Windows, we need to convert the path to a file:// URL for ESM dynamic imports
+  const migrationUrl = pathToFileURL(migrationPath).href;
+  const migration = await import(migrationUrl);
 
   logger.info({ version, description: migration.description || migrationFile }, 'Applying migration');
 
