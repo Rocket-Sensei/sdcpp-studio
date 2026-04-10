@@ -1,0 +1,60 @@
+# Models configuration
+models:
+  # ==================== Qwen Rapid AIO Models (Server Mode) ====================
+  qwen-rapid-aio-nsfw:
+    enabled: true
+    name: "Qwen Rapid AIO NSFW"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/qwen-rapid-aio/Qwen-Rapid-AIO-NSFW-v23.safetensors"
+      - "--vae"
+      - "./models/vae/qwen_image_vae.safetensors"
+      - "--llm"
+      - "./models/qwen25/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+      - "--llm_vision"
+      - "./models/qwen25/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+      - "-v"
+      - "--flow-shift"
+      - "3"
+      - "--steps"
+      - "24"
+    mode: "on_demand"
+    exec_mode: "auto"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
+
+  qwen-rapid-aio-sfw:
+    enabled: true
+    name: "Qwen Rapid AIO SFW"
+    capabilities: ["text-to-image", "imgedit"]
+    supports_negative_prompt: false
+    command: "./bin/sd-server"
+    args:
+      - "--diffusion-model"
+      - "./models/qwen-rapid-aio/Qwen-Rapid-AIO-SFW-v23.safetensors"
+      - "--vae"
+      - "./models/vae/qwen_image_vae.safetensors"
+      - "--llm"
+      - "./models/qwen25/Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+      - "--llm_vision"
+      - "./models/qwen25/Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf"
+      - "-v"
+      - "--flow-shift"
+      - "3"
+      - "--steps"
+      - "24"
+    mode: "on_demand"
+    exec_mode: "auto"
+    model_type: "imgedit"
+    default_size: "1024x1024"
+    generation_params:
+      cfg_scale: 2.5
+      sample_steps: 24
+      sampling_method: "euler"
