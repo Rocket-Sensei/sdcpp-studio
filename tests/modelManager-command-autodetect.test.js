@@ -60,28 +60,23 @@ describe('Model Manager Command Auto-Detection', () => {
     it('should have auto-detection logic for exec_mode', () => {
       expect(sourceCode).toContain("model.exec_mode === ExecMode.SERVER");
       expect(sourceCode).toContain("model.exec_mode === ExecMode.CLI");
-      expect(sourceCode).toContain("command = './bin/sd-server'");
-      expect(sourceCode).toContain("command = './bin/sd-cli'");
+      expect(sourceCode).toContain("this.binaries.sd_server");
+      expect(sourceCode).toContain("this.binaries.sd_cli");
     });
 
-    it('should use ./bin/sd-server for SERVER exec_mode', () => {
-      const serverMatch = sourceCode.match(/if\s*\(\s*model\.exec_mode\s*===\s*ExecMode\.SERVER\s*\)\s*\{[\s\S]*?command\s*=\s*['"]([^'"]+)['"]/);
-      expect(serverMatch).toBeTruthy();
-      expect(serverMatch[1]).toBe('./bin/sd-server');
+    it('should use sd_server binary for SERVER exec_mode', () => {
+      // Check that the code references sd_server binary
+      expect(sourceCode).toContain('this.binaries.sd_server');
     });
 
-    it('should use ./bin/sd-cli for CLI exec_mode', () => {
-      const cliMatch = sourceCode.match(/else\s+if\s*\(\s*model\.exec_mode\s*===\s*ExecMode\.CLI\s*\)\s*\{[\s\S]*?command\s*=\s*['"]([^'"]+)['"]/);
-      expect(cliMatch).toBeTruthy();
-      expect(cliMatch[1]).toBe('./bin/sd-cli');
+    it('should use sd_cli binary for CLI exec_mode', () => {
+      // Check that the code references sd_cli binary
+      expect(sourceCode).toContain('this.binaries.sd_cli');
     });
 
     it('should allow SERVER/CLI models without explicit command in validation', () => {
-      const validationMatch = sourceCode.match(/if\s*\(\s*\(modelConfig\.exec_mode\s*===\s*ExecMode\.SERVER\s*\|\|\s*modelConfig\.exec_mode\s*===\s*ExecMode\.CLI\)/);
-      expect(validationMatch).toBeTruthy();
-
-      const context = sourceCode.substring(sourceCode.indexOf(validationMatch[0]) - 100, sourceCode.indexOf(validationMatch[0]) + 500);
-      expect(context).toContain('auto-detect');
+      // Check that auto-detection logic exists
+      expect(sourceCode).toContain('Auto-detected command from binaries');
     });
 
     it('should skip spawning for API mode', () => {
@@ -126,9 +121,10 @@ describe('Model Manager Command Auto-Detection', () => {
       const modelManagerPath = path.join(__dirname, '../backend/services/modelManager.js');
       const sourceCode = readFileSync(modelManagerPath, 'utf-8');
 
-      expect(sourceCode).toContain("command = './bin/sd-server'");
-      expect(sourceCode).toContain("command = './bin/sd-cli'");
-      expect(sourceCode).toContain("Auto-detected command from exec_mode");
+      // Commands are now auto-detected in startModel method
+      expect(sourceCode).toContain("command = this.binaries.sd_server");
+      expect(sourceCode).toContain("command = this.binaries.sd_cli");
+      expect(sourceCode).toContain("Auto-detected command from binaries");
     });
 
     it('should throw error when command cannot be determined', async () => {

@@ -19,6 +19,13 @@ import { broadcastModelStatus, broadcastTerminalLog } from './websocket.js';
 import { createLogger, logCliCommand, logCliOutput, logCliError, getSdCppLogger, flushSdCppLogger } from '../utils/logger.js';
 import { extractFilenameFromArgs, extractQuantFromFilename } from '../utils/modelHelpers.js';
 import { getBackendRegistry } from './backendRegistry.js';
+import { parseTimeout } from '../utils/timeoutParser.js';
+import { ProcessEntry } from '../utils/processEntry.js';
+import { discoverConfigFiles } from '../utils/configDiscovery.js';
+import { mergeMemoryFlags } from '../utils/memoryFlags.js';
+import { processArgs, isServerReady } from '../utils/argProcessor.js';
+
+export { ProcessEntry, parseTimeout };
 
 const logger = createLogger('modelManager');
 
@@ -30,8 +37,7 @@ const PROJECT_ROOT = path.join(__dirname, '../..');  // Project root (two levels
 const DEFAULT_CONFIG_PATH = path.join(__dirname, '../config/models.yml');
 const CONFIG_DIR = path.join(__dirname, '../config');
 
-// Files that are NOT model configs (loaded in specific order)
-const NON_MODEL_CONFIGS = ['settings.yml', 'settings.local.yml', 'upscalers.yml'];
+
 
 // Model status constants
 export const ModelStatus = {
@@ -57,164 +63,6 @@ export const LoadMode = {
 };
 
 /**
- * Parse timeout string to milliseconds
- * Supports formats like "10m", "1h", "30s", "500ms"
- * @param {string} timeoutStr - Timeout string
- * @returns {number|null} Milliseconds or null if invalid
- */
-export function parseTimeout(timeoutStr) {
-  if (!timeoutStr || typeof timeoutStr !== 'string') {
-    return null;
-  }
-
-  const trimmed = timeoutStr.trim().toLowerCase();
-
-  // Try parsing as a plain number (assume milliseconds)
-  const plainNumber = parseInt(trimmed, 10);
-  if (!isNaN(plainNumber) && /^\d+$/.test(trimmed)) {
-    return plainNumber;
-  }
-
-  // Parse with unit suffix
-  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*([a-z]+)?$/);
-  if (!match) {
-    return null;
-  }
-
-  const value = parseFloat(match[1]);
-  const unit = match[2] || 'ms';
-
-  if (isNaN(value) || value <= 0) {
-    return null;
-  }
-
-  const multipliers = {
-    'ms': 1,
-    'millisecond': 1,
-    'milliseconds': 1,
-    's': 1000,
-    'sec': 1000,
-    'second': 1000,
-    'seconds': 1000,
-    'm': 60 * 1000,
-    'min': 60 * 1000,
-    'minute': 60 * 1000,
-    'minutes': 60 * 1000,
-    'h': 60 * 60 * 1000,
-    'hr': 60 * 60 * 1000,
-    'hour': 60 * 60 * 1000,
-    'hours': 60 * 60 * 1000,
-    'd': 24 * 60 * 60 * 1000,
-    'day': 24 * 60 * 60 * 1000,
-    'days': 24 * 60 * 60 * 1000,
-  };
-
-  const multiplier = multipliers[unit];
-  if (!multiplier) {
-    logger.warn({ timeoutStr, unit }, 'Unknown timeout unit');
-    return null;
-  }
-
-  return Math.floor(value * multiplier);
-}
-
-/**
- * Process entry for tracking running model processes
- */
-class ProcessEntry {
-  constructor(modelId, process, port, execMode, options = {}) {
-    this.modelId = modelId;
-    this.process = process;
-    this.port = port;
-    this.execMode = execMode;
-    this.startedAt = options.startedAt || Date.now();
-    this.pid = process.pid;
-    this.status = options.status || ModelStatus.STARTING;
-    this.exitCode = null;
-    this.signal = null;
-    this.outputBuffer = [];
-    this.errorBuffer = [];
-    this.command = options.command || '';
-    this.args = options.args || [];
-    this.autoStopTimeout = null; // Timer ID for auto-stop
-    this.autoStopTimeoutMs = null; // Configured timeout in ms (for display)
-  }
-
-  /**
-   * Get process uptime in seconds
-   */
-  getUptime() {
-    return Math.floor((Date.now() - this.startedAt) / 1000);
-  }
-
-  /**
-   * Get recent output lines
-   */
-  getRecentOutput(lines = 10) {
-    return this.outputBuffer.slice(-lines);
-  }
-
-  /**
-   * Get recent error lines
-   */
-  getRecentErrors(lines = 10) {
-    return this.errorBuffer.slice(-lines);
-  }
-
-  /**
-   * Append output to buffer
-   */
-  appendOutput(data) {
-    const text = data.toString().trim();
-    if (text) {
-      this.outputBuffer.push(`[${new Date().toISOString()}] ${text}`);
-      // Keep buffer size manageable
-      if (this.outputBuffer.length > 100) {
-        this.outputBuffer = this.outputBuffer.slice(-50);
-      }
-    }
-  }
-
-  /**
-   * Append error to buffer
-   */
-  appendError(data) {
-    const text = data.toString().trim();
-    if (text) {
-      this.errorBuffer.push(`[${new Date().toISOString()}] ${text}`);
-      // Keep buffer size manageable
-      if (this.errorBuffer.length > 100) {
-        this.errorBuffer = this.errorBuffer.slice(-50);
-      }
-    }
-  }
-
-  /**
-   * Clear auto-stop timeout
-   */
-  clearAutoStop() {
-    if (this.autoStopTimeout !== null) {
-      clearTimeout(this.autoStopTimeout);
-      this.autoStopTimeout = null;
-      this.autoStopTimeoutMs = null;
-    }
-  }
-
-  /**
-   * Get remaining time until auto-stop (in seconds)
-   * @returns {number|null} Remaining seconds or null if no auto-stop configured
-   */
-  getAutoStopRemaining() {
-    if (this.autoStopTimeoutMs === null) {
-      return null;
-    }
-    const elapsed = Date.now() - this.startedAt;
-    const remaining = Math.max(0, this.autoStopTimeoutMs - elapsed);
-    return Math.ceil(remaining / 1000);
-  }
-}
-
-/**
  * Main Model Manager class
  */
 export class ModelManager {
@@ -226,7 +74,7 @@ export class ModelManager {
       this.configPaths = [options.configPath];
     } else {
       // Auto-detect all YAML config files in the config directory
-      this.configPaths = this._discoverConfigFiles();
+      this.configPaths = discoverConfigFiles(CONFIG_DIR, DEFAULT_CONFIG_PATH);
     }
 
     // In-memory storage
@@ -728,10 +576,10 @@ export class ModelManager {
       }
       let args = options.args || model.args || [];
       // Merge memory default flags into args
-      args = this._mergeMemoryFlags(args, model);
+      args = mergeMemoryFlags(args, this.memoryDefaults, model.memory_overrides);
 
       // Replace port in args if needed
-      const processedArgs = this._processArgs(args, { port, model });
+      const processedArgs = processArgs(args, { port, model });
 
       // Inject --steps from generation_params if not already in args (for server mode)
       let finalArgs = processedArgs;
@@ -823,7 +671,7 @@ export class ModelManager {
 
         // Detect when server is ready (looks for common patterns)
         if (processEntry.status === ModelStatus.STARTING) {
-          if (this._isServerReady(output)) {
+          if (isServerReady(output)) {
             processEntry.status = ModelStatus.RUNNING;
             logger.info({ modelId, port }, 'Model is now running');
             // Broadcast model status change
@@ -1114,139 +962,6 @@ export class ModelManager {
       logger.error({ error }, 'Failed to allocate port with pick-port');
       throw new Error(`Failed to allocate port: ${error.message}`);
     }
-  }
-
-  /**
-   * Auto-discover all YAML config files in the config directory
-   * @returns {Array<string>} Array of config file paths in load order
-   * @private
-   */
-  _discoverConfigFiles() {
-    // Fall back to single config if directory doesn't exist
-    if (!fs.existsSync(CONFIG_DIR)) {
-      logger.warn({ configDir: CONFIG_DIR }, 'Config directory not found, using fallback');
-      return [DEFAULT_CONFIG_PATH];
-    }
-
-    const files = fs.readdirSync(CONFIG_DIR).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
-
-    // Separate into special configs and model configs
-    const specialConfigs = [];
-    const modelConfigs = [];
-
-    for (const file of files) {
-      if (NON_MODEL_CONFIGS.includes(file)) {
-        specialConfigs.push(file);
-      } else {
-        modelConfigs.push(file);
-      }
-    }
-
-    // Sort: settings.yml first, upscalers.yml second, then model configs alphabetically
-    specialConfigs.sort((a, b) => {
-      if (a === 'settings.yml') return -1;
-      if (b === 'settings.yml') return 1;
-      if (a === 'upscalers.yml') return -1;
-      if (b === 'upscalers.yml') return 1;
-      return a.localeCompare(b);
-    });
-
-    modelConfigs.sort();
-
-    const allConfigs = [...specialConfigs, ...modelConfigs];
-    return allConfigs.map(f => path.join(CONFIG_DIR, f));
-  }
-
-  /**
-   * Merge memory default flags into model args
-   * Priority: per-model memory_overrides > global memory_defaults
-   * Only adds flags that aren't already present in args
-   * @param {Array} args - Model arguments array
-   * @param {Object} modelConfig - Model configuration (may have memory_overrides)
-   * @returns {Array} Args with memory flags merged in
-   * @private
-   */
-  _mergeMemoryFlags(args, modelConfig) {
-    // Merge: per-model overrides take precedence over global defaults
-    const effectiveFlags = {
-      ...this.memoryDefaults,
-      ...(modelConfig.memory_overrides || {}),
-    };
-
-    const FLAG_MAP = {
-      offload_to_cpu: '--offload-to-cpu',
-      clip_on_cpu: '--clip-on-cpu',
-      vae_on_cpu: '--vae-on-cpu',
-      vae_tiling: '--vae-tiling',
-      diffusion_fa: '--diffusion-fa',
-      vae_conv_direct: '--vae-conv-direct',
-    };
-
-    const VALUE_FLAG_MAP = {
-      vae_tile_size: '--vae-tile-size',
-    };
-
-    const mergedArgs = [...args];
-
-    // Add boolean flags
-    for (const [key, cliFlag] of Object.entries(FLAG_MAP)) {
-      if (effectiveFlags[key] === true && !mergedArgs.includes(cliFlag)) {
-        mergedArgs.push(cliFlag);
-      }
-    }
-
-    // Add value flags
-    for (const [key, cliFlag] of Object.entries(VALUE_FLAG_MAP)) {
-      if (effectiveFlags[key] !== undefined && effectiveFlags[key] !== false && !mergedArgs.includes(cliFlag)) {
-        mergedArgs.push(cliFlag, String(effectiveFlags[key]));
-      }
-    }
-
-    return mergedArgs;
-  }
-
-  /**
-   * Process arguments, replacing placeholders
-   * @param {Array} args - Arguments array
-   * @param {Object} context - Context for replacements
-   * @returns {Array} Processed arguments
-   * @private
-   */
-  _processArgs(args, context) {
-    return args.map(arg => {
-      // Replace port placeholder
-      arg = arg.replace(/\{port\}/g, context.port);
-      arg = arg.replace(/\$\{port\}/g, context.port);
-
-      // Replace model-specific placeholders
-      if (context.model) {
-        arg = arg.replace(/\{model\.id\}/g, context.model.id);
-        arg = arg.replace(/\$\{model\.id\}/g, context.model.id);
-      }
-
-      return arg;
-    });
-  }
-
-  /**
-   * Check if server output indicates it's ready
-   * @param {string} output - Process output
-   * @returns {boolean} True if server appears ready
-   * @private
-   */
-  _isServerReady(output) {
-    const readyPatterns = [
-      /listening/i,
-      /server.*ready/i,
-      /started.*on.*port/i,
-      /serving.*http/i,
-      /accepting.*connections/i,
-      /ready.*accept/i,
-      /Uvicorn running/i,
-      /Application startup complete/i
-    ];
-
-    return readyPatterns.some(pattern => pattern.test(output));
   }
 
   /**
