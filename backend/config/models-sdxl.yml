@@ -4,8 +4,9 @@ models:
   # ==================== SDXL Finetunes ====================
   # SDXL finetune models - use SDXL VAE
   epicrealism-xl:
-    enabled: false
+    enabled: true
     name: "EpicRealism XL"
+    safety: "nsfw"
     description: "SDXL architecture with pure fix - supports negative prompts"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -29,8 +30,9 @@ models:
       sampling_method: "euler_a"
 
   forreal-xl:
-    enabled: false
+    enabled: true
     name: "ForReal XL"
+    safety: "nsfw"
     description: "SDXL architecture - photorealistic style"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -55,6 +57,7 @@ models:
 
   thinkdiffusion-xl:
     name: "ThinkDiffusion XL"
+    safety: "sfw"
     description: "SDXL architecture - creative style model"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -78,8 +81,9 @@ models:
       sampling_method: "euler_a"
 
   pornmaster-pro:
-    enabled: false
+    enabled: true
     name: "PornMaster Pro"
+    safety: "nsfw"
     description: "SDXL architecture - NSFW capable model"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -103,8 +107,9 @@ models:
       sampling_method: "euler_a"
 
   perfection-amateur:
-    enabled: false
+    enabled: true
     name: "Perfection Amateur"
+    safety: "nsfw"
     description: "Illustrious XL - NSFW / SFW Checkpoint"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -129,6 +134,7 @@ models:
 
   dreamshaper-xl-turbo:
     name: "DreamShaper XL Turbo"
+    safety: "sfw"
     description: "SDXL Turbo architecture - fast generation model"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -153,6 +159,7 @@ models:
 
   cyberrealistic-final:
     name: "CyberRealistic"
+    safety: "nsfw"
     description: "CyberRealistic"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -174,8 +181,9 @@ models:
       sampling_method: "euler_a"
 
   novaAnimeXLilV160:
-    enabled: false
+    enabled: true
     name: "novaAnimeXL il V160"
+    safety: "nsfw"
     description: ""
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -200,6 +208,7 @@ models:
 
   perfectdeliberate_v7:
     name: "Perfect Deliberate v7"
+    safety: "nsfw"
     description: ""
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -224,6 +233,7 @@ models:
 
   perfectdeliberate_v8:
     name: "Perfect Deliberate v8"
+    safety: "nsfw"
     description: ""
     capabilities: ["text-to-image"]
     supports_negative_prompt: true

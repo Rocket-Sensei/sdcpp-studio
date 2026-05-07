@@ -2,6 +2,7 @@ models:
   # ==================== Flux Models ====================
   flux1-schnell-fp8:
     name: "FLUX.1 Schnell"
+    safety: "sfw"
     quant: "Q8_0"
     description: "FLUX.1 Schnell - Fast generation model [Q8_0]"
     capabilities: ["text-to-image"]
@@ -30,8 +31,9 @@ models:
       sampling_method: "euler"
 
   flux1-schnell-fp8-cli:
-    enabled: false
+    enabled: true
     name: "FLUX.1 Schnell FP8 - CLI mode"
+    safety: "sfw"
     quant: "Q8_0"
     description: "FLUX.1 Schnell FP8 used via sd-cli"
     capabilities: ["text-to-image"]
@@ -61,8 +63,9 @@ models:
 
 
   fluxed-up-flux-61-q8:
-    enabled: false
+    enabled: true
     name: "FluxedUp Flux 61 Q8"
+    safety: "nsfw"
     quant: "Q8_0"
     description: "FluxedUp Flux 61 - Q8 quantized (12GB)"
     capabilities: ["text-to-image"]
@@ -89,8 +92,9 @@ models:
       sampling_method: "dpmpp_2m"
 
   fluxed-up-flux:
-    enabled: false
+    enabled: true
     name: "FluxedUp Flux"
+    safety: "nsfw"
     quant: "Q4_K_S"
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
@@ -117,8 +121,9 @@ models:
       sampling_method: "euler"
 
   fux-capacity:
-    enabled: false
+    enabled: true
     name: "fuxCapacityNSFW"
+    safety: "nsfw"
     quant: "Q8_0"
     description: "High quality flux model with NSFW support"
     capabilities: ["text-to-image"]
@@ -145,8 +150,9 @@ models:
       sample_steps: 24
 
   flux1-krea-dev:
-    enabled: false
+    enabled: true
     name: "FLUX.1 Krea Dev"
+    safety: "sfw"
     quant: "Q8_0"
     description: "FLUX.1 Krea Dev - Drop-in replacement for FLUX.1 dev"
     capabilities: ["text-to-image"]

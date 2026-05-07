@@ -2,6 +2,7 @@ models:
   # ==================== Flux Models ====================
   flux2-klein-4b:
     name: "FLUX.2 Klein 4B"
+    safety: "sfw"
     quant: "BF16"
     description: " FLUX.2 [klein] unifies generation and editing in a single compact architecture"
     capabilities: ["text-to-image", "imgedit"]
@@ -31,6 +32,7 @@ models:
   flux2-klein-4b-bf16:
     enabled: true
     name: "FLUX.2 Klein 4B GGUF"
+    safety: "sfw"
     quant: "BF16"
     description: "FLUX.2 [klein] 4B BF16 - High quality FP16/BF16 variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -59,6 +61,7 @@ models:
   flux2-klein-4b-f16:
     enabled: true
     name: "FLUX.2 Klein 4B F16"
+    safety: "sfw"
     quant: "F16"
     description: "FLUX.2 [klein] 4B F16 - Full precision variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -87,6 +90,7 @@ models:
   flux2-klein-4b-q8:
     enabled: true
     name: "FLUX.2 Klein 4B Q8_0"
+    safety: "sfw"
     quant: "Q8_0"
     description: "FLUX.2 [klein] 4B Q8_0 - High quality quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -113,8 +117,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q6:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q6_K"
+    safety: "sfw"
     quant: "Q6_K"
     description: "FLUX.2 [klein] 4B Q6_K - Medium-high quality quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -141,8 +146,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q5km:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q5_K_M"
+    safety: "sfw"
     quant: "Q5_K_M"
     description: "FLUX.2 [klein] 4B Q5_K_M - Medium quality quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -169,8 +175,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q5ks:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q5_K_S"
+    safety: "sfw"
     quant: "Q5_K_S"
     description: "FLUX.2 [klein] 4B Q5_K_S - Small-medium quality quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -197,8 +204,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q50:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q5_0"
+    safety: "sfw"
     quant: "Q5_0"
     description: "FLUX.2 [klein] 4B Q5_0 - Medium quality quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -225,8 +233,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q51:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q5_1"
+    safety: "sfw"
     quant: "Q5_1"
     description: "FLUX.2 [klein] 4B Q5_1 - Medium quality quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -253,8 +262,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q4km:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q4_K_M"
+    safety: "sfw"
     quant: "Q4_K_M"
     description: "FLUX.2 [klein] 4B Q4_K_M - Balanced quality/size quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -281,8 +291,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q4ks:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q4_K_S"
+    safety: "sfw"
     quant: "Q4_K_S"
     description: "FLUX.2 [klein] 4B Q4_K_S - Smaller balanced quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -311,6 +322,7 @@ models:
   flux2-klein-4b-q40:
     enabled: true
     name: "FLUX.2 Klein 4B Q4_0"
+    safety: "sfw"
     quant: "Q4_0"
     description: "FLUX.2 [klein] 4B Q4_0 - Compact quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -337,8 +349,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q41:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q4_1"
+    safety: "sfw"
     quant: "Q4_1"
     description: "FLUX.2 [klein] 4B Q4_1 - Compact quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -365,8 +378,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q3km:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q3_K_M"
+    safety: "sfw"
     quant: "Q3_K_M"
     description: "FLUX.2 [klein] 4B Q3_K_M - Smaller quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -393,8 +407,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q3ks:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q3_K_S"
+    safety: "sfw"
     quant: "Q3_K_S"
     description: "FLUX.2 [klein] 4B Q3_K_S - Very compact quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -421,8 +436,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-q2k:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein 4B Q2_K"
+    safety: "sfw"
     quant: "Q2_K"
     description: "FLUX.2 [klein] 4B Q2_K - Ultra-compact quantized variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -449,8 +465,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-base-bf16:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein Base 4B BF16"
+    safety: "sfw"
     quant: "BF16"
     description: "FLUX.2 [klein] Base 4B BF16 - Base model variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -477,8 +494,9 @@ models:
       sampling_method: "euler"
 
   flux2-klein-4b-base-fp8:
-    enabled: false
+    enabled: true
     name: "FLUX.2 Klein Base 4B FP8"
+    safety: "sfw"
     quant: "FP8"
     description: "FLUX.2 [klein] Base 4B FP8 - Base model FP8 variant"
     capabilities: ["text-to-image", "imgedit"]
@@ -506,6 +524,7 @@ models:
 
   flux2-klein-9b-q8:
     name: "FLUX.2 Klein 9B"
+    safety: "sfw"
     quant: "Q8_0"
     description: " FLUX.2 [klein] 9B Q8_0 unifies generation and editing in a single compact architecture"
     capabilities: ["text-to-image", "imgedit"]

@@ -3,6 +3,7 @@ models:
   # ==================== Stable Diffusion Models ====================
   sd15-base:
     name: "SD 1.5"
+    safety: "sfw"
     description: "Stable Diffusion 1.5 base model"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true
@@ -25,6 +26,7 @@ models:
 
   sdxl-turbo:
     name: "SDXL Turbo"
+    safety: "sfw"
     description: "Fast SDXL Turbo for quick generations"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true

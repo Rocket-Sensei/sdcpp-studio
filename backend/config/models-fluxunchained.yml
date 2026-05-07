@@ -4,8 +4,9 @@ models:
   # FluxUnchained with NF4 quantization
 
   fluxunchained-8step:
-    enabled: false
+    enabled: true
     name: "FluxUnchained 8 step"
+    safety: "nsfw"
     description: "FluxUnchained HyFU-8-Step-Hybrid-v1.0"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false

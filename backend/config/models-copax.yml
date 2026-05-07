@@ -6,6 +6,7 @@ models:
   copax-timeless-xlz1:
     enabled: true
     name: "Copax Timeless XL+Z1"
+    safety: "sfw"
     description: "Copax Timeless XL+Z1 - SDXL/Z-Image hybrid model for high quality outputs"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false

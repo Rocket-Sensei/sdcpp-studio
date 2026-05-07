@@ -1,8 +1,9 @@
 # Flux Models
 models:
   persephone-11fp8:
-    enabled: false
+    enabled: true
     name: "Persephone 11FP8"
+    safety: "nsfw"
     quant: "FP8"
     description: "Flux NSFW/SFW Checkpoint"
     capabilities: ["text-to-image"]
@@ -32,8 +33,9 @@ models:
       sampling_method: "dpmpp_2m"
 
   persephone-10q8:
-    enabled: false
+    enabled: true
     name: "Persephone 10Q8"
+    safety: "nsfw"
     quant: "Q8_0"
     description: "Flux NSFW/SFW Checkpoint"
     capabilities: ["text-to-image"]

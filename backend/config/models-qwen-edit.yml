@@ -5,6 +5,7 @@ models:
   qwen-image-edit-2511-q4-0:
     enabled: true
     name: "Qwen Image Edit 2511"
+    safety: "sfw"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     args:
@@ -35,6 +36,7 @@ models:
   qwen-image-edit-2511-Q5ks:
     enabled: true
     name: "Qwen Image Edit 2511"
+    safety: "sfw"
     description: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
@@ -64,8 +66,9 @@ models:
       sampling_method: "euler"
 
   qwen-image-edit-2511-Q5km:
-    enabled: false
+    enabled: true
     name: "Qwen Image Edit 2511"
+    safety: "sfw"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     args:
@@ -96,6 +99,7 @@ models:
   qwen-image-edit-2511-q5-0:
     enabled: true
     name: "Qwen Image Edit 2511"
+    safety: "sfw"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     args:
@@ -125,6 +129,7 @@ models:
 
   qwen-image-edit-2511-q5-1:
     name: "Qwen Image Edit 2511"
+    safety: "sfw"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     args:
@@ -155,6 +160,7 @@ models:
   qwen-image-edit-2511-q2-k:
     enabled: true
     name: "Qwen Image Edit 2511"
+    safety: "sfw"
     description: "Qwen Image Edit 2511"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
@@ -185,6 +191,7 @@ models:
 
   qwen-image-edit-2509:
     name: "Qwen Image Edit 2509"
+    safety: "sfw"
     description: "Qwen Image Edit 2509 [Q4_K_M] - image-to-image editing model with object manipulation and style transformation"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false

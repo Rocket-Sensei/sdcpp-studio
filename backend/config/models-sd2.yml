@@ -4,6 +4,7 @@ models:
   # ==================== SD 2.1 Models ====================
   sd-2-1-768:
     name: "SD 2.1 768"
+    safety: "sfw"
     description: "Stable Diffusion 2.1 - 768px resolution variant"
     capabilities: ["text-to-image"]
     supports_negative_prompt: true

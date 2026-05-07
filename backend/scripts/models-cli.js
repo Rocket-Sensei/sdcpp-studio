@@ -11,14 +11,16 @@
  *   node backend/scripts/models-cli.js info <model-id>    # Get detailed model info
  *   node backend/scripts/models-cli.js running            # Show running models
  *   node backend/scripts/models-cli.js files <model-id>   # Check model file status
+ *   node backend/scripts/models-cli.js unknown-files       # Show unreferenced files in ./models
  *   node backend/scripts/models-cli.js downloaded         # Show downloaded models
  */
 
 import { getModelManager } from '../services/modelManager.js';
 import { getModelFileStatus } from '../utils/modelHelpers.js';
-import { statSync } from 'fs';
-import { dirname, basename, resolve } from 'path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { dirname, basename, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import yaml from 'js-yaml';
 
 // ANSI colors for terminal output
 const colors = {
@@ -72,6 +74,16 @@ function printSubheader(title) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = resolve(__dirname, '../..');
+const MODEL_STORE = resolve(PROJECT_ROOT, 'models');
+const CONFIG_DIR = resolve(PROJECT_ROOT, 'backend/config');
+const MODEL_FILE_EXTENSIONS = new Set([
+  '.bin',
+  '.ckpt',
+  '.gguf',
+  '.pth',
+  '.pt',
+  '.safetensors',
+]);
 
 /**
  * Check if model files exist on disk
@@ -113,6 +125,48 @@ function formatFileSize(bytes) {
     unitIndex++;
   }
   return `${size.toFixed(2)} ${units[unitIndex]}`;
+}
+
+function walkFiles(dir) {
+  if (!existsSync(dir)) return [];
+
+  const results = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = resolve(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...walkFiles(entryPath));
+    } else if (entry.isFile()) {
+      results.push(entryPath);
+    }
+  }
+  return results;
+}
+
+function hasModelFileExtension(filePath) {
+  return MODEL_FILE_EXTENSIONS.has(filePath.slice(filePath.lastIndexOf('.')).toLowerCase());
+}
+
+async function getConfiguredModelFilePaths(models) {
+  const configured = new Set();
+
+  for (const model of models) {
+    const fileStatus = await checkModelFiles(model);
+    for (const file of fileStatus.files) {
+      configured.add(resolve(file.filePath));
+    }
+  }
+
+  const upscalersPath = resolve(CONFIG_DIR, 'upscalers.yml');
+  if (existsSync(upscalersPath)) {
+    const config = yaml.load(readFileSync(upscalersPath, 'utf8')) || {};
+    for (const upscaler of Object.values(config.upscalers || {})) {
+      if (upscaler?.model_path) {
+        configured.add(resolve(PROJECT_ROOT, upscaler.model_path));
+      }
+    }
+  }
+
+  return configured;
 }
 
 /**
@@ -371,6 +425,48 @@ function showDownloadedModels() {
 }
 
 /**
+ * Show files in ./models that are not referenced by any configured model.
+ */
+async function showUnknownFiles() {
+  const manager = getModelManager();
+  manager.loadConfig();
+
+  const allModels = manager.getAllModels();
+  const configuredFiles = await getConfiguredModelFilePaths(allModels);
+  const storeFiles = walkFiles(MODEL_STORE).filter(hasModelFileExtension);
+  const unknownFiles = storeFiles
+    .filter(filePath => !configuredFiles.has(resolve(filePath)))
+    .sort((a, b) => a.localeCompare(b));
+
+  printHeader('Unknown Model Files');
+
+  if (!existsSync(MODEL_STORE)) {
+    console.log(colorize(`Model store does not exist: ${MODEL_STORE}`, 'yellow'));
+    return;
+  }
+
+  if (unknownFiles.length === 0) {
+    console.log(colorize('No unknown model files found.', 'green'));
+    return;
+  }
+
+  let totalBytes = 0;
+  for (const filePath of unknownFiles) {
+    const size = statSync(filePath).size;
+    totalBytes += size;
+    console.log(
+      colors.red + '  ? ' + colors.reset +
+      colorize(relative(PROJECT_ROOT, filePath), 'yellow') +
+      colors.dim + ` (${formatFileSize(size)})` + colors.reset
+    );
+  }
+
+  console.log('');
+  console.log(`  Unknown files: ${colorize(String(unknownFiles.length), 'yellow')}`);
+  console.log(`  Total size:    ${colorize(formatFileSize(totalBytes), 'yellow')}`);
+}
+
+/**
  * Main CLI entry point
  */
 async function main() {
@@ -408,6 +504,12 @@ async function main() {
       await showModelFiles(target);
       break;
 
+    case 'unknown-files':
+    case 'unknown':
+    case 'orphans':
+      await showUnknownFiles();
+      break;
+
     case 'downloaded':
       showDownloadedModels();
       break;
@@ -423,6 +525,7 @@ Models CLI Tool - Usage:
   node backend/scripts/models-cli.js info <model-id>    # Get detailed model info
   node backend/scripts/models-cli.js running            # Show running models
   node backend/scripts/models-cli.js files <model-id>   # Check model file status
+  node backend/scripts/models-cli.js unknown-files       # Show unreferenced files in ./models
   node backend/scripts/models-cli.js downloaded         # Show downloaded models
   node backend/scripts/models-cli.js help               # Show this help
 

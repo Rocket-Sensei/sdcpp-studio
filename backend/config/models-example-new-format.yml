@@ -51,6 +51,7 @@ models:
   
   qwen-image:
     name: "Qwen Image"
+    safety: "sfw"
     description: "Qwen Image - advanced text-to-image with complex text rendering"
     backend: "sd-server"
     model_file: "./models/Qwen_Image-Q4_K_M.gguf"
@@ -66,6 +67,7 @@ models:
 
   qwen-image-2512:
     name: "Qwen Image 2512"
+    safety: "sfw"
     description: "Qwen Image 2512 - latest version"
     backend: "sd-server"
     model_file: "./models/qwen-image-2512-Q3_K_M.gguf"
@@ -83,8 +85,9 @@ models:
   
   flux1-schnell:
     name: "FLUX.1 Schnell"
+    safety: "sfw"
     description: "FLUX.1 Schnell - Fast generation [Q8_0]"
-    enabled: false
+    enabled: true
     backend: "sd-server-flux"
     model_file: "./models/flux1-schnell-Q8_0.gguf"
     vae: "./models/vae/flux1_f32.safetensors"
@@ -101,8 +104,9 @@ models:
   
   gemma-3-27b-it:
     name: "Gemma 3 27B IT"
+    safety: "sfw"
     description: "Google Gemma 3 27B Instruct"
-    enabled: false
+    enabled: true
     backend: "llama-server"
     # For llama-server with --models-preset, reference the INI section
     ini_section: "gemma-3-27b-it"
@@ -111,8 +115,9 @@ models:
 
   devstral-small-24b:
     name: "Devstral Small 24B"
+    safety: "sfw"
     description: "Devstral Small 2-24B Instruct"
-    enabled: false
+    enabled: true
     backend: "llama-server"
     ini_section: "Devstral-Small-2-24B-Instruct"
     capabilities: ["text-generation"]

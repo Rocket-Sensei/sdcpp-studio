@@ -37,6 +37,14 @@ backends:
       - "-v"
     description: "Stable Diffusion CLI for one-shot generation"
 
+  sd-cli-cpu:
+    command: "./bin/sd-cli-cpu"
+    exec_mode: "cli"
+    mode: "on_demand"
+    base_args:
+      - "-v"
+    description: "CPU-only Stable Diffusion CLI for oversized local models"
+
   # ==================== Llama Server (Text Generation) ====================
   llama-server:
     command: "./bin/llama-server"

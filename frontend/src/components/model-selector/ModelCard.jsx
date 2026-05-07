@@ -25,6 +25,25 @@ const MODEL_STATUS = {
   ERROR: "error",
 };
 
+function SafetyBadge({ safety }) {
+  const value = String(safety || '').toLowerCase();
+  if (value !== 'sfw' && value !== 'nsfw') return null;
+
+  const isNsfw = value === 'nsfw';
+  return (
+    <span
+      className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border flex-shrink-0"
+      style={{
+        backgroundColor: isNsfw ? 'rgba(244, 63, 94, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+        color: isNsfw ? '#fb7185' : '#4ade80',
+        borderColor: isNsfw ? 'rgba(244, 63, 94, 0.3)' : 'rgba(34, 197, 94, 0.3)',
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 /**
  * ModelCard - Card component for displaying a model in the selector
  *
@@ -131,6 +150,7 @@ export function ModelCard({
               {model.quant}
             </span>
           )}
+          <SafetyBadge safety={model.safety} />
           {model.isNew && (
             <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs px-1.5 py-0">
               New

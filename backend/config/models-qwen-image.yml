@@ -3,6 +3,7 @@ models:
   # ==================== Qwen Image (Server Mode) ====================
   qwen-image-2512:
     name: "Qwen Image 2512"
+    safety: "sfw"
     description: "Qwen Image 2512"
     default: true
     capabilities: ["text-to-image"]
@@ -34,6 +35,7 @@ models:
 
   qwen-image:
     name: "Qwen Image"
+    safety: "sfw"
     description: "Qwen Image - advanced text-to-image model with complex text rendering and precise image editing capabilities"
     default: true
     capabilities: ["text-to-image"]
@@ -65,8 +67,9 @@ models:
 
   # ==================== Qwen Image CLI Mode ====================
   qwen-image-cli:
-    enabled: false
+    enabled: true
     name: "Qwen Image - CLI mode"
+    safety: "sfw"
     description: "Qwen Image used via sd-cli"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false

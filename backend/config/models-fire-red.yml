@@ -5,10 +5,12 @@ models:
   fire-red-q4:
     enabled: true
     name: "FireRed Image Edit"
+    safety: "sfw"
     quant: "Q4_0"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
+    backend: "sd-cli-cpu"
+    command: "./bin/sd-cli-cpu"
     args:
       - "--diffusion-model"
       - "./models/fire-red/FireRed-Image-Edit-1.1-Q4_0.gguf"
@@ -25,7 +27,7 @@ models:
       - "24"
       - "--qwen-image-zero-cond-t"
     mode: "on_demand"
-    exec_mode: "auto"
+    exec_mode: "cli"
     # Port is dynamically allocated (40000-49000 range)
     model_type: "imgedit"
     default_size: "1024x1024"

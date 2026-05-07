@@ -3,8 +3,9 @@
 # No local server is started - requests go directly to the external API
 models:
   flux2:
-    enabled: false
+    enabled: true
     name: "Example"
+    safety: "sfw"
     description: "External API"
     capabilities: ["text-to-image"]
     supports_negative_prompt: false

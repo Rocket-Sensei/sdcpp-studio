@@ -7,6 +7,7 @@
 models:
   shuttle-3-diffusion:
     name: "Shuttle-3-Diffusion"
+    safety: "sfw"
     quant: "Q8_0"
     description: "Shuttle-3-Diffusion - Apache 2.0 licensed aesthetic model (Flux Schnell based)"
     capabilities: ["text-to-image"]
@@ -34,6 +35,7 @@ models:
       sampling_method: "euler"
   shuttle-jaguar:
     name: "Shuttle Jaguar"
+    safety: "sfw"
     quant: "Q8_0"
     description: "Shuttle Jaguar - Apache 2.0 licensed aesthetic model (Flux Schnell based)"
     capabilities: ["text-to-image"]

@@ -4,9 +4,11 @@ models:
   qwen-rapid-aio-nsfw:
     enabled: true
     name: "Qwen Rapid AIO NSFW"
+    safety: "nsfw"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
+    backend: "sd-cli-cpu"
+    command: "./bin/sd-cli-cpu"
     args:
       - "--diffusion-model"
       - "./models/qwen-rapid-aio/Qwen-Rapid-AIO-NSFW-v23.safetensors"
@@ -22,7 +24,7 @@ models:
       - "--steps"
       - "24"
     mode: "on_demand"
-    exec_mode: "auto"
+    exec_mode: "cli"
     model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:
@@ -33,9 +35,11 @@ models:
   qwen-rapid-aio-sfw:
     enabled: true
     name: "Qwen Rapid AIO SFW"
+    safety: "sfw"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
-    command: "./bin/sd-server"
+    backend: "sd-cli-cpu"
+    command: "./bin/sd-cli-cpu"
     args:
       - "--diffusion-model"
       - "./models/qwen-rapid-aio/Qwen-Rapid-AIO-SFW-v23.safetensors"
@@ -51,7 +55,7 @@ models:
       - "--steps"
       - "24"
     mode: "on_demand"
-    exec_mode: "auto"
+    exec_mode: "cli"
     model_type: "imgedit"
     default_size: "1024x1024"
     generation_params:

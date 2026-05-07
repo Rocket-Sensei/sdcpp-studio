@@ -167,6 +167,25 @@ function ProjectedMemoryBadge({ modelId, width, height, flags }) {
   );
 }
 
+function SafetyBadge({ safety }) {
+  const value = String(safety || '').toLowerCase();
+  if (value !== 'sfw' && value !== 'nsfw') return null;
+
+  const isNsfw = value === 'nsfw';
+  return (
+    <span
+      className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border flex-shrink-0"
+      style={{
+        backgroundColor: isNsfw ? 'rgba(244, 63, 94, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+        color: isNsfw ? '#fb7185' : '#4ade80',
+        borderColor: isNsfw ? 'rgba(244, 63, 94, 0.3)' : 'rgba(34, 197, 94, 0.3)',
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 /**
  * Analyze model args and return array of component types
  * @param {Object} model - Model configuration object
@@ -900,6 +919,7 @@ export function MultiModelSelector({
                         {model.quant}
                       </span>
                     )}
+                    <SafetyBadge safety={model.safety} />
                     {enableMemoryControls && isSelected && isServerMode && (
                       <div className="inline-flex items-center gap-1 flex-shrink-0">
                         <ProjectedMemoryBadge
