@@ -44,6 +44,25 @@ function SafetyBadge({ safety }) {
   );
 }
 
+function CpuOnlyBadge({ model }) {
+  const isCpuOnly = model?.cpuOnly || model?.backend === 'sd-cli-cpu' || model?.command === './bin/sd-cli-cpu';
+  if (!isCpuOnly) return null;
+
+  return (
+    <span
+      className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide border flex-shrink-0"
+      style={{
+        backgroundColor: 'rgba(14, 165, 233, 0.15)',
+        color: '#38bdf8',
+        borderColor: 'rgba(14, 165, 233, 0.3)',
+      }}
+      title="CPU-only backend"
+    >
+      CPU
+    </span>
+  );
+}
+
 /**
  * ModelCard - Card component for displaying a model in the selector
  *
@@ -151,6 +170,7 @@ export function ModelCard({
             </span>
           )}
           <SafetyBadge safety={model.safety} />
+          <CpuOnlyBadge model={model} />
           {model.isNew && (
             <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs px-1.5 py-0">
               New
