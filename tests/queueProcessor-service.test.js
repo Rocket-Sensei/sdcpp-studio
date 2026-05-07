@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
+import { mergeMemoryFlags } from '../backend/utils/memoryFlags.js';
 
 // Create hoisted state for modelManager mock and readFile mock that can be modified in tests
 const { getMockModelManagerState, setMockModelManagerState, getMockModelManagerInstance, setMockModelManagerInstance, getMockReadFile, setMockReadFile } = vi.hoisted(() => {
@@ -52,12 +53,6 @@ const { getMockModelManagerState, setMockModelManagerState, getMockModelManagerI
       sample_steps: 20
     })),
     getModelStepsFromArgs: vi.fn(() => 20),
-    _mergeMemoryFlags: vi.fn((args, modelConfig) => {
-      // Default mock: append memory flags like the real implementation
-      const merged = [...args];
-      merged.push('--offload-to-cpu', '--clip-on-cpu', '--diffusion-fa');
-      return merged;
-    }),
     getEffectiveMemoryFlags: vi.fn(() => ({
       offload_to_cpu: true,
       clip_on_cpu: true,
@@ -144,6 +139,14 @@ vi.mock('../backend/services/cliHandler.js', () => ({
 vi.mock('../backend/services/websocket.js', () => ({
   broadcastQueueEvent: vi.fn(),
   broadcastGenerationComplete: vi.fn()
+}));
+
+vi.mock('../backend/utils/memoryFlags.js', () => ({
+  mergeMemoryFlags: vi.fn((args, modelConfig) => {
+    const merged = [...args];
+    merged.push('--offload-to-cpu', '--clip-on-cpu', '--diffusion-fa');
+    return merged;
+  })
 }));
 
 // Mock logger module
@@ -1091,9 +1094,9 @@ describe('Queue Processor - Memory Flags Injection', () => {
     vi.useFakeTimers();
     // Reset queue processor internal state (isProcessing flag) from previous tests
     resetQueueProcessorState();
-    // Restore _mergeMemoryFlags implementation after clearAllMocks resets call history
+    // Restore mergeMemoryFlags implementation after clearAllMocks resets call history
     // (clearAllMocks preserves implementations but we re-set for safety)
-    getMockModelManager()._mergeMemoryFlags.mockImplementation((args, modelConfig) => {
+    mergeMemoryFlags.mockImplementation((args, modelConfig) => {
       const merged = [...args];
       if (!merged.includes('--offload-to-cpu')) merged.push('--offload-to-cpu');
       if (!merged.includes('--clip-on-cpu')) merged.push('--clip-on-cpu');
@@ -1121,7 +1124,7 @@ describe('Queue Processor - Memory Flags Injection', () => {
     vi.useRealTimers();
   });
 
-  it('should inject memory flags into CLI model args via _mergeMemoryFlags', async () => {
+  it('should inject memory flags into CLI model args via mergeMemoryFlags', async () => {
     const job = {
       id: randomUUID(),
       type: 'generate',
@@ -1148,8 +1151,8 @@ describe('Queue Processor - Memory Flags Injection', () => {
     startQueueProcessor(100);
     await vi.advanceTimersByTimeAsync(200);
 
-    // Verify _mergeMemoryFlags was called with the model's raw args
-    expect(getMockModelManager()._mergeMemoryFlags).toHaveBeenCalledWith(
+    // Verify mergeMemoryFlags was called with the model's raw args
+    expect(mergeMemoryFlags).toHaveBeenCalledWith(
       ['--diffusion-model', './models/test.gguf', '--vae', './models/vae.safetensors'],
       expect.objectContaining({ id: 'cli-model', exec_mode: ExecMode.CLI })
     );
@@ -1158,7 +1161,7 @@ describe('Queue Processor - Memory Flags Injection', () => {
     expect(cliHandler.generateImage).toHaveBeenCalled();
     const callArgs = cliHandler.generateImage.mock.calls[0];
     const passedModelConfig = callArgs[2]; // 3rd argument is modelConfig
-    // The merged args should include the memory flags added by _mergeMemoryFlags mock
+    // The merged args should include the memory flags added by mergeMemoryFlags mock
     expect(passedModelConfig.args).toContain('--offload-to-cpu');
     expect(passedModelConfig.args).toContain('--clip-on-cpu');
     expect(passedModelConfig.args).toContain('--diffusion-fa');
@@ -1233,8 +1236,8 @@ describe('Queue Processor - Memory Flags Injection', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     // Auto mode with single image should resolve to CLI
-    // _mergeMemoryFlags should have been called
-    expect(getMockModelManager()._mergeMemoryFlags).toHaveBeenCalled();
+    // mergeMemoryFlags should have been called
+    expect(mergeMemoryFlags).toHaveBeenCalled();
 
     // And the CLI handler should have been called with memory flags
     expect(cliHandler.generateImage).toHaveBeenCalled();

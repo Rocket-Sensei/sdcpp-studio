@@ -2,6 +2,7 @@ import { claimNextPendingGeneration, claimNextPendingGenerationWithModelAffinity
 import { generateImageDirect } from './imageService.js';
 import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode, ModelStatus } from './modelManager.js';
+import { mergeMemoryFlags } from '../utils/memoryFlags.js';
 import { cliHandler } from './cliHandler.js';
 import { readFile } from 'fs/promises';
 import { loggedFetch, createLogger, createGenerationLogger, logGenerationStart, logGenerationEnd } from '../utils/logger.js';
@@ -909,7 +910,7 @@ async function processCLIGeneration(job, modelConfig, params, genLogger) {
     // into model args before passing to CLI handler.
     // For server mode this happens in modelManager.startModel(), but CLI mode
     // bypasses startModel() so we must merge here.
-    const mergedArgs = modelManager._mergeMemoryFlags(modelConfig.args || [], modelConfig);
+    const mergedArgs = mergeMemoryFlags(modelConfig.args || [], modelConfig);
     const configWithMemoryFlags = { ...modelConfig, args: mergedArgs };
 
     // Use CLI handler to generate image, passing generation ID for logging

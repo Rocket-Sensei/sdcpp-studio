@@ -2,6 +2,7 @@ import { loggedFetch, createLogger } from '../utils/logger.js';
 import { generateImageDirect } from './imageService.js';
 import { randomUUID } from 'crypto';
 import { getModelManager, ExecMode } from './modelManager.js';
+import { mergeMemoryFlags } from '../utils/memoryFlags.js';
 
 const logger = createLogger('studioHordeClient');
 
@@ -217,7 +218,7 @@ async function executeJob(hordeJob) {
  */
 async function processCLIGeneration(params, modelConfig) {
   const { cliHandler } = await import('./cliHandler.js');
-  const mergedArgs = modelManager._mergeMemoryFlags(modelConfig.args || [], modelConfig);
+  const mergedArgs = mergeMemoryFlags(modelConfig.args || [], modelConfig);
   const configWithMemoryFlags = { ...modelConfig, args: mergedArgs };
 
   const imageBuffer = await cliHandler.generateImage(configWithMemoryFlags.id, params, configWithMemoryFlags);
