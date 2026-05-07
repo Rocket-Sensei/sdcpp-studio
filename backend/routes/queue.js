@@ -17,6 +17,13 @@ import { authenticateRequest } from '../middleware/auth.js';
 
 const logger = createLogger('routes:queue');
 
+function readMemoryFlag(body, snakeKey, camelKey) {
+  const value = body[snakeKey] ?? body[camelKey];
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'string') return value === '1' || value.toLowerCase() === 'true';
+  return Boolean(value);
+}
+
 /**
  * Queue management routes
  * These endpoints provide a job queue interface for image generation
@@ -45,11 +52,11 @@ export function registerQueueRoutes(app, upload) {
         sample_steps: req.body.sample_steps,
         clip_skip: req.body.clip_skip,
         // Per-generation memory flags (override model defaults)
-        offload_to_cpu: req.body.offload_to_cpu,
-        clip_on_cpu: req.body.clip_on_cpu,
-        vae_on_cpu: req.body.vae_on_cpu,
-        vae_tiling: req.body.vae_tiling,
-        diffusion_fa: req.body.diffusion_fa,
+        offload_to_cpu: readMemoryFlag(req.body, 'offload_to_cpu', 'offloadToCpu'),
+        clip_on_cpu: readMemoryFlag(req.body, 'clip_on_cpu', 'clipOnCpu'),
+        vae_on_cpu: readMemoryFlag(req.body, 'vae_on_cpu', 'vaeOnCpu'),
+        vae_tiling: readMemoryFlag(req.body, 'vae_tiling', 'vaeTiling'),
+        diffusion_fa: readMemoryFlag(req.body, 'diffusion_fa', 'diffusionFa'),
       };
       await createGeneration(params);
       res.json({ job_id: id, status: GenerationStatus.PENDING });
@@ -95,11 +102,11 @@ export function registerQueueRoutes(app, upload) {
         sample_steps: req.body.sample_steps,
         clip_skip: req.body.clip_skip,
         // Per-generation memory flags (override model defaults)
-        offload_to_cpu: req.body.offload_to_cpu,
-        clip_on_cpu: req.body.clip_on_cpu,
-        vae_on_cpu: req.body.vae_on_cpu,
-        vae_tiling: req.body.vae_tiling,
-        diffusion_fa: req.body.diffusion_fa,
+        offload_to_cpu: readMemoryFlag(req.body, 'offload_to_cpu', 'offloadToCpu'),
+        clip_on_cpu: readMemoryFlag(req.body, 'clip_on_cpu', 'clipOnCpu'),
+        vae_on_cpu: readMemoryFlag(req.body, 'vae_on_cpu', 'vaeOnCpu'),
+        vae_tiling: readMemoryFlag(req.body, 'vae_tiling', 'vaeTiling'),
+        diffusion_fa: readMemoryFlag(req.body, 'diffusion_fa', 'diffusionFa'),
       };
 
       // Handle optional mask upload
@@ -158,11 +165,11 @@ export function registerQueueRoutes(app, upload) {
         sample_steps: req.body.sample_steps,
         clip_skip: req.body.clip_skip,
         // Per-generation memory flags (override model defaults)
-        offload_to_cpu: req.body.offload_to_cpu,
-        clip_on_cpu: req.body.clip_on_cpu,
-        vae_on_cpu: req.body.vae_on_cpu,
-        vae_tiling: req.body.vae_tiling,
-        diffusion_fa: req.body.diffusion_fa,
+        offload_to_cpu: readMemoryFlag(req.body, 'offload_to_cpu', 'offloadToCpu'),
+        clip_on_cpu: readMemoryFlag(req.body, 'clip_on_cpu', 'clipOnCpu'),
+        vae_on_cpu: readMemoryFlag(req.body, 'vae_on_cpu', 'vaeOnCpu'),
+        vae_tiling: readMemoryFlag(req.body, 'vae_tiling', 'vaeTiling'),
+        diffusion_fa: readMemoryFlag(req.body, 'diffusion_fa', 'diffusionFa'),
       };
 
       await createGeneration(params);

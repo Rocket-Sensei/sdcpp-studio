@@ -105,6 +105,22 @@ describe('memoryFlags', () => {
       expect(result).toContain('--vae-conv-direct');
     });
 
+    it('should add boolean flags from persisted integer values', () => {
+      const result = mergeMemoryFlags([], {
+        offload_to_cpu: 1,
+        clip_on_cpu: 1,
+        vae_on_cpu: 1,
+        vae_tiling: 0,
+        diffusion_fa: 1,
+      });
+
+      expect(result).toContain('--offload-to-cpu');
+      expect(result).toContain('--clip-on-cpu');
+      expect(result).toContain('--vae-on-cpu');
+      expect(result).not.toContain('--vae-tiling');
+      expect(result).toContain('--diffusion-fa');
+    });
+
     it('should not add boolean flags when set to false', () => {
       const args = [];
       const defaults = {

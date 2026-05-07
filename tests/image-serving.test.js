@@ -142,6 +142,33 @@ describe('Image Serving and Pagination', () => {
     });
   });
 
+  describe('Generation Memory Flags', () => {
+    it('should store boolean memory flags as SQLite integers', async () => {
+      const generationId = 'memory-flags-generation';
+
+      await createGeneration({
+        id: generationId,
+        type: 'generate',
+        model: 'test-model',
+        prompt: 'test prompt',
+        offload_to_cpu: true,
+        clip_on_cpu: true,
+        vae_on_cpu: false,
+        vae_tiling: false,
+        diffusion_fa: true,
+      });
+
+      const generations = getAllGenerations();
+      const generation = generations.find(gen => gen.id === generationId);
+
+      expect(generation.offload_to_cpu).toBe(1);
+      expect(generation.clip_on_cpu).toBe(1);
+      expect(generation.vae_on_cpu).toBe(0);
+      expect(generation.vae_tiling).toBe(0);
+      expect(generation.diffusion_fa).toBe(1);
+    });
+  });
+
   describe('Image API Response - static_url Field', () => {
     it('should include static_url in getImageById response', async () => {
       const imagesDir = getImagesDir();

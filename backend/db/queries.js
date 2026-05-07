@@ -8,6 +8,12 @@ import { generationWaiter } from '../services/generationWaiter.js';
 
 const logger = createLogger('queries');
 
+function toSqliteBoolean(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string') return value === '1' || value.toLowerCase() === 'true' ? 1 : 0;
+  return value ? 1 : 0;
+}
+
 // Generation status constants (merged from queue)
 export const GenerationStatus = {
   PENDING: 'pending',
@@ -104,11 +110,11 @@ export async function createGeneration(data) {
     data.sampling_method || null,
     data.clip_skip || null,
     // Per-generation memory flags (null means use model defaults)
-    data.offload_to_cpu ?? null,
-    data.clip_on_cpu ?? null,
-    data.vae_on_cpu ?? null,
-    data.vae_tiling ?? null,
-    data.diffusion_fa ?? null
+    toSqliteBoolean(data.offload_to_cpu),
+    toSqliteBoolean(data.clip_on_cpu),
+    toSqliteBoolean(data.vae_on_cpu),
+    toSqliteBoolean(data.vae_tiling),
+    toSqliteBoolean(data.diffusion_fa)
   );
 }
 

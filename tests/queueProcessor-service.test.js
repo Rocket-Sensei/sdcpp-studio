@@ -1096,11 +1096,12 @@ describe('Queue Processor - Memory Flags Injection', () => {
     resetQueueProcessorState();
     // Restore mergeMemoryFlags implementation after clearAllMocks resets call history
     // (clearAllMocks preserves implementations but we re-set for safety)
-    mergeMemoryFlags.mockImplementation((args, modelConfig) => {
+    mergeMemoryFlags.mockImplementation((args, memoryFlags) => {
       const merged = [...args];
-      if (!merged.includes('--offload-to-cpu')) merged.push('--offload-to-cpu');
-      if (!merged.includes('--clip-on-cpu')) merged.push('--clip-on-cpu');
-      if (!merged.includes('--diffusion-fa')) merged.push('--diffusion-fa');
+      if (memoryFlags.offload_to_cpu && !merged.includes('--offload-to-cpu')) merged.push('--offload-to-cpu');
+      if (memoryFlags.clip_on_cpu && !merged.includes('--clip-on-cpu')) merged.push('--clip-on-cpu');
+      if (memoryFlags.vae_on_cpu && !merged.includes('--vae-on-cpu')) merged.push('--vae-on-cpu');
+      if (memoryFlags.diffusion_fa && !merged.includes('--diffusion-fa')) merged.push('--diffusion-fa');
       return merged;
     });
     // Reset loggedFetch mock to return success by default
@@ -1130,6 +1131,11 @@ describe('Queue Processor - Memory Flags Injection', () => {
       type: 'generate',
       model: 'cli-model',
       prompt: 'test prompt',
+      offload_to_cpu: 1,
+      clip_on_cpu: 1,
+      vae_on_cpu: 1,
+      vae_tiling: 0,
+      diffusion_fa: 1,
       status: GenerationStatus.PENDING,
       created_at: Date.now()
     };
@@ -1151,10 +1157,16 @@ describe('Queue Processor - Memory Flags Injection', () => {
     startQueueProcessor(100);
     await vi.advanceTimersByTimeAsync(200);
 
-    // Verify mergeMemoryFlags was called with the model's raw args
+    // Verify mergeMemoryFlags was called with the model's raw args and resolved memory flags.
     expect(mergeMemoryFlags).toHaveBeenCalledWith(
       ['--diffusion-model', './models/test.gguf', '--vae', './models/vae.safetensors'],
-      expect.objectContaining({ id: 'cli-model', exec_mode: ExecMode.CLI })
+      expect.objectContaining({
+        offload_to_cpu: 1,
+        clip_on_cpu: 1,
+        vae_on_cpu: 1,
+        vae_tiling: 0,
+        diffusion_fa: 1,
+      })
     );
 
     // Verify the CLI handler received the model config with merged args (including memory flags)
@@ -1164,6 +1176,7 @@ describe('Queue Processor - Memory Flags Injection', () => {
     // The merged args should include the memory flags added by mergeMemoryFlags mock
     expect(passedModelConfig.args).toContain('--offload-to-cpu');
     expect(passedModelConfig.args).toContain('--clip-on-cpu');
+    expect(passedModelConfig.args).toContain('--vae-on-cpu');
     expect(passedModelConfig.args).toContain('--diffusion-fa');
     // And still contain the original args
     expect(passedModelConfig.args).toContain('--diffusion-model');

@@ -218,7 +218,11 @@ async function executeJob(hordeJob) {
  */
 async function processCLIGeneration(params, modelConfig) {
   const { cliHandler } = await import('./cliHandler.js');
-  const mergedArgs = mergeMemoryFlags(modelConfig.args || [], modelConfig);
+  const memoryFlags = {
+    ...modelManager.memoryDefaults,
+    ...(modelConfig.memory_overrides || {}),
+  };
+  const mergedArgs = mergeMemoryFlags(modelConfig.args || [], memoryFlags);
   const configWithMemoryFlags = { ...modelConfig, args: mergedArgs };
 
   const imageBuffer = await cliHandler.generateImage(configWithMemoryFlags.id, params, configWithMemoryFlags);

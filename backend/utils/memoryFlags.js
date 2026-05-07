@@ -17,6 +17,10 @@ const VALUE_FLAG_MAP = {
   vae_tile_size: '--vae-tile-size',
 };
 
+function isEnabled(value) {
+  return value === true || value === 1 || value === '1' || value === 'true';
+}
+
 /**
  * Merge memory default flags into model args
  * Priority: per-model memory_overrides > global memory_defaults
@@ -37,7 +41,7 @@ export function mergeMemoryFlags(args, memoryDefaults, memoryOverrides = {}) {
 
   // Add boolean flags
   for (const [key, cliFlag] of Object.entries(FLAG_MAP)) {
-    if (effectiveFlags[key] === true && !mergedArgs.includes(cliFlag)) {
+    if (isEnabled(effectiveFlags[key]) && !mergedArgs.includes(cliFlag)) {
       mergedArgs.push(cliFlag);
     }
   }

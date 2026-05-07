@@ -305,7 +305,11 @@ async function processQueue() {
       }, 'job_updated');
 
       // Create a working copy of modelConfig with resolved exec_mode
-      const effectiveModelConfig = { ...modelConfig, exec_mode: effectiveExecMode };
+      const effectiveModelConfig = {
+        ...modelConfig,
+        exec_mode: effectiveExecMode,
+        effective_memory_flags: effectiveFlags,
+      };
 
       // For other job types, proceed with model-based generation
       switch (job.type) {
@@ -910,7 +914,11 @@ async function processCLIGeneration(job, modelConfig, params, genLogger) {
     // into model args before passing to CLI handler.
     // For server mode this happens in modelManager.startModel(), but CLI mode
     // bypasses startModel() so we must merge here.
-    const mergedArgs = mergeMemoryFlags(modelConfig.args || [], modelConfig);
+    const memoryFlags = modelConfig.effective_memory_flags || {
+      ...modelManager.memoryDefaults,
+      ...(modelConfig.memory_overrides || {}),
+    };
+    const mergedArgs = mergeMemoryFlags(modelConfig.args || [], memoryFlags);
     const configWithMemoryFlags = { ...modelConfig, args: mergedArgs };
 
     // Use CLI handler to generate image, passing generation ID for logging
