@@ -137,6 +137,23 @@ export function getCurrentJob() {
   return currentJob;
 }
 
+export async function cancelActiveGeneration(generationId) {
+  let stopped = cliHandler.cancelGeneration(generationId);
+
+  if (currentJob?.id === generationId && currentModelId) {
+    const modelConfig = modelManager.getModel(currentModelId);
+    if (modelConfig?.exec_mode === ExecMode.SERVER || modelManager.isModelRunning(currentModelId)) {
+      stopped = await modelManager.stopModel(currentModelId, { timeout: 30000 }) || stopped;
+    }
+  }
+
+  if (currentJob?.id === generationId && stopped) {
+    currentJob = null;
+  }
+
+  return stopped;
+}
+
 /**
  * Process the next job in the queue
  */

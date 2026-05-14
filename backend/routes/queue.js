@@ -14,6 +14,7 @@ import {
 import { ensurePngFormat } from '../utils/imageUtils.js';
 import { getInputImagesDir } from '../db/database.js';
 import { authenticateRequest } from '../middleware/auth.js';
+import { cancelActiveGeneration } from '../services/queueProcessor.js';
 
 const logger = createLogger('routes:queue');
 
@@ -266,11 +267,12 @@ export function registerQueueRoutes(app, upload) {
   // Cancel job
   app.delete('/api/queue/:id', authenticateRequest, async (req, res) => {
     try {
+      const processStopped = await cancelActiveGeneration(req.params.id);
       const job = cancelGeneration(req.params.id);
       if (!job) {
         return res.status(404).json({ error: 'Job not found or cannot be cancelled' });
       }
-      res.json({ success: true, job });
+      res.json({ success: true, job, processStopped });
     } catch (error) {
       logger.error({ error }, 'Error cancelling job');
       res.status(500).json({ error: error.message });

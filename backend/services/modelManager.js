@@ -29,6 +29,11 @@ export { ProcessEntry, parseTimeout };
 
 const logger = createLogger('modelManager');
 
+function normalizeTags(tags) {
+  if (!tags) return [];
+  return (Array.isArray(tags) ? tags : [tags]).map(tag => String(tag).toLowerCase());
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -280,6 +285,14 @@ export class ModelManager {
         } else if (!Object.values(ExecMode).includes(modelConfig.exec_mode)) {
           logger.warn({ modelId, execMode: modelConfig.exec_mode }, 'Model has invalid exec_mode, defaulting to auto');
           modelConfig.exec_mode = ExecMode.AUTO;
+        }
+        const modelTags = normalizeTags(modelConfig.tags);
+        if (!modelConfig.backend && modelTags.includes('cpu-only')) {
+          const cpuBackend = this.backendRegistry.findBackendByTag('cpu-only', backend => backend.exec_mode === ExecMode.CLI);
+          if (cpuBackend) {
+            modelConfig.backend = cpuBackend.id;
+            logger.debug({ modelId, backend: cpuBackend.id }, 'Matched cpu-only model tag to backend');
+          }
         }
         // Command is required for SERVER and CLI modes, but not for API mode
         // If backend is specified, command will be inherited from backend preset

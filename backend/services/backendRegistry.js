@@ -29,6 +29,11 @@ import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('backendRegistry');
 
+function normalizeTags(tags) {
+  if (!tags) return [];
+  return (Array.isArray(tags) ? tags : [tags]).map(tag => String(tag).toLowerCase());
+}
+
 /**
  * Maps model file fields to command-line argument flags
  */
@@ -158,6 +163,19 @@ export class BackendRegistry {
     return Array.from(this.backends.values());
   }
 
+  backendHasTag(backendId, tag) {
+    const backend = this.getBackend(backendId);
+    return backend ? normalizeTags(backend.tags).includes(String(tag).toLowerCase()) : false;
+  }
+
+  findBackendByTag(tag, predicate = null) {
+    const normalizedTag = String(tag).toLowerCase();
+    return this.getAllBackends().find(backend => {
+      if (!normalizeTags(backend.tags).includes(normalizedTag)) return false;
+      return predicate ? predicate(backend) : true;
+    }) || null;
+  }
+
   /**
    * Check if a backend exists
    * @param {string} backendId - Backend identifier
@@ -205,6 +223,22 @@ export class BackendRegistry {
         backend: modelConfig.backend 
       }, 'Backend not found, using model config as-is');
       return modelConfig;
+    }
+
+    const modelTags = normalizeTags(modelConfig.tags);
+    const backendTags = normalizeTags(backend.tags);
+    if (backendTags.includes('cpu-only') && !modelTags.includes('cpu-only')) {
+      logger.warn({
+        modelId: modelConfig.id,
+        backend: backend.id,
+        modelTags,
+        backendTags,
+      }, 'CPU-only backend requires model cpu-only tag, using model config as-is');
+      return {
+        ...modelConfig,
+        backend: undefined,
+        command: modelConfig.exec_mode === 'server' ? './bin/sd-server' : './bin/sd-cli',
+      };
     }
 
     // Start with backend configuration

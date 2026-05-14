@@ -444,8 +444,8 @@ export function cancelGeneration(id) {
     return null;
   }
 
-  // Only allow cancelling pending or processing jobs
-  if (generation.status !== GenerationStatus.PENDING && generation.status !== GenerationStatus.PROCESSING) {
+  // Only allow cancelling jobs that have not reached a terminal state.
+  if (![GenerationStatus.PENDING, GenerationStatus.MODEL_LOADING, GenerationStatus.PROCESSING].includes(generation.status)) {
     return null;
   }
 

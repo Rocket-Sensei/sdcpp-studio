@@ -33,6 +33,7 @@ backends:
     command: "./bin/sd-cli"
     exec_mode: "cli"
     mode: "on_demand"
+    tags: ["gpu"]
     base_args:
       - "-v"
     description: "Stable Diffusion CLI for one-shot generation"
@@ -41,6 +42,7 @@ backends:
     command: "./bin/sd-cli-cpu"
     exec_mode: "cli"
     mode: "on_demand"
+    tags: ["cpu-only"]
     base_args:
       - "-v"
     description: "CPU-only Stable Diffusion CLI for oversized local models"

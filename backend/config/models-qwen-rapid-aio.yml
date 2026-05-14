@@ -5,6 +5,7 @@ models:
     enabled: true
     name: "Qwen Rapid AIO NSFW"
     safety: "nsfw"
+    tags: ["cpu-only"]
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     backend: "sd-cli-cpu"
@@ -36,6 +37,7 @@ models:
     enabled: true
     name: "Qwen Rapid AIO SFW"
     safety: "sfw"
+    tags: ["cpu-only"]
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false
     backend: "sd-cli-cpu"

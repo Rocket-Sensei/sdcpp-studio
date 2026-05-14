@@ -94,6 +94,7 @@ function mapStyleToArgs(style) {
 class CLIHandler {
   constructor() {
     this.tempDir = path.join(process.cwd(), 'temp', 'cli-output');
+    this.activeProcesses = new Map();
     this.ensureTempDir();
   }
 
@@ -348,6 +349,8 @@ class CLIHandler {
   executeCommand(command, generationId = null) {
     return new Promise((resolve, reject) => {
       const [cmd, ...args] = command;
+      let settled = false;
+      let killTimeoutHandle = null;
 
       // Get SD.cpp logger with generation context
       const sdCppLogger = getSdCppLogger(generationId);
@@ -357,6 +360,10 @@ class CLIHandler {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: process.env,
       });
+
+      if (generationId) {
+        this.activeProcesses.set(generationId, child);
+      }
 
       let stdout = '';
       let stderr = '';
@@ -406,6 +413,14 @@ class CLIHandler {
       });
 
       child.on('close', (code) => {
+        if (generationId) {
+          this.activeProcesses.delete(generationId);
+        }
+        if (killTimeoutHandle) {
+          clearTimeout(killTimeoutHandle);
+        }
+        if (settled) return;
+        settled = true;
         // Log CLI output with generation ID (summary)
         logCliOutput(stdout, stderr, code, generationId);
 
@@ -421,6 +436,14 @@ class CLIHandler {
       });
 
       child.on('error', (error) => {
+        if (generationId) {
+          this.activeProcesses.delete(generationId);
+        }
+        if (killTimeoutHandle) {
+          clearTimeout(killTimeoutHandle);
+        }
+        if (settled) return;
+        settled = true;
         logCliError(error, generationId);
         reject(new Error(
           `Failed to spawn command: ${error.message}\n` +
@@ -431,7 +454,14 @@ class CLIHandler {
       // Set timeout for command execution (default 5 minutes)
       const timeout = 5 * 60 * 1000;
       const timeoutHandle = setTimeout(() => {
+        if (settled) return;
+        settled = true;
         child.kill('SIGTERM');
+        killTimeoutHandle = setTimeout(() => {
+          if (child.exitCode === null && child.signalCode === null) {
+            child.kill('SIGKILL');
+          }
+        }, 30000);
         reject(new Error(`Command timeout after ${timeout}ms`));
       }, timeout);
 
@@ -439,6 +469,21 @@ class CLIHandler {
         clearTimeout(timeoutHandle);
       });
     });
+  }
+
+  cancelGeneration(generationId) {
+    const child = this.activeProcesses.get(generationId);
+    if (!child || child.killed || child.exitCode !== null) {
+      return false;
+    }
+
+    child.kill('SIGTERM');
+    setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGKILL');
+      }
+    }, 30000);
+    return true;
   }
 
   /**

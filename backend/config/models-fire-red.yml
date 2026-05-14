@@ -6,6 +6,7 @@ models:
     enabled: true
     name: "FireRed Image Edit"
     safety: "sfw"
+    tags: ["cpu-only"]
     quant: "Q4_0"
     capabilities: ["text-to-image", "imgedit"]
     supports_negative_prompt: false

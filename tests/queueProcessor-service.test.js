@@ -132,7 +132,8 @@ vi.mock('../backend/services/imageService.js', () => ({
 
 vi.mock('../backend/services/cliHandler.js', () => ({
   cliHandler: {
-    generateImage: vi.fn()
+    generateImage: vi.fn(),
+    cancelGeneration: vi.fn()
   }
 }));
 
@@ -224,7 +225,7 @@ import { getModelManager, ExecMode, ModelStatus } from '../backend/services/mode
 import { generateImageDirect } from '../backend/services/imageService.js';
 import { cliHandler } from '../backend/services/cliHandler.js';
 import { broadcastQueueEvent, broadcastGenerationComplete } from '../backend/services/websocket.js';
-import { startQueueProcessor, stopQueueProcessor, getCurrentJob, resetQueueProcessorState } from '../backend/services/queueProcessor.js';
+import { startQueueProcessor, stopQueueProcessor, getCurrentJob, resetQueueProcessorState, cancelActiveGeneration } from '../backend/services/queueProcessor.js';
 import { loggedFetch } from '../backend/utils/logger.js';
 
 // Helper to get the mocked model manager instance
@@ -1008,6 +1009,15 @@ describe('Queue Processor - Current Job Tracking', () => {
     startQueueProcessor(100);
 
     await vi.advanceTimersByTimeAsync(150);
+  });
+
+  it('should stop the active CLI process when cancelling the current generation', async () => {
+    cliHandler.cancelGeneration.mockReturnValue(true);
+
+    const stopped = await cancelActiveGeneration('active-job');
+
+    expect(stopped).toBe(true);
+    expect(cliHandler.cancelGeneration).toHaveBeenCalledWith('active-job');
   });
 });
 
